@@ -21,7 +21,10 @@
         </div>
     </div>
     </div>
-    <script src="main.js"></script>
+    <script type="module">
+        import { startVisualGame } from './src/tetris-visual.js';
+        startVisualGame({ msPerRow: 45, lookahead: true });
+</script>
 </body>
 
 </html>

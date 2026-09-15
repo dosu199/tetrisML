@@ -1,0 +1,12 @@
+{
+  "name": "tetris-ml",
+  "version": "0.2.0",
+  "description": "Headless Tetris core, AI search, and a genetic algorithm that learns the evaluation weights",
+  "type": "module",
+  "scripts": {
+    "test": "node bench.js --test",
+    "bench": "node bench.js",
+    "train": "node train.js",
+    "compare": "node compare.js"
+  }
+}
