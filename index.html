@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+    <title>Tetris</title>
+</head>
+
+<body>
+    <div id="wrapper">
+        <div id="gameContainer"></div>
+        <div id="gameStuff">
+            <div id="nextTetromino">
+            </div>
+            <div id="score">
+                <div id="name">Lines cleared:</div>
+                <div id="scoreBoard">0</div>
+            </div>
+        </div>
+    </div>
+    </div>
+    <script type="module">
+  import { startVisualGame } from './src/tetris-visual.js';
+  const { weights } = await fetch('./weights.json').then((r) => r.json());
+  startVisualGame({ weights, msPerRow: 45, lookahead: true, imagePath: 'images/' });
+</script>
+</body>
+
+</html>
