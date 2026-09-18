@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tetris bot - headless core demo</title>
+<style>
+  :root { color-scheme: dark; }
+  body {
+    margin: 0; min-height: 100vh; display: flex; gap: 32px;
+    align-items: flex-start; justify-content: center; padding: 32px;
+    background: #12141c; color: #e6eaf4;
+    font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, sans-serif;
+  }
+  #gameContainer { display: flex; flex-direction: column; background: #0b0d14; }
+  .row { display: flex; }
+  .block {
+    width: 22px; height: 22px; background-size: cover; box-sizing: border-box;
+    border: 1px solid rgba(0,0,0,.35);
+  }
+  aside { min-width: 190px; }
+  h1 { font-size: 15px; margin: 0 0 16px; font-weight: 600; letter-spacing: .01em; }
+  .stat { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid #222634; }
+  .stat span:last-child { font-variant-numeric: tabular-nums; color: #9db2ff; }
+  #nextTetromino { width: 90px; height: 90px; margin-top: 14px; background-size: contain; background-repeat: no-repeat; }
+  p { color: #8b93a8; font-size: 12.5px; }
+  code { background: #1b1f2b; padding: 1px 5px; border-radius: 3px; }
+</style>
+</head>
+<body>
+  <div id="gameContainer"></div>
+  <aside>
+    <h1>Tetris bot</h1>
+    <div class="stat"><span>Score</span><span id="scoreBoard">0</span></div>
+    <div class="stat"><span>Next</span><span></span></div>
+    <div id="nextTetromino"></div>
+    <p style="margin-top:20px">
+      Running the published weights with 2-ply lookahead. Drop your own
+      <code>images/</code> folder next to this file and the sprites appear;
+      without it the fallback colours are used.
+    </p>
+  </aside>
+
+  <script type="module">
+    import { startVisualGame } from './src/tetris-visual.js';
+    startVisualGame({ msPerRow: 45, lookahead: true });
+  </script>
+</body>
+</html>

@@ -1,0 +1,38 @@
+{
+  "weights": [
+    -0.728612701249561,
+    0.24479053154157598,
+    -0.24098940380358078,
+    0.01140592991403511,
+    -0.10831740509428388,
+    -0.36670221976886014,
+    -0.3700604738285208,
+    -0.2604749637539923
+  ],
+  "featureNames": [
+    "aggregateHeight",
+    "linesCleared",
+    "holes",
+    "bumpiness",
+    "maxHeight",
+    "rowTransitions",
+    "colTransitions",
+    "wells"
+  ],
+  "trainFitness": 797.75,
+  "finalMaxPieces": 2000,
+  "generations": 8,
+  "populationSize": 50,
+  "trainSeeds": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+  ],
+  "elapsedSeconds": 210.737,
+  "trainedAt": "2026-09-15T10:13:03.363Z"
+}

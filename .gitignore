@@ -1,0 +1,9 @@
+node_modules/
+*.log
+.DS_Store
+
+# Datasets are large (30MB+) and fully regenerable from collect.js.
+data/*.csv
+
+# weights.json, model.json and value-model.json ARE committed — they are the
+# record of what was learned, and they are small.
