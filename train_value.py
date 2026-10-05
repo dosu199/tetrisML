@@ -32,11 +32,38 @@ parser.add_argument("--model", default="value-model.json")
 parser.add_argument("--hidden", default="128,64")
 parser.add_argument("--max-iter", type=int, default=80)
 parser.add_argument("--seed", type=int, default=42)
+parser.add_argument("--sample", type=int, default=200_000,
+                    help="cap on rows loaded; 0 = all. Guards against running out of memory.")
 args = parser.parse_args()
 
+
+def read_boards(path, sample=0, seed=42):
+    """
+    Read the CSV without letting pandas default every board cell to int64.
+
+    A 640k-row file is 315 MB on disk but would become about 1.2 GB in memory
+    at 8 bytes per cell. Declaring int8 for the cells cuts that by eight, which
+    is the difference between running and being killed on a 4 GB Codespace.
+    """
+    header = pd.read_csv(path, nrows=0).columns
+    dtype = {c: np.int8 for c in header if c.startswith(("a", "b")) and "_" in c}
+    dtype["lines"] = np.int8
+    dtype["target"] = np.float32
+    if "decision_id" in header:
+        dtype["decision_id"] = np.int32
+    frame = pd.read_csv(path, dtype=dtype)
+    if sample and sample < len(frame):
+        frame = frame.sample(sample, random_state=seed)
+        print(f"  subsampled to {sample:,} rows (--sample 0 to use all)")
+    return frame
+
+
 print(f"\nloading {args.data}")
-df = pd.read_csv(args.data)
-X = df.drop(columns=["target"]).to_numpy(dtype=np.float32)
+df = read_boards(args.data, args.sample, args.seed)
+# decision_id groups the candidate boards of one decision together. It is
+# bookkeeping for the ranking trainer, NOT an input - feeding a row counter to
+# the model would let it memorise the training set and learn nothing.
+X = df.drop(columns=[c for c in ("target", "decision_id") if c in df.columns]).to_numpy(np.float32)
 y = df["target"].to_numpy(dtype=np.float32)
 
 print(f"  rows      {len(df):,}")

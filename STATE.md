@@ -1,6 +1,80 @@
 # Project state — resume from here
 
-Last updated: 2026-09-15
+Last updated: 2026-10-05
+
+## CURRENT STATUS (October 2026)
+
+The game runs in the browser. A convolutional value network
+(`cnn-model.json`, 2,129 parameters, 2-ply) plays exactly as well as the
+search bot: 0 losses in 20 games of 2,000 pieces and in 10 games of 5,000
+pieces, same mean lines. See "Phase 2E". Imitation has reached its teacher's
+ceiling; the next step is learning from its own play (RL). `PLAN.md` has the step-by-step version in Bosnian.
+
+The section below is the September record of the repo mix-up and is kept for
+history; it is resolved.
+
+## WHERE WE STOPPED (September — resolved)
+
+All three phases are written, run and measured — but **only in node**. The one
+thing still not done is getting the refactored code running in the browser on
+the real page, and there is a specific mess in the way.
+
+**What happened.** The Phase 1+2 zip was extracted over the repo instead of
+merged into it, and commit `74cdee8` ("implemented phase 2") deleted the
+original game files: `index.html`, `style.css`, `main.js`, `images/`,
+`TetrisAiFinal.rar`. That commit is already pushed. Nothing is lost — they live
+in the parent commit.
+
+**Recovery:**
+
+```bash
+git checkout 74cdee8^ -- index.html style.css images/
+git add -A && git commit -m "Restore original game files" && git push
+```
+
+**Then, the actual integration.** Do NOT write a fresh `index.html`. We tried
+that and the styling did not match, because `style.css` was written for the
+original markup — the old code referenced wrappers like `#content` and `#users`
+that a generic page does not have. Restore the original page and change exactly
+one line in it: replace
+
+```html
+<script src="main.js"></script>
+```
+
+with
+
+```html
+<script type="module">
+  import { startVisualGame } from './src/tetris-visual.js';
+  const { weights } = await fetch('./weights.json').then((r) => r.json());
+  startVisualGame({ weights, msPerRow: 45, lookahead: true, imagePath: 'images/' });
+</script>
+```
+
+and move it to just before `</body>` if it sits in `<head>`.
+
+This works without touching the CSS because `src/tetris-visual.js` builds the
+same DOM the old `createBlocks()` did: `#gameContainer` holding
+`div.row.row_0` … `div.row.row_26`, each with 16 `div.block` children. Same
+class names, same structure.
+
+Serve it with `npx serve .` and open the forwarded port — `type="module"` will
+not load over `file://` or the VS Code preview.
+
+If the styling still fights after that, the next step is to read `style.css`
+and adapt, not to regenerate the page.
+
+**After that is resolved:** delete `main.js`, and the project is fully
+integrated.
+
+**Agent switcher (done).** `startVisualGame` now takes a `chooser` and exposes
+`setChooser()`, `setSpeed()` and an `onStats` callback, so the page can switch
+between the search bot, the regression network and the ranking network live and
+show lines / pieces / games / best. Switching wipes the board, because carrying
+one agent's stack into another's run would make the comparison meaningless.
+The search bot stays the default — the networks are there to be watched, not
+because they play better.
 
 ## The goal
 
@@ -187,12 +261,152 @@ argmax, the metric that matters is error relative to the decision margin, not
 error relative to the target's variance.** A headline metric can look
 outstanding while the model is useless for the decision it was built for.
 
-### What would close the gap
+**C. Pairwise ranking (RankNet)** — same network, same inputs, same inference
+code; only the training objective changes. Instead of "what score does this
+board deserve", the loss asks "of these two boards the bot was choosing
+between, which is better": `L = log(1 + exp(-(f(better) - f(worse))))`.
+Implemented by hand in numpy (`train_rank.py`) — sklearn has no ranking loss
+and PyTorch is a 529 MB dependency for a two-layer network.
 
-Train on *ranking* rather than absolute value — a pairwise loss that only cares
-which of two afterstates is better is optimising the thing the argmax actually
-uses. Failing that, more capacity and far more data, since the residual has to
-drop below ~0.3 before the argmax becomes reliable.
+The result is the most interesting thing in the whole project.
+
+| | all pairs | close pairs | picks bot's best | **lines per game** |
+|---|---|---|---|---|
+| regression (MSE) | 93.9% | 72.2% | 93.8% | 24.2 |
+| ranking (pairwise) | 92.0% | 69.6% | 91.5% | **51.3** |
+
+**Every offline metric prefers regression. The only metric that matters prefers
+ranking, by more than 2×.** Ranking plays at 25.8% of the expert against
+regression's 12.2%.
+
+The explanation is in the agreement numbers. On boards the *expert* reaches —
+the training distribution — regression wins (93.8% vs 91.5%). On boards the
+*network itself* reaches during play, it is the other way round: ranking agrees
+with the expert 50.6% of the time, regression only 36.5%.
+
+So the ranking objective did not produce a more accurate model. It produced one
+that **degrades more gracefully off-distribution**. Freed from having to
+reproduce absolute magnitudes, it learned relative structure that still holds
+on boards it was never trained on — and in a game where every move determines
+what you see next, robustness outside the training distribution beats accuracy
+inside it.
+
+### What this settles, and what it does not
+
+It settles the diagnostic question: the training objective genuinely mattered,
+worth a 2× improvement, so this was not purely a capacity problem.
+
+It does not close the gap — 25.8% is still a long way from the expert. Two
+suspects remain, and they are testable in this order:
+
+**Covariate shift, again.** The value dataset is collected while the *expert*
+drives, so it is all tidy boards. The DAgger fix that helped behaviour cloning
+applies here unchanged: collect value data while the *network* drives, with the
+expert still supplying every label. This is the obvious next experiment and it
+reuses code that already exists.
+
+**Architecture.** A fully-connected network sees 240 unrelated numbers; it has
+no idea the board is a 2D grid. A small convolutional network sees
+neighbourhoods, which is how holes, overhangs and wells are actually defined.
+
+## Phase 2D — 2-ply search with the network, and DAgger (October 2026)
+
+Goal confirmed by the user: a neural network that plays well, not the
+search bot.
+
+**2-ply.** `chooseValueMove(board, piece, net, { next, lookahead, beam })` now
+looks one piece ahead: rank the current piece's moves by 1-ply score, expand
+the top `beam` (default 5), judge each by the best board the next piece can
+reach. ~6 ms per decision in node.
+
+The first version passed the network only the SECOND move's line clears.
+That played at 33.4 lines — a third of 1-ply. Screening variants showed the
+cause: with first-move clears uncredited, the search postponed clearing and
+the stack grew. Crediting both moves (`min(4, lines1 + lines2)`, exactly what
+the Phase 1 bot does) took it to 184.9 lines, 93.2% of the expert, 2 deaths
+in 20. Agreement on its own boards rose from 50.6% to 74.5%.
+
+**DAgger.** `collect_values.js --policy <model> --lookahead --beta 0.5` lets
+the network drive half the pieces (with 2-ply) while the expert labels every
+candidate board. `merge_csv.js` concatenates datasets and shifts
+`decision_id`s so pairs never cross files. One round: 141,702 new rows, merged
+to 213,702, retrained as `rank-dagger.json`.
+
+At a 2,000-piece cap (10 games, seeds 20000+):
+
+| | median | mean | % expert | died | own-board agreement |
+|---|---|---|---|---|---|
+| rank, 2-ply | 679.5 | 527.8 | 66.1% | 6/10 | 75.5% |
+| rank + DAgger, 2-ply | 797.5 | 676.7 | 84.8% | 2/10 | 80.9% |
+| expert | 798 | 798.2 | 100% | 0/10 | — |
+
+The DAgger model at 1-ply barely moved (51.3 → 54.6, noise): the data was
+collected under the 2-ply policy, so it covers the boards the 2-ply player
+reaches. DAgger fixes the distribution of the policy you collected with.
+
+10 games is a small sample; the median matching the expert is the more
+reliable signal than the mean or the death count.
+
+**DAgger round 2.** `rank-dagger.json` drove 70% of pieces (beta 0.3, 2-ply,
+cap 600, seeds 60000+): 208,302 rows, merged to 422,004 / 70,334 decisions,
+retrained 25,000 steps as `rank-dagger2.json`. Re-measured both rounds on 20
+games at a 2,000-piece cap:
+
+| | median | mean | worst | % expert | died | own-board agreement |
+|---|---|---|---|---|---|---|
+| round 1 | 798 | 703.6 | 23 | 88.1% | 4/20 | 80.9% |
+| round 2 | 798 | 762.0 | 339 | 95.4% | 3/20 | 83.0% |
+| expert | 798.5 | 798.4 | 797 | 100% | 0/20 | — |
+
+Gains are shrinking (round 1: +22 points, round 2: +7). The next lever is
+architecture: a small convolutional network.
+
+## Phase 2E — convolutional value network (October 2026)
+
+`train_cnn.py`, numpy only (download.pytorch.org is blocked from the build
+sandbox and the PyPI torch wheel needs multi-GB CUDA libs; numpy also means the
+user's Codespace needs no new dependency).
+
+Architecture: board padded to 26x12 with walls/floor = 1 and sky = 0, plus a
+constant height channel `(25 - paddedRow) / 24`; conv 3x3 2->16 ReLU;
+depthwise 3x3 + pointwise 1x1 16->32 ReLU; average pool over all 240
+positions; [32 pooled, lines] -> 32 ReLU -> 1. 2,129 parameters, no
+per-position weights. Pairwise RankNet loss, Adam, cosine LR decay, 10,000
+steps of 256 pairs on `data/combined2.csv` (~32 min on 2 cores).
+
+`--gradcheck` compares all analytic gradients with central differences in
+float64: worst relative error 6.1e-8.
+
+The test split reproduces train_rank.py's exactly (fresh `default_rng(42)`,
+same shuffle), so the MLP comparison is on decisions neither model trained on.
+An earlier draft used a different split and graded the MLP partly on its own
+training data, flattering it by ~2 points.
+
+| | params | all pairs | close pairs | top-1 |
+|---|---|---|---|---|
+| MLP rank-dagger2 | 94,977 | 95.6% | 78.9% | 96.6% |
+| CNN | 2,129 | 98.9% | 93.7% | 99.1% |
+
+Play, 2-ply beam 5, seeds 20000+:
+
+| | cap | games | mean | worst | died | own-board agreement |
+|---|---|---|---|---|---|---|
+| MLP rank-dagger2 | 2000 | 20 | 762.0 | 339 | 3 | 83.0% |
+| CNN | 2000 | 20 | 798.3 | 797 | 0 | 91.2% |
+| expert | 2000 | 20 | 798.4 | 797 | 0 | — |
+| CNN | 5000 | 10 | 1998.3 | 1997 | 0 | — |
+| expert | 5000 | 10 | 1998.3 | 1998 | 0 | — |
+
+JS inference (`loadCnnNet` in tetris-policy.js): conv1's constant parts (bias,
+height channel, walls, floor) are precomputed into a base map; per board only
+filled cells are scattered in. Rows more than two above the stack are
+identical to an empty board (5x5 receptive field), so their pooled
+contribution is precomputed as a running total by row and skipped. ~87 us per
+evaluation, ~10-17 ms per 2-ply decision. `cnn-model.json` carries five boards
+with Python scores; the JS loader verifies them and throws on mismatch.
+
+Both caps are now saturated for both players. Further comparisons need longer
+games or harder conditions.
 
 ## Decisions already made (don't relitigate)
 
@@ -247,13 +461,16 @@ for all 27 rows on every frame.
 
 ## Open items
 
-**The browser version has not been confirmed by a human yet.** It passes a
-fake-DOM smoke test in node (builds 432 blocks, plays, clears lines, updates
-the score element), but nobody has opened it in a real browser. This is the
-first thing to do.
+**The browser version still does not run.** See "Where we stopped" at the top —
+this is the live blocker. The code passes a fake-DOM smoke test in node (builds
+432 blocks, plays, clears lines, updates the score element), so the renderer
+logic is sound; what is unresolved is the page and CSS integration.
 
-`main.js` still exists in the repo and is superseded. Delete once the above is
-confirmed.
+`main.js` is superseded by `src/`. Delete it once the browser version works.
+
+Datasets (`data/*.csv`, ~123 MB) are gitignored and not in the repo. Regenerate
+with `collect.js` and `collect_values.js` when needed — the commands are under
+"How to reproduce Phase 2".
 
 The demo training run used `--ceiling 2000` to finish in three minutes. The
 default ceiling is 20,000, which keeps selection pressure on far longer and

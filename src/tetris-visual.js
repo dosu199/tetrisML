@@ -126,9 +126,9 @@ export class Renderer {
 
 export function startVisualGame(options = {}) {
   let weights = options.weights || PUBLISHED_WEIGHTS;
+  let msPerRow = options.msPerRow ?? 40;
   const {
     seed = Date.now() & 0xffff,
-    msPerRow = 40,
     lookahead = true,
     imagePath = 'images/',
     containerId = 'gameContainer',
@@ -150,6 +150,23 @@ export function startVisualGame(options = {}) {
   let score = 0;
   let lines = 0;
 
+  // Stats that survive a game ending, so the page can show what an agent is
+  // actually worth over several games rather than one lucky or unlucky run.
+  let games = 1;
+  let pieces = 0;
+  let bestLines = 0;
+  let totalLines = 0;
+
+  /**
+   * Who decides where the piece goes. Swappable at runtime, which is the whole
+   * point: the search bot, the regression network and the ranking network all
+   * satisfy the same signature, so you can watch them play the same game.
+   *
+   *   (board, currentPiece, nextPiece) -> { rotation, col, row } | null
+   */
+  let chooser =
+    options.chooser || ((b, c, n) => chooseMove(b, c, n, weights, { lookahead }));
+
   let active = null; // { rotation, row, col }
   let accumulator = 0;
   let lastTime = 0;
@@ -161,10 +178,21 @@ export function startVisualGame(options = {}) {
 
   function showScore() {
     if (scoreBoard) scoreBoard.innerHTML = String(score);
+    options.onStats?.({
+      score,
+      lines,
+      pieces,
+      games,
+      bestLines,
+      avgLines: totalLines / Math.max(games - 1, 1),
+      finishedGames: games - 1,
+    });
   }
 
   function spawn() {
-    const move = chooseMove(board, current, next, weights, { lookahead });
+    // A network chooser returns no score field; only the search bot does, and
+    // -Infinity is its way of saying every remaining move loses.
+    const move = chooser(board, current, next);
     if (move === null || move.score === -Infinity) return false;
     active = {
       rotation: PIECES[current].rotations[move.rotation],
@@ -175,13 +203,23 @@ export function startVisualGame(options = {}) {
     return true;
   }
 
-  function reset() {
+  function reset(hard = false) {
+    if (hard) {
+      games = 1;
+      bestLines = 0;
+      totalLines = 0;
+    } else {
+      totalLines += lines;
+      if (lines > bestLines) bestLines = lines;
+      games++;
+    }
     board = createBoard();
-    bag = new Bag((Date.now() & 0xffff) + 1);
+    bag = new Bag((Date.now() & 0xffff) + games);
     current = bag.next();
     next = bag.next();
     score = 0;
     lines = 0;
+    pieces = 0;
     active = null;
     showScore();
   }
@@ -203,13 +241,14 @@ export function startVisualGame(options = {}) {
 
     // landed
     placePiece(board, active.rotation, active.row, active.col);
+    pieces++;
     const cleared = clearLines(board);
     if (cleared > 0) {
       lines += cleared;
       // classic scoring: a quadruple is worth far more than four singles
       score += [0, 40, 100, 300, 1200][cleared];
-      showScore();
     }
+    showScore();
     active = null;
     current = next;
     next = bag.next();
@@ -241,6 +280,18 @@ export function startVisualGame(options = {}) {
     setWeights(w) {
       weights = w;
     },
-    stats: () => ({ score, lines }),
+    /**
+     * Swap the agent mid-session. The board is wiped and the counters reset,
+     * because carrying a stack built by one agent into another's run would
+     * make the comparison meaningless.
+     */
+    setChooser(fn) {
+      chooser = fn;
+      reset(true);
+    },
+    setSpeed(ms) {
+      msPerRow = ms;
+    },
+    stats: () => ({ score, lines, pieces, games, bestLines }),
   };
 }

@@ -41,6 +41,10 @@ const games = Number(flag('games', 20));
 const cap = Number(flag('cap', 500));
 const valueFile = flag('value', null);
 const modelFile = flag('model', 'model.json');
+// --lookahead lets a value network see the next piece too (2-ply), and --beam
+// says how many of the best first moves to look ahead from.
+const netLookahead = argv.includes('--lookahead');
+const beam = Number(flag('beam', 5));
 
 // Two ways to use a network here. --model is the behaviour-cloned policy that
 // names a move directly. --value is the afterstate scorer: we enumerate the
@@ -48,7 +52,7 @@ const modelFile = flag('model', 'model.json');
 const model = JSON.parse(readFileSync(valueFile ?? modelFile, 'utf8'));
 const policy = valueFile ? loadValueNet(model) : loadPolicy(model);
 const chooseCloned = valueFile
-  ? (b, c) => chooseValueMove(b, c, policy)
+  ? (b, c, n) => chooseValueMove(b, c, policy, { next: n, lookahead: netLookahead, beam })
   : (b, c, n) => choosePolicyMove(b, c, n, policy);
 
 let weights = PUBLISHED_WEIGHTS;
@@ -100,11 +104,18 @@ console.log(`\nthe cloned policy, playing for itself`);
 console.log(`-------------------------------------`);
 console.log(`model      ${valueFile ?? modelFile}  (${valueFile ? 'value network, scores afterstates' : 'cloned policy, names the move'})`);
 console.log(`           ${model.hidden?.join(' x ') ?? '?'} hidden units, trained on ${model.trainRows?.toLocaleString()} rows`);
+const pct = (v) => `${(v * 100).toFixed(1)}%`;
 console.log(
   valueFile
-    ? `reported   test R2 ${model.testR2.toFixed(3)}`
-    : `reported   ${(model.testAccuracy * 100).toFixed(1)}% test accuracy, ${(model.top3Accuracy * 100).toFixed(1)}% top-3`
+    ? model.rankAccuracy != null
+      ? `reported   ${pct(model.rankAccuracy)} pair accuracy, ${pct(model.closePairAccuracy)} on close pairs, ` +
+        `picks the bot's best ${pct(model.top1Accuracy)} of the time`
+      : `reported   test R2 ${model.testR2.toFixed(3)}`
+    : `reported   ${pct(model.testAccuracy)} test accuracy, ${pct(model.top3Accuracy)} top-3`
 );
+if (valueFile) {
+  console.log(`search     ${netLookahead ? `2-ply, beam ${beam} (network sees the next piece)` : '1-ply (current piece only)'}`);
+}
 console.log(`games      ${games} on seeds 20000+, ${cap}-piece cap\n`);
 
 const expert = playWith((b, c, n) => {
