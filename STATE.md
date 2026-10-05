@@ -408,6 +408,30 @@ with Python scores; the JS loader verifies them and throws on mismatch.
 Both caps are now saturated for both players. Further comparisons need longer
 games or harder conditions.
 
+## Hard modes (October 2026)
+
+`playEpisode(chooser, seed, { cap, randomizer: 'bag'|'memoryless', preview,
+garbageEvery })` in tetris-core.js; `MemorylessGen`; `addGarbageRow`.
+`hardmode.js` benchmarks the bot vs a network. No preview disables 2-ply for
+both players (next = null). 10 games, cap 2000, seeds 20000+:
+
+| mode | bot mean pieces / died | CNN mean pieces / died |
+|---|---|---|
+| normal | 2000 / 0 | 2000 / 0 |
+| memoryless | 2000 / 0 | 2000 / 0 |
+| no-preview | 2000 / 0 | 1974 / 1 |
+| memoryless + no-preview | 2000 / 0 | 1444 / 6 |
+| garbage every 5 | 216 / 10 | 236 / 10 |
+
+Memoryless alone does not separate them. Without preview the CNN breaks and
+the bot does not: the CNN's parity relied on 2-ply search, and it was trained
+only on 7-bag games, so the rule change is out of distribution. The
+hand-designed linear evaluation transfers; the learned one does not. Garbage
+is the only mode where both lose, and there they are roughly level.
+
+`collect_rollouts.js` (rollout-based policy iteration for step 6) is written
+but has NOT been run or tested yet; it is not in the user's repo.
+
 ## Decisions already made (don't relitigate)
 
 Kept the original 16×27 board with the 3-cell frame. The frame is why collision

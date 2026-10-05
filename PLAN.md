@@ -70,6 +70,49 @@ Offline, na istim test-odlukama:
 
 ---
 
+## Teži režimi — izmjereno
+
+Na običnim pravilima bot i CNN uvijek prežive, pa se ne mogu porediti. Zato
+`hardmode.js` oduzima dio pomoći. 10 partija po igraču, do 2.000 figura,
+2 poteza unaprijed gdje postoji pogled na sljedeću figuru:
+
+| režim | bot prosjek figura | bot umro | CNN prosjek figura | CNN umrla |
+|---|---|---|---|---|
+| normalno (7-bag, vidi sljedeću) | 2000 | 0/10 | 2000 | 0/10 |
+| nasumični generator, vidi sljedeću | 2000 | 0/10 | 2000 | 0/10 |
+| 7-bag, **ne vidi** sljedeću | 2000 | 0/10 | 1974 | 1/10 |
+| **nasumični + ne vidi sljedeću** | **2000** | **0/10** | **1444** | **6/10** |
+| garbage svakih 5 figura | 216 | 10/10 | 236 | 10/10 |
+
+Šta to znači:
+
+**Nasumični generator sam po sebi ne pomaže.** Obje strane i dalje prežive
+sve, kako je literatura i predviđala.
+
+**Bez pogleda na sljedeću figuru mreža se lomi, a bot ne.** U najtežem
+režimu bot preživi svih 10 partija, a mreža umre u 6. Mreža je bila jednaka
+botu samo zato što je imala pretragu na 2 poteza da joj pokrije greške, i
+zato što je trenirana isključivo na 7-bag partijama. Botova ručno smišljena
+funkcija se prenosi na nove uslove; naučena mreža ne. To je opet pomak
+distribucije, ovaj put u **pravilima igre**, ne u pločama.
+
+**Garbage je jedini režim gdje obje strane gube**, i tu su otprilike
+izjednačene (236 prema 216 u prosjeku, ali medijan je obrnut, 214 prema 228 —
+unutar šuma za 10 partija).
+
+### Odluka za korak 6 — tvoja
+
+- **Garbage svakih 5:** obje strane umiru, partije su kratke (brzo za
+  eksperimente), i ima mjesta da mreža postane bolja od bota.
+- **Nasumični + bez pogleda:** ovdje je mreža jasno slabija od bota. Cilj bi
+  prvo bio da ga dostigne (DAgger u tom režimu), a tek onda da ga nadmaši —
+  ali bot ovdje ne umire, pa „bolje od bota" ne bi bilo vidljivo do duže kape.
+
+```bash
+node hardmode.js --value cnn-model.json --games 10 --cap 2000
+node hardmode.js --mode memoryless-no-preview --games 20
+```
+
 ## Šta smo naučili — konvolucija
 
 **Prava pretpostavka vrijedi više od parametara.** CNN ima 45 puta manje

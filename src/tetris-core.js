@@ -345,3 +345,97 @@ export function columnHeights(board, out = new Int32Array(PLAY_COLS)) {
   }
   return out;
 }
+
+/* ------------------------------------------------------------- hard mode */
+
+/**
+ * Pushes a "garbage" row in from the bottom: a full row with one hole, the
+ * way multiplayer Tetris punishes you for your opponent's clears. Everything
+ * on the board moves up one row.
+ *
+ * Why it exists: on a normal 7-bag game both the search bot and the CNN
+ * survive 5,000+ pieces every time, so they cannot be told apart, and a
+ * learner has no failures to learn from. Garbage makes every game end
+ * eventually, and makes how LONG you last a real, measurable skill.
+ *
+ * The row is stored as FRAME (8): it counts as filled everywhere (collision,
+ * features, the networks' inputs) and renders grey.
+ *
+ * Returns false if a block was already in the top row - pushing it off the
+ * board is a top-out.
+ */
+export function addGarbageRow(board, holeCol) {
+  let overflow = false;
+  for (let c = PLAY_LEFT; c <= PLAY_RIGHT; c++) if (board[idx(0, c)] !== 0) overflow = true;
+  for (let r = 0; r < PLAY_BOTTOM; r++) {
+    for (let c = PLAY_LEFT; c <= PLAY_RIGHT; c++) board[idx(r, c)] = board[idx(r + 1, c)];
+  }
+  for (let c = PLAY_LEFT; c <= PLAY_RIGHT; c++) {
+    board[idx(PLAY_BOTTOM, c)] = c - PLAY_LEFT === holeCol ? 0 : FRAME;
+  }
+  return !overflow;
+}
+
+/**
+ * Memoryless piece generator: every piece is drawn uniformly and independently.
+ * This is the classic NES-style randomiser. Unlike the 7-bag it gives NO
+ * guarantees - you can get four S pieces in a row, or wait 30 pieces for an I.
+ */
+export class MemorylessGen {
+  constructor(seed) {
+    this.rand = mulberry32(seed);
+  }
+  next() {
+    return Math.floor(this.rand() * PIECES.length);
+  }
+}
+
+/**
+ * One full game with any chooser, under a chosen rule set. The hard-mode
+ * benchmark and the RL trainer both use this, so they measure the same game.
+ *
+ *   chooser(board, current, next) -> { rotation, col, row } | null
+ *   opts:
+ *     cap           stop after this many pieces
+ *     randomizer    'bag' (7-bag, default) or 'memoryless'
+ *     preview       true = the chooser sees the next piece; false = it gets
+ *                   null and has to decide on the current piece alone
+ *     garbageEvery  0 = off; N = a garbage row rises every N pieces
+ *
+ * Every random stream is derived from the seed, so two agents on the same
+ * seed face exactly the same pieces and the same garbage.
+ */
+export function playEpisode(
+  chooser,
+  seed,
+  { cap = 500, garbageEvery = 0, randomizer = 'bag', preview = true } = {}
+) {
+  const board = createBoard();
+  const gen = randomizer === 'memoryless' ? new MemorylessGen(seed) : new Bag(seed);
+  const holes = mulberry32(seed * 7 + 12345);
+  let current = gen.next();
+  let next = gen.next();
+  let lines = 0;
+  let pieces = 0;
+  let died = false;
+
+  while (pieces < cap) {
+    const move = chooser(board, current, preview ? next : null);
+    if (move === null || move.score === -Infinity) {
+      died = true;
+      break;
+    }
+    placePiece(board, PIECES[current].rotations[move.rotation], move.row, move.col);
+    lines += clearLines(board);
+    pieces++;
+    if (garbageEvery > 0 && pieces % garbageEvery === 0) {
+      if (!addGarbageRow(board, Math.floor(holes() * PLAY_COLS))) {
+        died = true;
+        break;
+      }
+    }
+    current = next;
+    next = gen.next();
+  }
+  return { lines, pieces, died };
+}

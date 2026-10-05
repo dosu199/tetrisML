@@ -103,7 +103,11 @@ function playWith(chooser) {
 console.log(`\nthe cloned policy, playing for itself`);
 console.log(`-------------------------------------`);
 console.log(`model      ${valueFile ?? modelFile}  (${valueFile ? 'value network, scores afterstates' : 'cloned policy, names the move'})`);
-console.log(`           ${model.hidden?.join(' x ') ?? '?'} hidden units, trained on ${model.trainRows?.toLocaleString()} rows`);
+console.log(
+  model.kind === 'value-cnn'
+    ? `           convolutional network, ${model.params?.toLocaleString()} parameters, trained on ${model.trainRows?.toLocaleString()} pairs`
+    : `           ${model.hidden?.join(' x ') ?? '?'} hidden units, trained on ${model.trainRows?.toLocaleString()} rows`
+);
 const pct = (v) => `${(v * 100).toFixed(1)}%`;
 console.log(
   valueFile
