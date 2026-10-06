@@ -35,7 +35,8 @@ const flag = (n, d) => {
 
 const games = Number(flag('games', 10));
 const cap = Number(flag('cap', 2000));
-const valueFile = flag('value', 'cnn-model.json');
+// One or more networks, comma-separated: --value cnn-hard.json,cnn-big.json
+const valueFiles = flag('value', 'cnn-model.json').split(',').filter(Boolean);
 const only = flag('mode', null);
 // Use fresh seeds for a decisive test, so no earlier result can bias the
 // choice of games. 20000+ is the default; collection used 30000-85000+.
@@ -53,7 +54,6 @@ let weights = PUBLISHED_WEIGHTS;
 try {
   weights = JSON.parse(readFileSync('weights.json', 'utf8')).weights;
 } catch {}
-const net = loadValueNet(JSON.parse(readFileSync(valueFile, 'utf8')));
 
 // next === null when there is no preview; both choosers then search 1-ply.
 const players = {
@@ -61,8 +61,12 @@ const players = {
     const m = chooseMove(b, c, n, weights, { lookahead: n != null });
     return m && m.score !== -Infinity ? m : null;
   },
-  network: (b, c, n) => chooseValueMove(b, c, net, { next: n, lookahead: n != null }),
 };
+for (const file of valueFiles) {
+  const net = loadValueNet(JSON.parse(readFileSync(file, 'utf8')));
+  const name = file.replace(/\.json$/, '');
+  players[name] = (b, c, n) => chooseValueMove(b, c, net, { next: n, lookahead: n != null });
+}
 
 const median = (xs) => {
   const s = [...xs].sort((a, b) => a - b);
@@ -70,10 +74,10 @@ const median = (xs) => {
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 };
 
-console.log(`\nhard-mode benchmark: bot vs ${valueFile}`);
+console.log(`\nhard-mode benchmark: bot vs ${valueFiles.join(', ')}`);
 console.log(`${games} games per player per mode, seeds ${seedBase}+, cap ${cap} pieces\n`);
-console.log('  mode                    player     pieces med   pieces mean   lines mean   topped out   time');
-console.log('  ----------------------  -------    ----------   -----------   ----------   ----------   ----');
+console.log('  mode                    player        pieces med   pieces mean   lines mean   topped out   time');
+console.log('  ----------------------  ----------    ----------   -----------   ----------   ----------   ----');
 
 for (const [mode, opts] of Object.entries(MODES)) {
   if (only && mode !== only) continue;
@@ -84,7 +88,7 @@ for (const [mode, opts] of Object.entries(MODES)) {
     const pcs = r.map((x) => x.pieces);
     const lines = r.map((x) => x.lines);
     console.log(
-      `  ${mode.padEnd(22)}  ${name.padEnd(7)}    ${String(median(pcs)).padStart(10)}   ` +
+      `  ${mode.padEnd(22)}  ${name.padEnd(10)}    ${String(median(pcs)).padStart(10)}   ` +
         `${(pcs.reduce((a, b) => a + b, 0) / games).toFixed(1).padStart(11)}   ` +
         `${(lines.reduce((a, b) => a + b, 0) / games).toFixed(1).padStart(10)}   ` +
         `${`${r.filter((x) => x.died).length}/${games}`.padStart(10)}   ${((Date.now() - t0) / 1000).toFixed(0)}s`

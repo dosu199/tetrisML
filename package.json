@@ -1,12 +1,16 @@
 {
   "name": "tetris-ml",
-  "version": "0.2.0",
-  "description": "Headless Tetris core, AI search, and a genetic algorithm that learns the evaluation weights",
+  "version": "0.3.0",
+  "description": "Headless Tetris core, a genetic algorithm for the evaluation weights, and convolutional value networks trained by imitation and DAgger",
   "type": "module",
   "scripts": {
     "test": "node bench.js --test",
     "bench": "node bench.js",
     "train": "node train.js",
-    "compare": "node compare.js"
+    "compare": "node compare.js",
+    "test:cnn": "python3 train_cnn.py --gradcheck",
+    "hard:quick": "node hardmode.js --value cnn-hard.json,cnn-big.json --games 10 --seed 90000 --mode memoryless-no-preview",
+    "hard:full": "node hardmode.js --value cnn-hard.json,cnn-big.json --games 50 --seed 90000 --mode memoryless-no-preview",
+    "hard:all-modes": "node hardmode.js --value cnn-hard.json,cnn-big.json --games 10 --cap 2000"
   }
 }

@@ -9,7 +9,77 @@ ovo je kratka verzija s konkretnim koracima.
 
 ---
 
-## Gdje smo sada (6. oktobar)
+## Gdje smo sada (6. oktobar, nakon veće CNN)
+
+**Veća CNN nije donijela značajan napredak — i to je koristan odgovor.**
+Usko grlo nije veličina mreže. Sljedeće ulaganje ide u podatke iz teškog
+režima (DAgger) ili u učenje iz vlastite igre, ne u arhitekturu.
+
+### Tri mreže, iste partije
+
+Nasumični generator + bez pogleda, **50 svježih partija** (seed 90000+):
+
+| | parametara | prosjek figura | medijan | umrlo |
+|---|---|---|---|---|
+| bot | — | 1878 | 2000 | **9/50** |
+| `cnn-model.json` (stara) | 2.129 | 1499 | 1749 | 29/50 |
+| `cnn-hard.json` | 2.129 | 1598 | 2000 | 22/50 |
+| **`cnn-big.json`** | **7.329** | **1716** | **2000** | **18/50** |
+
+Garbage svakih 5, 20 partija (sve strane umiru; prosjek preživljenih figura):
+
+| bot | stara | cnn-hard | cnn-big |
+|---|---|---|---|
+| 239,8 (medijan 240) | 227,6 | 235,8 | **250,3** (medijan 228,5) |
+
+Normalna igra, 20 partija do 500 figura, 2 poteza: cnn-big 198,5 linija,
+0 izgubljenih — jednako botu, ništa nije pokvareno.
+
+Offline (iste test-odluke): cnn-hard 98,9% / 93,9% / 99,1%, cnn-big
+99,0% / 94,1% / 99,0% — praktično identično.
+
+### Kako ovo čitati
+
+- **Trend je u korist veće mreže svuda** (18 prema 22 izgubljene, 250 prema
+  236 u garbage-u), ali **nijedna razlika nije statistički značajna**
+  (18 vs 22 od 50: p ≈ 0,4). Offline su identične.
+- **Zaključak: kapacitet nije usko grlo.** 3,4 puta više parametara daje
+  najviše mali pomak. Mreža već bira botov potez u 99% pozicija; preostale
+  greške nisu problem „premale glave".
+- Prvi put je neka mreža imala **veći prosjek od bota** (garbage, 250 prema
+  240) — ali medijan je niži (228,5 prema 240), pa je to najvjerovatnije šum.
+- Cijena: cnn-big je 3–4 puta sporija (oko 14 ms po odluci bez pogleda,
+  50–65 ms sa 2 poteza). U browseru se ne primijeti.
+
+### Preporuka
+
+`cnn-big.json` kao glavna mreža za eksperimente — nigdje nije gora i trend
+je pozitivan. `cnn-hard.json` ostaje kao brža alternativa.
+
+### Kako testirati
+
+```bash
+npm test                 # 26 testova igre
+npm run test:cnn         # provjera backpropa CNN-a
+npm run hard:quick       # bot vs cnn-hard vs cnn-big, 10 partija (~5 min)
+npm run hard:full        # isto, 50 partija na seed 90000+ (~30 min)
+npm run hard:all-modes   # svih 5 režima, 10 partija
+```
+
+### Sljedeći korak
+
+Pošto veća mreža nije rješenje, preostaju dvije poluge:
+
+1. **Treći krug DAgger-a u teškom režimu**, s `cnn-big.json` kao vozačem.
+   Gađa direktno pozicije u kojima mreža griješi. Cilj: s 18 na blizu 9.
+2. **Korak 6 — učenje iz vlastite igre.** Jedini put da mreža pređe bota.
+   `collect_rollouts.js` je napisan, ali nikad testiran.
+
+---
+
+## Prethodni krug — cnn-hard (6. oktobar, ujutro)
+
+
 
 **Trening u teškom režimu je pomogao, ali manje nego što je prvi test
 pokazivao, i mreža je i dalje jasno slabija od bota u tom režimu.**
@@ -294,6 +364,8 @@ async function chooserFor(kind) {
     rank: './rank-model.json',
     dagger: './rank-dagger2.json',
     cnn: './cnn-model.json',
+    hard: './cnn-hard.json',
+    big: './cnn-big.json',
   };
   nets[kind] ??= loadValueNet(await json(files[kind]));
   const net = nets[kind];
@@ -306,6 +378,8 @@ I dodaj opciju u `<select id="agent">`:
 ```html
 <option value="dagger">Ranking mreza + DAgger, 2 poteza</option>
 <option value="cnn">Konvolucijska mreza (CNN), 2 poteza</option>
+<option value="hard">CNN trenirana i u teskom rezimu</option>
+<option value="big">Veca CNN (7.329 parametara)</option>
 ```
 
 Jedna odluka traje 6 ms za MLP i oko 10–17 ms za CNN, pa igra u browseru radi

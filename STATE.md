@@ -474,6 +474,30 @@ regression anywhere, probable gain in hard mode); keep cnn-model.json.
 
 hardmode.js now takes `--seed`. Use >= 50 games on fresh seeds for decisions.
 
+## Bigger CNN — capacity test (October 6)
+
+`cnn-big.json`: C1=32, C2=64, H=64, 7,329 parameters, trained FROM SCRATCH on
+`data/combined3.csv`, 8,000 steps, lr 2e-3, ~44 min (288 ms/step vs 148 for
+the small net). Offline on the same test decisions: 99.0% / 94.1% / 99.0%,
+vs cnn-hard 98.9% / 93.9% / 99.1%.
+
+Memoryless + no preview, 50 fresh games (seeds 90000+), mean / median /
+died: bot 1877.5 / 2000 / 9; cnn-model 1498.8 / 1749 / 29; cnn-hard
+1597.9 / 2000 / 22; cnn-big 1715.6 / 2000 / 18. 18 vs 22: z ~0.8, p ~0.4.
+Garbage5, 20 games, mean pieces: bot 239.8 (median 240), cnn-model 227.6,
+cnn-hard 235.8, cnn-big 250.3 (median 228.5). Normal, 20 games cap 500,
+2-ply: cnn-big 198.5 lines, 0 deaths.
+
+Conclusion: capacity is not the bottleneck. Trend favours the bigger net
+everywhere, nothing is significant, and offline accuracy is unchanged. The
+remaining hard-mode gap (18 vs 9 of 50) should be attacked with hard-mode
+data (DAgger round 3, cnn-big driving) or own-play learning (step 6).
+
+JS cost: ~14 ms per 1-ply decision, 50-65 ms per 2-ply decision (vs ~4 / ~12
+for the small net). hardmode.js now accepts several networks
+(`--value a.json,b.json`) and `--seed`; npm scripts hard:quick / hard:full /
+hard:all-modes / test:cnn added.
+
 ## Decisions already made (don't relitigate)
 
 Kept the original 16×27 board with the 3-cell frame. The frame is why collision
