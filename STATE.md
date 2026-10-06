@@ -432,6 +432,48 @@ is the only mode where both lose, and there they are roughly level.
 `collect_rollouts.js` (rollout-based policy iteration for step 6) is written
 but has NOT been run or tested yet; it is not in the user's repo.
 
+## PAUSED HERE (October 5) — hard-mode DAgger for the CNN
+
+Added `--memoryless` / `--no-preview` to collect_values.js and `--init` to
+train_cnn.py. Collected DAgger data with the CNN driving 50%:
+`data/hard1.csv` (213,516 rows, memoryless + no preview, seeds 80000+),
+`data/hard2.csv` (108,000 rows, 7-bag + no preview, seeds 85000+); merged with
+combined2 into `data/combined3.csv` (743,520 rows / 123,920 decisions).
+Fine-tuned from cnn-model.json, 6,000 steps, lr 1e-3 -> `cnn-hard.json`.
+Offline metrics unchanged (98.9% / 93.9% / 99.1%).
+
+10 games, cap 2000 (mean pieces / died): memoryless+no-preview bot 2000/0,
+old CNN 1444/6, cnn-hard 1868/2; no-preview bot 2000/0, old 1974/1, cnn-hard
+1975/2; garbage5 bot 216, old 236, cnn-hard 199 (possible regression or
+noise; no garbage data in the fine-tuning set); normal: all 2000/0.
+
+Interrupted 20-game run, memoryless+no-preview: bot 1898 / 4 of 20 died, old
+CNN 1456 / 11 of 20; garbage5 bot 239.8. cnn-hard 20-game numbers were not
+reached. Note the bot also loses in this mode at n=20 — n=10 hid it.
+
+Not yet packaged; nothing from this round is in the user's repo.
+Next: finish 20-game checks for cnn-hard, decide whether it replaces
+cnn-model.json, package, then step 6. collect_rollouts.js remains untested.
+
+## Hard-mode DAgger — results (October 6)
+
+20 games, seeds 20000+, memoryless + no preview: bot 1898 / 4 died, old CNN
+1456 / 11, cnn-hard 1711 / 7. The first 10 of these are the earlier 10-game
+test, so on games 11-20 the two CNNs died equally often (5 each).
+
+50 fresh games, seeds 90000+ (never used anywhere), same mode:
+bot 1877.5 mean / 2000 median / 9 died; old CNN 1498.8 / 1749 / 29;
+cnn-hard 1597.9 / 2000 / 22. Two-proportion z for 29 vs 22: ~1.4 (p ~0.16);
+pooled with the 20-game set (40/70 vs 29/70): z ~1.9 (p ~0.06).
+
+Garbage5, 20 games: bot 239.8, old CNN 227.6, cnn-hard 235.8 — the 10-game
+"regression" (199) was noise.
+
+Decision recommended: adopt cnn-hard.json as the main network (no measured
+regression anywhere, probable gain in hard mode); keep cnn-model.json.
+
+hardmode.js now takes `--seed`. Use >= 50 games on fresh seeds for decisions.
+
 ## Decisions already made (don't relitigate)
 
 Kept the original 16×27 board with the 3-cell frame. The frame is why collision

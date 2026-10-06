@@ -42,6 +42,7 @@ import {
   copyBoard,
   placements,
   mulberry32,
+  MemorylessGen,
 } from './src/tetris-core.js';
 import { chooseMove, evaluate, PUBLISHED_WEIGHTS } from './src/tetris-ai.js';
 import {
@@ -65,6 +66,11 @@ const seedBase = Number(flag('seed', 30000));
 const policyFile = flag('policy', null);
 const beta = Number(flag('beta', 0.5));
 const netLookahead = argv.includes('--lookahead');
+// Rule changes for hard-mode data. --memoryless swaps the 7-bag for
+// independent random pieces; --no-preview hides the next piece from the
+// network driver, so it plays 1-ply exactly as it would in that mode.
+const memoryless = argv.includes('--memoryless');
+const noPreview = argv.includes('--no-preview');
 
 let weights = PUBLISHED_WEIGHTS;
 if (existsSync('weights.json')) weights = JSON.parse(readFileSync('weights.json', 'utf8')).weights;
@@ -78,6 +84,9 @@ if (policyFile) {
   );
 } else {
   console.log('expert drives every piece');
+}
+if (memoryless || noPreview) {
+  console.log(`rules: ${memoryless ? 'memoryless pieces' : '7-bag'}, ${noPreview ? 'no preview' : 'preview'}`);
 }
 
 const rand = mulberry32(seedBase * 31 + 99);
@@ -95,7 +104,7 @@ let decisionId = 0;
 
 for (let g = 0; g < games; g++) {
   const board = createBoard();
-  const bag = new Bag(seedBase + g);
+  const bag = memoryless ? new MemorylessGen(seedBase + g) : new Bag(seedBase + g);
   let current = bag.next();
   let next = bag.next();
 
@@ -129,7 +138,11 @@ for (let g = 0; g < games; g++) {
     // Who actually moves decides which boards we see next - nothing else.
     let played = expert;
     if (net && rand() >= beta) {
-      played = chooseValueMove(board, current, net, { next, lookahead: netLookahead }) ?? expert;
+      played =
+        chooseValueMove(board, current, net, {
+          next: noPreview ? null : next,
+          lookahead: netLookahead && !noPreview,
+        }) ?? expert;
       networkMoves++;
     } else {
       expertMoves++;
@@ -161,6 +174,6 @@ if (net) {
 console.log(`file       ${outFile} (${(Buffer.byteLength(rows.join('\n')) / 1e6).toFixed(1)} MB)`);
 console.log(
   net
-    ? `\nnext: node merge_csv.js data/values.csv ${outFile} --out data/combined.csv\n`
+    ? `\nnext: node merge_csv.js <your current training csv> ${outFile} --out data/combined-new.csv\n`
     : `\nnext: python3 train_rank.py --data ${outFile}\n`
 );

@@ -68,6 +68,8 @@ parser.add_argument("--lr", type=float, default=2e-3)
 parser.add_argument("--sample", type=int, default=0)
 parser.add_argument("--seed", type=int, default=42)
 parser.add_argument("--gradcheck", action="store_true")
+parser.add_argument("--init", default=None,
+                    help="start from an existing cnn-model.json instead of random weights (fine-tuning)")
 args = parser.parse_args()
 
 rng = np.random.default_rng(args.seed)
@@ -298,6 +300,15 @@ def top1(s):
 # ===================================================================== train
 
 p = init_params(args.c1, args.c2, args.h)
+if args.init:
+    # Fine-tuning: keep everything the network already knows and continue
+    # training on the new, larger dataset. Faster than starting over, and the
+    # old skills are a head start rather than something to re-learn.
+    with open(args.init) as f:
+        _old = json.load(f)
+    for k in p:
+        p[k] = np.array(_old[k], dtype=np.float32).reshape(p[k].shape)
+    print(f"  initialised from {args.init}")
 n_params = sum(v.size for v in p.values())
 m = {k: np.zeros_like(v) for k, v in p.items()}
 v = {k: np.zeros_like(v) for k, v in p.items()}

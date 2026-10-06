@@ -37,6 +37,9 @@ const games = Number(flag('games', 10));
 const cap = Number(flag('cap', 2000));
 const valueFile = flag('value', 'cnn-model.json');
 const only = flag('mode', null);
+// Use fresh seeds for a decisive test, so no earlier result can bias the
+// choice of games. 20000+ is the default; collection used 30000-85000+.
+const seedBase = Number(flag('seed', 20000));
 
 const MODES = {
   normal: { randomizer: 'bag', preview: true, garbageEvery: 0 },
@@ -68,7 +71,7 @@ const median = (xs) => {
 };
 
 console.log(`\nhard-mode benchmark: bot vs ${valueFile}`);
-console.log(`${games} games per player per mode, seeds 20000+, cap ${cap} pieces\n`);
+console.log(`${games} games per player per mode, seeds ${seedBase}+, cap ${cap} pieces\n`);
 console.log('  mode                    player     pieces med   pieces mean   lines mean   topped out   time');
 console.log('  ----------------------  -------    ----------   -----------   ----------   ----------   ----');
 
@@ -77,7 +80,7 @@ for (const [mode, opts] of Object.entries(MODES)) {
   for (const [name, chooser] of Object.entries(players)) {
     const t0 = Date.now();
     const r = [];
-    for (let g = 0; g < games; g++) r.push(playEpisode(chooser, 20000 + g, { cap, ...opts }));
+    for (let g = 0; g < games; g++) r.push(playEpisode(chooser, seedBase + g, { cap, ...opts }));
     const pcs = r.map((x) => x.pieces);
     const lines = r.map((x) => x.lines);
     console.log(

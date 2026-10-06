@@ -9,6 +9,60 @@ ovo je kratka verzija s konkretnim koracima.
 
 ---
 
+## Gdje smo sada (6. oktobar)
+
+**Trening u teškom režimu je pomogao, ali manje nego što je prvi test
+pokazivao, i mreža je i dalje jasno slabija od bota u tom režimu.**
+
+`cnn-hard.json` = CNN dodatno trenirana na DAgger podacima iz režima bez
+pogleda na sljedeću figuru (nasumični generator i 7-bag), 6.000 koraka iz
+`cnn-model.json`, na `data/combined3.csv` (743.520 redova).
+
+Nasumični generator + bez pogleda, umrlo partija:
+
+| test | bot | stari CNN | cnn-hard |
+|---|---|---|---|
+| 10 partija (seed 20000+) | 0/10 | 6/10 | 2/10 |
+| 20 partija (seed 20000+) | 4/20 | 11/20 | 7/20 |
+| **50 novih partija (seed 90000+)** | **9/50** | **29/50** | **22/50** |
+
+Prosjek figura na 50 novih: bot 1878, stari CNN 1499, cnn-hard 1598.
+Medijan: bot 2000, stari 1749, cnn-hard 2000.
+
+Ostali režimi, cnn-hard nije pokvario ništa:
+
+| režim | bot | stari CNN | cnn-hard |
+|---|---|---|---|
+| normalno, 10 partija | 2000 / 0 umrlo | 2000 / 0 | 2000 / 0 |
+| garbage svakih 5, 20 partija (prosjek figura) | 239,8 | 227,6 | 235,8 |
+
+### Lekcija iz ovog kruga: veličina uzorka
+
+Na 10 partija poboljšanje je izgledalo ogromno (6 → 2 umrle). Na 20 je druga
+polovina pokazala nula razlike. Na 50 svježih partija ostalo je umjereno
+poboljšanje (29 → 22). Garbage „pogoršanje" s 10 partija (236 → 199) je na 20
+partija nestalo (228 → 236). **Prvi test je izabrao sretne partije; svaki veći
+test je vratio rezultat prema stvarnoj vrijednosti.** Statistički, 29 → 22
+od 50 je na granici (p ≈ 0,16 samo za taj test; ≈ 0,06 kad se spoje svih 70
+partija), ali smjer je isti u oba nezavisna testa i medijan je porastao.
+
+### Odluka
+
+Preporuka: **koristiti `cnn-hard.json` kao glavnu mrežu.** Nigdje nije gora, a
+u teškom režimu je vjerovatno bolja. `cnn-model.json` ostaje kao rezerva.
+
+### Sljedeći koraci
+
+1. Teški režim i dalje zaostaje za botom (22 prema 9 od 50). Opcije:
+   još jedan krug DAgger-a u tom režimu s `cnn-hard.json` kao vozačem, ili
+   veća CNN (`--c1 32 --c2 64`) trenirana ispočetka na `combined3.csv`.
+2. Korak 6 — učenje iz vlastite igre (`collect_rollouts.js`, još netestiran).
+
+Za svaku buduću odluku: **najmanje 50 partija, na svježim seedovima**
+(`node hardmode.js --seed 90000 --games 50 ...`).
+
+---
+
 ## Gdje smo stali
 
 **Konvolucijska neuronska mreža (`cnn-model.json`, 2 poteza) igra jednako dobro
