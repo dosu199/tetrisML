@@ -4,11 +4,6 @@ A neural network that learns to play Tetris by playing it. Nobody shows it
 good moves; it only gets the game's reward. There is also a classic search bot
 to measure it against.
 
-The approach follows
-[vietnh1009/Tetris-deep-Q-learning-pytorch](https://github.com/vietnh1009/Tetris-deep-Q-learning-pytorch),
-rewritten in plain JavaScript. It needs no PyTorch or Python, and the same
-code trains in node and plays in the browser.
-
 ## How the network plays
 
 For each new piece:
@@ -89,50 +84,6 @@ Training writes over `dqn-model.json`, so use `--out` to keep the old one
 (for example `--out dqn-try2.json`). You can then compare the two networks in
 one run:
 `node hardmode.js --model dqn-model.json,dqn-try2.json --games 50 --seed 90000`.
-
-## Watching it play in the browser
-
-In `index.html`, replace your current game `<script type="module">` with:
-
-```html
-<select id="agent">
-  <option value="dqn">Neural network (DQN)</option>
-  <option value="bot">Bot (search)</option>
-</select>
-<div id="agentStats"></div>
-
-<script type="module">
-  import { startVisualGame } from './src/tetris-visual.js';
-  import { chooseMove } from './src/tetris-ai.js';
-  import { loadDqn, chooseDqnMove } from './src/tetris-dqn.js';
-
-  const json = (f) => fetch(f).then((r) => r.json());
-  const weights = (await json('./weights.json')).weights;
-  const net = loadDqn(await json('./dqn-model.json'));
-
-  const choosers = {
-    dqn: (board, cur) => chooseDqnMove(board, cur, net),
-    bot: (board, cur, next) => chooseMove(board, cur, next, weights, { lookahead: true }),
-  };
-
-  const statsEl = document.getElementById('agentStats');
-  const game = startVisualGame({
-    chooser: choosers.dqn,
-    msPerRow: 45,
-    imagePath: 'images/',
-    onStats: (s) => {
-      statsEl.textContent = `game ${s.games} · lines ${s.lines} · pieces ${s.pieces} · best ${s.bestLines} lines`;
-    },
-  });
-
-  document.getElementById('agent').addEventListener('change', (e) => {
-    game.setChooser(choosers[e.target.value]);
-  });
-</script>
-```
-
-`type="module"` scripts do not load over `file://`. In a Codespace, run
-`npx serve .` and open the forwarded port.
 
 ## History
 

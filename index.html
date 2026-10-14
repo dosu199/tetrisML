@@ -31,48 +31,38 @@
         </div>
     </div>
     </div>
-    <script type="module">
+    <select id="agent">
+  <option value="dqn">Neural network (DQN)</option>
+  <option value="bot">Bot (search)</option>
+</select>
+<div id="agentStats"></div>
+
+<script type="module">
   import { startVisualGame } from './src/tetris-visual.js';
   import { chooseMove } from './src/tetris-ai.js';
-  import { loadValueNet, chooseValueMove } from './src/tetris-policy.js';
+  import { loadDqn, chooseDqnMove } from './src/tetris-dqn.js';
 
   const json = (f) => fetch(f).then((r) => r.json());
   const weights = (await json('./weights.json')).weights;
+  const net = loadDqn(await json('./dqn-model.json'));
 
-  const nets = {};
-  async function chooserFor(kind) {
-  if (kind === 'search') {
-    return (b, c, n) => chooseMove(b, c, n, weights, { lookahead: true });
-  }
-  const files = {
-    value: './value-model.json',
-    rank: './rank-model.json',
-    dagger: './rank-dagger.json',
+  const choosers = {
+    dqn: (board, cur) => chooseDqnMove(board, cur, net),
+    bot: (board, cur, next) => chooseMove(board, cur, next, weights, { lookahead: true }),
   };
-  nets[kind] ??= loadValueNet(await json(files[kind]));
-  const net = nets[kind];
-  return (b, c, n) => chooseValueMove(b, c, net, { next: n, lookahead: true });
-}
 
-  const statsBox = document.getElementById('agentStats');
+  const statsEl = document.getElementById('agentStats');
   const game = startVisualGame({
-    weights,
+    chooser: choosers.dqn,
     msPerRow: 45,
-    lookahead: true,
     imagePath: 'images/',
     onStats: (s) => {
-      statsBox.textContent =
-        `linije: ${s.lines}   figure: ${s.pieces}   partija: ${s.games}` +
-        `   najbolje: ${s.bestLines}` +
-        (s.finishedGames ? `   prosjek: ${s.avgLines.toFixed(1)}` : '');
+      statsEl.textContent = `game ${s.games} · lines ${s.lines} · pieces ${s.pieces} · best ${s.bestLines} lines`;
     },
   });
 
-  const select = document.getElementById('agent');
-  select.addEventListener('change', async () => {
-    select.disabled = true;
-    game.setChooser(await chooserFor(select.value));
-    select.disabled = false;
+  document.getElementById('agent').addEventListener('change', (e) => {
+    game.setChooser(choosers[e.target.value]);
   });
 </script>
 </body>
