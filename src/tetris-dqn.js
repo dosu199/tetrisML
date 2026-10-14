@@ -1,0 +1,234 @@
+/**
+ * tetris-dqn.js - the neural network that plays, and the code to run it.
+ *
+ * The approach follows vietnh1009/Tetris-deep-Q-learning-pytorch, rewritten
+ * here in plain JavaScript so it needs no PyTorch and runs in the browser:
+ *
+ *   1. For the current piece, try every rotation x column.
+ *   2. For each resulting board, compute 4 numbers:
+ *        lines cleared, holes, bumpiness, total height
+ *   3. A small neural network (4 -> 64 -> 64 -> 1) turns those 4 numbers into
+ *      one score: "how good is this board for the rest of the game".
+ *   4. Play the move with the highest score.
+ *
+ * The network learns that score by itself, from the game's reward - see
+ * train_dqn.js. Nobody tells it what a good board looks like.
+ *
+ * No DOM access in this file, so the same code trains in node and plays in
+ * the browser.
+ */
+
+import { PIECES, copyBoard, placePiece, clearLines, placements } from './tetris-core.js';
+import { extractFeatures } from './tetris-ai.js';
+
+/* ----------------------------------------------------------------- state */
+
+export const STATE_NAMES = ['linesCleared', 'holes', 'bumpiness', 'totalHeight'];
+export const STATE_SIZE = STATE_NAMES.length;
+
+const scratch = new Float64Array(8);
+
+/** The 4 numbers the network sees, for a board after a move. */
+export function boardState(board, linesCleared, out = new Float64Array(STATE_SIZE)) {
+  // extractFeatures gives 8 features; the DQN uses these 4, in this order.
+  const f = extractFeatures(board, linesCleared, scratch);
+  out[0] = f[1]; // lines cleared by the move
+  out[1] = f[2]; // holes
+  out[2] = f[3]; // bumpiness
+  out[3] = f[0]; // total (aggregate) height
+  return out;
+}
+
+/** Every legal move for a piece, with the board it produces and its state. */
+export function nextStates(board, pieceIdx) {
+  const out = [];
+  for (const move of placements(board, pieceIdx)) {
+    const after = copyBoard(board);
+    placePiece(after, PIECES[pieceIdx].rotations[move.rotation], move.row, move.col);
+    const lines = clearLines(after);
+    out.push({ move, board: after, lines, state: boardState(after, lines) });
+  }
+  return out;
+}
+
+/* ---------------------------------------------------------------- network */
+
+/**
+ * A plain multi-layer perceptron with ReLU between layers, plus the backward
+ * pass and Adam optimiser needed to train it. Small enough to read in one go:
+ * a forward pass is "multiply by a matrix, add a bias, ReLU, repeat".
+ */
+export class MLP {
+  constructor(sizes, rand = Math.random) {
+    this.sizes = sizes;
+    this.W = []; // W[l] is sizes[l] x sizes[l+1], row-major
+    this.b = [];
+    for (let l = 0; l < sizes.length - 1; l++) {
+      const nIn = sizes[l];
+      const nOut = sizes[l + 1];
+      // Xavier-uniform initialisation, same as the reference implementation
+      const limit = Math.sqrt(6 / (nIn + nOut));
+      const w = new Float64Array(nIn * nOut);
+      for (let i = 0; i < w.length; i++) w[i] = (rand() * 2 - 1) * limit;
+      this.W.push(w);
+      this.b.push(new Float64Array(nOut));
+    }
+    this.t = 0;
+    this.mW = this.W.map((w) => new Float64Array(w.length));
+    this.vW = this.W.map((w) => new Float64Array(w.length));
+    this.mb = this.b.map((b) => new Float64Array(b.length));
+    this.vb = this.b.map((b) => new Float64Array(b.length));
+  }
+
+  /** Score one input vector. */
+  predict(x) {
+    let a = x;
+    for (let l = 0; l < this.W.length; l++) {
+      const nIn = this.sizes[l];
+      const nOut = this.sizes[l + 1];
+      const out = new Float64Array(nOut);
+      const W = this.W[l];
+      for (let j = 0; j < nOut; j++) out[j] = this.b[l][j];
+      for (let i = 0; i < nIn; i++) {
+        const xi = a[i];
+        if (xi === 0) continue;
+        const row = i * nOut;
+        for (let j = 0; j < nOut; j++) out[j] += xi * W[row + j];
+      }
+      if (l < this.W.length - 1) for (let j = 0; j < nOut; j++) if (out[j] < 0) out[j] = 0;
+      a = out;
+    }
+    return a[0];
+  }
+
+  /**
+   * One gradient step on a batch, minimising mean squared error between the
+   * network's outputs and `targets`. X is a flat array of batch x inputs.
+   * Returns the loss before the step.
+   */
+  trainStep(X, targets, lr) {
+    const B = targets.length;
+    const L = this.W.length;
+
+    // forward, keeping every layer's activations
+    const acts = [X];
+    for (let l = 0; l < L; l++) {
+      const nIn = this.sizes[l];
+      const nOut = this.sizes[l + 1];
+      const W = this.W[l];
+      const prev = acts[l];
+      const out = new Float64Array(B * nOut);
+      for (let n = 0; n < B; n++) {
+        const o = n * nOut;
+        for (let j = 0; j < nOut; j++) out[o + j] = this.b[l][j];
+        for (let i = 0; i < nIn; i++) {
+          const xi = prev[n * nIn + i];
+          if (xi === 0) continue;
+          const row = i * nOut;
+          for (let j = 0; j < nOut; j++) out[o + j] += xi * W[row + j];
+        }
+        if (l < L - 1) for (let j = 0; j < nOut; j++) if (out[o + j] < 0) out[o + j] = 0;
+      }
+      acts.push(out);
+    }
+
+    // loss and its gradient with respect to the output
+    const pred = acts[L];
+    let loss = 0;
+    let grad = new Float64Array(B);
+    for (let n = 0; n < B; n++) {
+      const d = pred[n] - targets[n];
+      loss += d * d;
+      grad[n] = (2 * d) / B;
+    }
+    loss /= B;
+
+    // backward: the chain rule, layer by layer
+    const gW = [];
+    const gb = [];
+    for (let l = L - 1; l >= 0; l--) {
+      const nIn = this.sizes[l];
+      const nOut = this.sizes[l + 1];
+      const prev = acts[l];
+      const W = this.W[l];
+      const dW = new Float64Array(nIn * nOut);
+      const db = new Float64Array(nOut);
+      const dPrev = new Float64Array(B * nIn);
+      for (let n = 0; n < B; n++) {
+        for (let j = 0; j < nOut; j++) {
+          const g = grad[n * nOut + j];
+          if (g === 0) continue;
+          db[j] += g;
+          for (let i = 0; i < nIn; i++) {
+            dW[i * nOut + j] += prev[n * nIn + i] * g;
+            dPrev[n * nIn + i] += W[i * nOut + j] * g;
+          }
+        }
+      }
+      // ReLU of the layer below lets gradient through only where it was > 0
+      if (l > 0) for (let k = 0; k < dPrev.length; k++) if (prev[k] <= 0) dPrev[k] = 0;
+      gW[l] = dW;
+      gb[l] = db;
+      grad = dPrev;
+    }
+
+    // Adam
+    this.t++;
+    const b1 = 0.9;
+    const b2 = 0.999;
+    const c1 = 1 - b1 ** this.t;
+    const c2 = 1 - b2 ** this.t;
+    for (let l = 0; l < L; l++) {
+      for (const [p, g, m, v] of [
+        [this.W[l], gW[l], this.mW[l], this.vW[l]],
+        [this.b[l], gb[l], this.mb[l], this.vb[l]],
+      ]) {
+        for (let k = 0; k < p.length; k++) {
+          m[k] = b1 * m[k] + (1 - b1) * g[k];
+          v[k] = b2 * v[k] + (1 - b2) * g[k] * g[k];
+          p[k] -= (lr * (m[k] / c1)) / (Math.sqrt(v[k] / c2) + 1e-8);
+        }
+      }
+    }
+    return loss;
+  }
+
+  toJSON() {
+    return {
+      kind: 'dqn',
+      state: STATE_NAMES,
+      sizes: this.sizes,
+      W: this.W.map((w) => Array.from(w)),
+      b: this.b.map((b) => Array.from(b)),
+    };
+  }
+
+  static fromJSON(json) {
+    const net = new MLP(json.sizes, () => 0.5);
+    net.W = json.W.map((w) => Float64Array.from(w));
+    net.b = json.b.map((b) => Float64Array.from(b));
+    return net;
+  }
+}
+
+/* ------------------------------------------------------------------ play */
+
+/** Load a trained model (dqn-model.json). */
+export function loadDqn(json) {
+  if (json.kind !== 'dqn') throw new Error(`not a DQN model (kind: ${json.kind})`);
+  return MLP.fromJSON(json);
+}
+
+/** The network's move for this piece, or null if no move fits (game over). */
+export function chooseDqnMove(board, pieceIdx, net) {
+  let best = null;
+  let bestScore = -Infinity;
+  for (const s of nextStates(board, pieceIdx)) {
+    const v = net.predict(s.state);
+    if (v > bestScore) {
+      bestScore = v;
+      best = s.move;
+    }
+  }
+  return best;
+}

@@ -1,226 +1,144 @@
-# Phase 0 — headless Tetris core
+# Tetris ML
 
-Your game logic, pulled out of `main()` and off the DOM, so a learning
-algorithm can play millions of pieces against it. Everything here is a
-refactor of code you already wrote; no new game features, no framework, no
-change to your board layout (still 16×27 with the 3-cell frame).
+A neural network that learns to play Tetris by playing it. Nobody shows it
+good moves; it only gets the game's reward. There is also a classic search bot
+to measure it against.
 
-Verified: 26 sanity tests pass, plus a fake-DOM smoke test of the renderer.
+The approach follows
+[vietnh1009/Tetris-deep-Q-learning-pytorch](https://github.com/vietnh1009/Tetris-deep-Q-learning-pytorch),
+rewritten in plain JavaScript. It needs no PyTorch or Python, and the same
+code trains in node and plays in the browser.
 
-## Baseline numbers
+## How the network plays
 
-Measured on this machine with your published weights and a 500-piece cap:
+For each new piece:
 
-| | 1-ply (training) | 2-ply (playing) |
-|---|---|---|
-| median lines / game | 196 | 199 |
-| topped out | 0 of 100 | 0 of 20 |
-| throughput | **11.7 games/s** (5,841 pieces/s) | 0.5 games/s |
+1. Try every rotation in every column.
+2. For each resulting board, compute 4 numbers: **lines cleared, holes,
+   bumpiness, total height**.
+3. The network (4 → 64 → 64 → 1, about 4,500 weights) turns those 4 numbers
+   into one score: how good this board is for the rest of the game.
+4. Play the move with the highest score.
 
-The theoretical maximum is 200 lines in 500 pieces (four cells per piece, ten
-per row), so the search is running at about 98% efficiency — that is the
-evidence that the placement enumeration is now correct.
+## How it learns (deep Q-learning)
 
-A typical GA run of 50 candidates × 5 seeds × 40 generations is about 10,000
-games, which is **roughly 14 minutes single-threaded**. Rendered at your
-current speed that same run would have taken months. That factor is the entire
-reason for this phase.
+- **Reward** per piece: `1 + 10 × lines²`. Surviving earns a little and clearing
+  lines earns a lot. A tetris (4 lines) is worth 16× a single.
+- **Target** (the Bellman equation):
+  `score(previous board) ≈ reward + 0.99 × score(new board)`, or just the
+  reward if the game ended. Repeat this over thousands of moves and value flows
+  backwards from line clears and deaths to the moves that caused them.
+- **Exploration**: at first it plays at random (epsilon 1). Epsilon falls to
+  0.001 over 2,000 games, so by the end it almost always picks its best move.
+- **Replay memory**: the last 30,000 moves. After every game it takes one
+  training step on a random batch of 512 of them.
+- **Best checkpoint**: DQN does not improve steadily. It climbs, then often
+  collapses. Every 100 games, `train_dqn.js` plays 5 test games with no
+  exploration and saves the network only when it beats the best so far. In our
+  run the final network survived 144 pieces on average while the saved best
+  survived about 1,900. So always use the saved best network, never the final
+  one.
 
-## Bugs fixed
+## Results
 
-**The simulation was mutating the live game.** `calculateBestTetrominoPostion`
-called `breakeRowsForAi(gameBoard, ...)` — the real board from the closure,
-not `aiGameBoard`. Since that function deletes rows in place, every candidate
-placement the AI considered was clearing rows out of the game you were
-watching, and reporting the line count of the wrong board. There is now a
-regression test (`chooseMove leaves the real board untouched`) that fails if
-this ever comes back.
+50 games each on seeds 90000+ (never seen in training), capped at 2,000 pieces:
 
-**Most placements were never evaluated.** `aiCurrentTetrominoPosition.x` was
-never reset between columns, so after the first drop it held the landing row
-and every later column started its drop buried inside the stack, hitting the
-`if (collision) { y -= 1; continue; }` branch and being skipped. Columns are
-now enumerated directly from the piece's width.
+| mode | player | mean pieces | mean lines | topped out |
+|---|---|---|---|---|
+| no preview, 7-bag | bot (search) | 1970.6 | 783.0 | 1/50 |
+| no preview, 7-bag | **DQN** | **1902.4** | **753.0** | **5/50** |
+| no preview, random pieces | bot (search) | 1877.5 | 741.8 | 9/50 |
+| no preview, random pieces | **DQN** | **783.1** | **294.9** | **43/50** |
 
-**Bumpiness measured the wrong quantity.** `numberOfBlocksInOneColumn` counts
-filled *cells*; bumpiness needs column *heights*. The two are equal only on a
-board with no holes — that is, only on boards where bumpiness matters least.
-
-**`checkHorizontalWallCollision` did nothing.** It tested
-`aIGameBoard[pos.x][pos.y + 1]` without adding `i` and `j`, so the nested
-loops checked the same single cell sixteen times. It happened not to break
-because of the 3-wide frame. Replaced by direct column bounds.
-
-**The piece didn't always land where the AI decided.** `gameSpeed = 10` once
-`x >= 4` started the fast drop whether or not the piece had finished rotating
-and sliding, so a piece with far to travel could land somewhere that was never
-evaluated. For a learning agent this is fatal: the move you score has to be
-the move you made. The piece now takes its chosen rotation and column
-immediately and then falls.
-
-Also: the unused `tetromi` object (whose `S` was an O piece), the
-`oneTetrominoSack[34]` magic numbers, the duplicated `while (rowsToBeBroken > 0)`
-block in `breakeRows` that re-cleared rows and double-counted score, and the
-`querySelectorAll` call for all 27 rows on every frame.
-
-## Two deliberate behaviour changes
-
-The piece randomiser is now a standard **7-bag** (shuffle all seven, deal them
-out, repeat) instead of the five-array sack. The old one could deal the same
-piece many times in a row, which adds variance that makes two weight vectors
-hard to tell apart.
-
-The board is a flat `Uint8Array` instead of an array of arrays. Cell `(r, c)`
-is `board[r * WIDTH + c]`. Copying the board is the hottest operation in the
-search — thousands of copies per piece — and `board.slice()` is far faster
-than the nested loops in `copyBoard`.
+With the normal 7-bag generator the network is close to the hand-tuned bot. It
+learned this in about 5 minutes, from nothing but the reward. With fully
+random pieces it is much weaker, because it never saw that generator in
+training (it trained on 7-bag only). The DQN decides from the current piece
+alone, so whether you show it the next piece makes no difference.
 
 ## Files
 
 ```
-src/tetris-core.js       board, pieces, seeded 7-bag, collision, drop, line clears
-src/tetris-ai.js         8 features, evaluation, 1-ply and 2-ply search
-src/tetris-headless.js   playGame(weights, seed) and evaluateWeights()  ← Phase 1 calls this
+src/tetris-core.js       board, pieces, 7-bag, collision, line clears, playEpisode()
+src/tetris-dqn.js        the network: 4 features, MLP with backprop + Adam, chooseDqnMove()
+src/tetris-ai.js         8 features + search bot (the opponent)
 src/tetris-visual.js     the only file that touches the DOM
-bench.js                 sanity tests + benchmark
-demo.html                standalone demo page (your own index.html is untouched)
+src/tetris-headless.js   fast games for the genetic algorithm
+src/ga.js, ga-worker.js  genetic algorithm for the bot's weights
+train_dqn.js             trains the network        -> dqn-model.json
+hardmode.js              bot vs network, 5 rule modes
+test_dqn.js              gradient check + smoke test for the network
+bench.js                 26 tests for the game core
+train.js / compare.js    genetic algorithm for the bot -> weights.json
 ```
 
-`tetris-core`, `tetris-ai` and `tetris-headless` never mention `document` or
-`window`, which is why the same code runs in node and in the browser.
-
-## Running it
+## Commands
 
 ```bash
-node bench.js --test     # 26 tests
-node bench.js            # tests, then the benchmark
-npx serve .              # then open demo.html or index.html
+npm test                 # 26 core tests + the DQN checks
+node train_dqn.js        # train a new network, about 5 minutes -> dqn-model.json
+node hardmode.js         # bot vs network in all 5 modes, 10 games each
+node hardmode.js --model dqn-model.json --games 50 --seed 90000 --mode no-preview
+npx serve .              # then open index.html in the browser
 ```
 
-`type="module"` scripts will not load over `file://`. In a Codespace, run
-`npx serve .` and open the forwarded port — the VS Code file preview is not
-enough.
+Training options (all have defaults): `--epochs 3000 --decay 2000 --batch 512
+--lr 1e-3 --gamma 0.99 --memory 30000 --seed 123 --out dqn-model.json`.
 
-## Wiring it into your existing page
+Training writes over `dqn-model.json`, so use `--out` to keep the old one
+(for example `--out dqn-try2.json`). You can then compare the two networks in
+one run:
+`node hardmode.js --model dqn-model.json,dqn-try2.json --games 50 --seed 90000`.
 
-Drop `src/`, `bench.js`, `package.json` and `demo.html` into your project root
-next to `index.html`, `style.css` and `images/`. Then in your `index.html`,
-replace the line that loads the old script:
+## Watching it play in the browser
+
+In `index.html`, replace your current game `<script type="module">` with:
 
 ```html
-<!-- remove -->
-<script src="main.js"></script>
+<select id="agent">
+  <option value="dqn">Neural network (DQN)</option>
+  <option value="bot">Bot (search)</option>
+</select>
+<div id="agentStats"></div>
 
-<!-- add -->
 <script type="module">
   import { startVisualGame } from './src/tetris-visual.js';
-  startVisualGame({ msPerRow: 45, lookahead: true });
+  import { chooseMove } from './src/tetris-ai.js';
+  import { loadDqn, chooseDqnMove } from './src/tetris-dqn.js';
+
+  const json = (f) => fetch(f).then((r) => r.json());
+  const weights = (await json('./weights.json')).weights;
+  const net = loadDqn(await json('./dqn-model.json'));
+
+  const choosers = {
+    dqn: (board, cur) => chooseDqnMove(board, cur, net),
+    bot: (board, cur, next) => chooseMove(board, cur, next, weights, { lookahead: true }),
+  };
+
+  const statsEl = document.getElementById('agentStats');
+  const game = startVisualGame({
+    chooser: choosers.dqn,
+    msPerRow: 45,
+    imagePath: 'images/',
+    onStats: (s) => {
+      statsEl.textContent = `game ${s.games} · lines ${s.lines} · pieces ${s.pieces} · best ${s.bestLines} lines`;
+    },
+  });
+
+  document.getElementById('agent').addEventListener('change', (e) => {
+    game.setChooser(choosers[e.target.value]);
+  });
 </script>
 ```
 
-That is the only change to your HTML, and `style.css` needs none at all: the
-renderer builds the same `#gameContainer > .row.row_N > .block` structure your
-`createBlocks()` did, and writes to `#scoreBoard` and `#nextTetromino` the
-same way. Sprite filenames are unchanged too (`red.png` … `purple.png`,
-`nextRed.png` … `nextPurple.png`), so `images/` is untouched. If your sprites
-live elsewhere, pass `imagePath`.
+`type="module"` scripts do not load over `file://`. In a Codespace, run
+`npx serve .` and open the forwarded port.
 
-`main.js` is fully replaced — rename it to `main.old.js` until you have the
-new version running in the browser, then delete it.
+## History
 
-## Phase 1 — the genetic algorithm (done)
-
-```bash
-node train.js                 # 50 candidates, 40 generations
-node train.js --population 50 --generations 8 --workers 2 --ceiling 2000
-node compare.js --games 20 --cap 10000
-```
-
-`train.js` writes `weights.json` and `training-log.csv`. `compare.js` scores
-the learned weights against the published ones on seeds starting at 10,000 —
-games that were never used in training, which is the same discipline as the
-train/test split from your course.
-
-### What a real run looked like
-
-50 candidates, 8 generations, two cores, 211 seconds, starting from completely
-random weights:
-
-| gen | best | median | mean | cap |
-|---|---|---|---|---|
-| 1 | 164.8 | 0.3 | 16.1 | 500 |
-| 2 | 196.5 | 11.0 | 54.2 | 500 |
-| 3 | 197.0 | 99.8 | 108.1 | 500 |
-| 4 | 396.8 | 365.9 | 287.4 | 1000 ← raised |
-| 5 | 797.5 | 794.1 | 711.4 | 2000 ← raised |
-| 8 | 797.8 | 796.5 | 796.0 | 2000 |
-
-Held out, 10 games at a 10,000-piece cap:
-
-| | median | mean | worst game | topped out |
-|---|---|---|---|---|
-| published | 3994.5 | 3330.0 | 558 | 2 |
-| learned | 3995.0 | **3914.5** | **3420** | 2 |
-
-Read that carefully, because it is the interesting part. The medians are
-identical — both sets of weights reach the cap on a typical game, so the median
-has saturated and stopped measuring anything. The difference is in
-**consistency**: the learned weights average 17.6% more lines and their worst
-game was 3,420 lines against 558. The GA did not find a higher ceiling; it
-found weights that fall apart far less often.
-
-It also disagreed with the published weights about *why*. It weights
-`aggregateHeight` much more heavily (-0.73 vs -0.51), cares far less about
-`linesCleared` (0.24 vs 0.76), and put real weight on three features the
-published vector ignores entirely — `rowTransitions`, `colTransitions` and
-`wells` all came out around -0.3. Surface smoothness, measured as transitions,
-turns out to matter more than the original four features could express.
-
-### Things that will bite you
-
-**Fitness saturates.** Once most of the population reaches the cap, every
-candidate scores the same and selection pressure vanishes — learning silently
-stops. The cap doubles automatically when the population median passes 90% of
-the physical ceiling (0.4 lines per piece), which is what the "cap raised"
-rows above are. Each raise re-scores the whole population, so those generations
-take much longer.
-
-**Use the same seeds for every candidate.** Different seeds means you are
-ranking luck, and the population converges on whoever drew friendly pieces.
-
-**The default ceiling is 20,000 pieces.** The run above used `--ceiling 2000`
-to finish in three minutes. Letting it go to the default keeps selection
-pressure on for far longer and produces better weights, but expect the last
-generations to take several minutes each.
-
-## Playing with the learned weights
-
-```html
-<script type="module">
-  import { startVisualGame } from './src/tetris-visual.js';
-  const { weights } = await fetch('./weights.json').then((r) => r.json());
-  startVisualGame({ weights, msPerRow: 45, lookahead: true });
-</script>
-```
-
-## Phase 2 starts here
-
-The GA learned eight numbers. Phase 2 learns the *function* instead, and it is
-the phase that uses your Udemy course directly.
-
-The idea is behaviour cloning: let the Phase 1 bot play thousands of games and
-log every decision — the board state before the move, and the placement it
-chose. That is a labelled dataset, and everything after that is ordinary
-supervised learning of exactly the kind the course covers. Load it with pandas,
-split train and test, fit a model in scikit-learn, then a small network in
-Keras, and measure both how closely it reproduces the bot's choices and how
-well the resulting agent actually plays.
-
-Two things make this a genuinely good exercise rather than busywork. The
-dataset is one you generated, so you understand every column. And there is a
-real question to answer at the end: a network that predicts the bot's move 95%
-of the time may still play far worse than the bot, because the 5% it gets
-wrong are the hard positions. Finding that out is the lesson.
-
-The concrete next step is a `collect.js` that plays N games and writes a CSV of
-`(features, chosen placement)` rows.
+The project began with a genetic algorithm that tuned the bot's 8 weights.
+That work is still used: it produced `weights.json`. Next came imitation
+learning, where networks copied the bot (MLP, ranking net, CNN, DAgger). That
+works, but it can never beat its teacher, and it needed a large Python
+pipeline. Version 0.4 replaced it with this much smaller DQN, which learns from
+the reward alone. The old code is in git history if you ever want it.
