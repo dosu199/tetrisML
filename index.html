@@ -30,8 +30,9 @@
 </div>
         </div>
     </div>
-    </div>
-    <select id="agent">
+    </div>   
+   <select id="agent">
+  <option value="dqn2">Neural network + lookahead</option>
   <option value="dqn">Neural network (DQN)</option>
   <option value="bot">Bot (search)</option>
 </select>
@@ -47,13 +48,14 @@
   const net = loadDqn(await json('./dqn-model.json'));
 
   const choosers = {
+    dqn2: (board, cur, next) => chooseDqnMove(board, cur, net, next, { lookahead: true }),
     dqn: (board, cur) => chooseDqnMove(board, cur, net),
     bot: (board, cur, next) => chooseMove(board, cur, next, weights, { lookahead: true }),
   };
 
   const statsEl = document.getElementById('agentStats');
   const game = startVisualGame({
-    chooser: choosers.dqn,
+    chooser: choosers.dqn2,
     msPerRow: 45,
     imagePath: 'images/',
     onStats: (s) => {
