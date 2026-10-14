@@ -46,7 +46,7 @@
 
 import { writeFileSync } from 'node:fs';
 import { createBoard, Bag, mulberry32, placements, playEpisode } from './src/tetris-core.js';
-import { MLP, STATE_SIZE, boardState, nextStates, chooseDqnMove } from './src/tetris-dqn.js';
+import { MLP, FEATURE_SETS, boardState, nextStates, chooseDqnMove } from './src/tetris-dqn.js';
 
 const argv = process.argv.slice(2);
 const flag = (n, d) => {
@@ -63,14 +63,24 @@ const MEMORY = Number(flag('memory', 30000));
 const EPS_START = Number(flag('eps-start', 1));
 const EPS_END = Number(flag('eps-end', 1e-3));
 const MAX_PIECES = Number(flag('max-pieces', 2000)); // per training game
-const SEED = Number(flag('seed', 123));
+const SEED = Number(flag('seed', 125)); // 125 trains the shipped dqn-model.json
 const OUT = flag('out', 'dqn-model.json');
 const LOG = Number(flag('log', 100));
 const EVAL_GAMES = Number(flag('eval-games', 5)); // greedy test games per check
 const EVAL_CAP = Number(flag('eval-cap', 1000));
 
+// --features basic (the reference's 4, default) or full (all 8 bot features).
+// 'full' needs feature scaling to learn at all, so it switches scaling on;
+// --scale turns it on for 'basic' too.
+const FEATURE_KIND = flag('features', 'basic');
+const FEATURES = FEATURE_SETS[FEATURE_KIND];
+if (!FEATURES) throw new Error('--features must be basic or full');
+const SCALED = FEATURE_KIND === 'full' || argv.includes('--scale');
+const STATE_SIZE = FEATURES.length;
+
 const rand = mulberry32(SEED);
-const net = new MLP([STATE_SIZE, 64, 64, 1], rand);
+const net = new MLP([STATE_SIZE, 64, 64, 1], rand, FEATURES, SCALED);
+const IDX = net.input;
 
 
 /* ---------------------------------------------------------- replay memory */
@@ -113,14 +123,14 @@ function playTrainingGame(seed, epsilon) {
   const board0 = createBoard();
   const bag = new Bag(seed);
   let board = board0;
-  let state = boardState(board, 0);
+  let state = boardState(board, 0, IDX);
   let current = bag.next();
   let pieces = 0;
   let lines = 0;
   let score = 0;
 
   while (true) {
-    const options = nextStates(board, current);
+    const options = nextStates(board, current, IDX);
     if (options.length === 0) break; // cannot happen on the first piece
 
     let pick;
@@ -176,7 +186,7 @@ function evaluateGreedy() {
 /* ------------------------------------------------------------------- main */
 
 console.log(`\ntraining a DQN to play Tetris`);
-console.log(`  network   ${net.sizes.join(' -> ')}  (input: lines, holes, bumpiness, height)`);
+console.log(`  network   ${net.sizes.join(' -> ')}  (input: ${FEATURES.join(', ')}${SCALED ? ', scaled' : ''})`);
 console.log(`  games     ${EPOCHS} after warm-up, epsilon ${EPS_START} -> ${EPS_END} over ${DECAY}`);
 console.log(`  learning  batch ${BATCH}, lr ${LR}, gamma ${GAMMA}, memory ${MEMORY}`);
 console.log(`  cap       ${MAX_PIECES} pieces per training game\n`);

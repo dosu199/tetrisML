@@ -1,36 +1,35 @@
 # Plan — Tetris ML
 
-Last updated: 13 October 2026.
+Last updated: 14 October 2026.
 
 **Goal:** a neural network that plays Tetris well and learns by itself.
 
-## Where we are (v0.4)
+## Where we are (v0.5)
 
-- The old imitation pipeline (CSV data, Python training, CNN, DAgger) has
-  been removed. In its place is a single DQN in plain JavaScript:
-  `src/tetris-dqn.js` + `train_dqn.js`, about 450 lines in total.
-- Training takes about 5 minutes. The best network is saved in `dqn-model.json`.
-- Results, 50 fresh games:
-  - 7-bag, no preview: DQN **5/50** topped out, bot 1/50.
-  - Fully random pieces: DQN 43/50, bot 9/50. It never trained on random
-    pieces.
+- One DQN in plain JavaScript: `src/tetris-dqn.js` + `train_dqn.js`.
+- `dqn-model.json` (4 features, seed 125), 50 fresh games, no preview:
+  - 7-bag, up to 10,000 pieces: DQN **0/50** topped out, bot 8/50. The
+    network beats the bot.
+  - Fully random pieces, up to 2,000: DQN 25/50, bot 9/50.
+- Step 1 tried (8 features + scaling): it **did not help**. The seed matters
+  more than the features. See README, "What we learned".
 
-## Possible next steps (in order, each one small)
+## Possible next steps (in order)
 
-1. **Watch it in the browser.** Use the snippet in the README.
-2. **Train on random pieces too.** Add a `--memoryless` option to
-   `train_dqn.js` that uses `MemorylessGen` instead of `Bag`. Expectation:
-   much better in the "random" mode. About 15 lines of code and 5 minutes of
-   training.
-3. **Stability.** We tried input normalization plus a target network. The
-   best result was about the same (865 vs 1000 in the test), and the network
-   still collapsed at the end, so we did not keep it. Best-checkpointing is
-   enough for now.
-4. **Next piece in the state.** Add the next piece (7 numbers, one-hot) to the
-   input, so the network can plan two pieces ahead the way the bot does.
+1. **Train on random pieces too.** Add a `--memoryless` option to
+   `train_dqn.js` (use `MemorylessGen` instead of `Bag`). Target: below 25/50
+   in the "random" mode.
+2. **Look one piece ahead** (2-ply search with the network as the evaluator).
+   No training needed.
+3. **Better checkpoint selection.** Use more test games inside training
+   (e.g. 20 instead of 5, with a higher cap), and train 3+ seeds per setting.
+   After that, retry `--features full` with longer training (`--epochs 6000`).
+4. **Later:** the raw board (240 cells) as input instead of hand-picked
+   features.
 
 ## Rules we work by
 
 - Decide on at least 50 games with fresh seeds (90000+). 10 games is not
-  enough.
+  enough. When everyone reaches the 2,000-piece cap, raise it (`--cap 10000`).
+- Train more than one seed before concluding anything.
 - Do not change direction without agreeing first.

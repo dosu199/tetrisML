@@ -4,6 +4,11 @@ A neural network that learns to play Tetris by playing it. Nobody shows it
 good moves; it only gets the game's reward. There is also a classic search bot
 to measure it against.
 
+The approach follows
+[vietnh1009/Tetris-deep-Q-learning-pytorch](https://github.com/vietnh1009/Tetris-deep-Q-learning-pytorch),
+rewritten in plain JavaScript. It needs no PyTorch or Python, and the same
+code trains in node and plays in the browser.
+
 ## How the network plays
 
 For each new piece:
@@ -36,26 +41,43 @@ For each new piece:
 
 ## Results
 
-50 games each on seeds 90000+ (never seen in training), capped at 2,000 pieces:
+The shipped `dqn-model.json`. 50 games per row on seeds 90000+ (never seen in
+training), no next-piece preview:
 
-| mode | player | mean pieces | mean lines | topped out |
+| pieces | cap | player | mean pieces | topped out |
 |---|---|---|---|---|
-| no preview, 7-bag | bot (search) | 1970.6 | 783.0 | 1/50 |
-| no preview, 7-bag | **DQN** | **1902.4** | **753.0** | **5/50** |
-| no preview, random pieces | bot (search) | 1877.5 | 741.8 | 9/50 |
-| no preview, random pieces | **DQN** | **783.1** | **294.9** | **43/50** |
+| 7-bag | 10,000 | bot (search) | 9068 | 8/50 |
+| 7-bag | 10,000 | **DQN** | **10000** | **0/50** |
+| fully random | 2,000 | bot (search) | 1878 | 9/50 |
+| fully random | 2,000 | DQN | 1514 | 25/50 |
 
-With the normal 7-bag generator the network is close to the hand-tuned bot. It
-learned this in about 5 minutes, from nothing but the reward. With fully
-random pieces it is much weaker, because it never saw that generator in
-training (it trained on 7-bag only). The DQN decides from the current piece
-alone, so whether you show it the next piece makes no difference.
+With normal pieces the network beats the hand-tuned bot: it never lost a game
+in 500,000 pieces. With fully random pieces the bot is still better. The
+network trained on 7-bag only. The DQN decides from the current piece alone,
+so showing it the next piece makes no difference.
+
+### What we learned getting here (v0.5)
+
+- **One training run proves little.** We trained the same code with three
+  seeds. In the 10,000-piece test, the three networks lost 20/50, 12/50 and
+  0/50 games. The random seed mattered more than any setting we tried. So
+  train several seeds and keep the best on a 50-game test.
+- **More inputs did not help (yet).** Giving the network all 8 of the bot's
+  features (`--features full`) made it no better, and two of three runs were
+  much worse. Possible reasons: about 3,000 training steps are too few for
+  the extra inputs, and the 5-game check inside training is too coarse to
+  pick the best checkpoint.
+- **Feature scaling is required for 8 inputs.** Without it, the 8-feature
+  network did not learn at all; it stayed at about 50 pieces. The inputs
+  differ by up to 60× (lines 0–4, total height up to 240), so a few large
+  ones swamp the rest. `FEATURE_SCALE` in `tetris-dqn.js` divides each input
+  by roughly its largest value.
 
 ## Files
 
 ```
 src/tetris-core.js       board, pieces, 7-bag, collision, line clears, playEpisode()
-src/tetris-dqn.js        the network: 4 features, MLP with backprop + Adam, chooseDqnMove()
+src/tetris-dqn.js        the network: features, MLP with backprop + Adam, chooseDqnMove()
 src/tetris-ai.js         8 features + search bot (the opponent)
 src/tetris-visual.js     the only file that touches the DOM
 src/tetris-headless.js   fast games for the genetic algorithm
@@ -78,12 +100,59 @@ npx serve .              # then open index.html in the browser
 ```
 
 Training options (all have defaults): `--epochs 3000 --decay 2000 --batch 512
---lr 1e-3 --gamma 0.99 --memory 30000 --seed 123 --out dqn-model.json`.
+--lr 1e-3 --gamma 0.99 --memory 30000 --seed 125 --features basic --out dqn-model.json`.
+`--features full` uses all 8 bot features (scaled automatically); `--scale`
+turns scaling on for the 4 basic ones. Training is deterministic: the
+defaults reproduce the shipped `dqn-model.json` exactly.
 
 Training writes over `dqn-model.json`, so use `--out` to keep the old one
 (for example `--out dqn-try2.json`). You can then compare the two networks in
 one run:
 `node hardmode.js --model dqn-model.json,dqn-try2.json --games 50 --seed 90000`.
+
+## Watching it play in the browser
+
+In `index.html`, replace your current game `<script type="module">` with:
+
+```html
+<select id="agent">
+  <option value="dqn">Neural network (DQN)</option>
+  <option value="bot">Bot (search)</option>
+</select>
+<div id="agentStats"></div>
+
+<script type="module">
+  import { startVisualGame } from './src/tetris-visual.js';
+  import { chooseMove } from './src/tetris-ai.js';
+  import { loadDqn, chooseDqnMove } from './src/tetris-dqn.js';
+
+  const json = (f) => fetch(f).then((r) => r.json());
+  const weights = (await json('./weights.json')).weights;
+  const net = loadDqn(await json('./dqn-model.json'));
+
+  const choosers = {
+    dqn: (board, cur) => chooseDqnMove(board, cur, net),
+    bot: (board, cur, next) => chooseMove(board, cur, next, weights, { lookahead: true }),
+  };
+
+  const statsEl = document.getElementById('agentStats');
+  const game = startVisualGame({
+    chooser: choosers.dqn,
+    msPerRow: 45,
+    imagePath: 'images/',
+    onStats: (s) => {
+      statsEl.textContent = `game ${s.games} · lines ${s.lines} · pieces ${s.pieces} · best ${s.bestLines} lines`;
+    },
+  });
+
+  document.getElementById('agent').addEventListener('change', (e) => {
+    game.setChooser(choosers[e.target.value]);
+  });
+</script>
+```
+
+`type="module"` scripts do not load over `file://`. In a Codespace, run
+`npx serve .` and open the forwarded port.
 
 ## History
 
@@ -92,4 +161,5 @@ That work is still used: it produced `weights.json`. Next came imitation
 learning, where networks copied the bot (MLP, ranking net, CNN, DAgger). That
 works, but it can never beat its teacher, and it needed a large Python
 pipeline. Version 0.4 replaced it with this much smaller DQN, which learns from
-the reward alone. The old code is in git history if you ever want it.
+the reward alone. Version 0.5 added feature sets and scaling, and picked the
+best of several training seeds. The old code is in git history if you ever want it.

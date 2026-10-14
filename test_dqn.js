@@ -9,7 +9,7 @@
 
 import { readFileSync } from 'node:fs';
 import { mulberry32, playEpisode } from './src/tetris-core.js';
-import { MLP, loadDqn, chooseDqnMove } from './src/tetris-dqn.js';
+import { MLP, FEATURE_SETS, loadDqn, chooseDqnMove } from './src/tetris-dqn.js';
 
 let failed = 0;
 const check = (name, ok, detail = '') => {
@@ -19,7 +19,7 @@ const check = (name, ok, detail = '') => {
 
 // 1. gradient check on a tiny network
 const r = mulberry32(7);
-const net = new MLP([4, 5, 3, 1], r);
+const net = new MLP([4, 5, 3, 1], r, FEATURE_SETS.basic);
 const B = 6;
 const X = new Float64Array(B * 4).map(() => r() * 4);
 const y = new Float64Array(B).map(() => r() * 3);

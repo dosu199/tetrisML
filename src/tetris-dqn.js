@@ -19,34 +19,73 @@
  */
 
 import { PIECES, copyBoard, placePiece, clearLines, placements } from './tetris-core.js';
-import { extractFeatures } from './tetris-ai.js';
+import { extractFeatures, FEATURE_NAMES, NUM_FEATURES } from './tetris-ai.js';
 
 /* ----------------------------------------------------------------- state */
 
-export const STATE_NAMES = ['linesCleared', 'holes', 'bumpiness', 'totalHeight'];
-export const STATE_SIZE = STATE_NAMES.length;
+// Which board numbers the network sees. Names come from FEATURE_NAMES in
+// tetris-ai.js; a trained model stores its list, so old models keep working.
+export const FEATURE_SETS = {
+  // the 4 from the reference implementation
+  basic: ['linesCleared', 'holes', 'bumpiness', 'aggregateHeight'],
+  // all 8 the search bot uses: the 4 above plus the shape of the surface
+  full: ['linesCleared', 'holes', 'bumpiness', 'aggregateHeight', 'maxHeight', 'rowTransitions', 'colTransitions', 'wells'],
+};
+export const DEFAULT_FEATURES = FEATURE_SETS.full;
 
-const scratch = new Float64Array(8);
+const ALIASES = { totalHeight: 'aggregateHeight' }; // name used by v0.4 models
 
-/** The 4 numbers the network sees, for a board after a move. */
-export function boardState(board, linesCleared, out = new Float64Array(STATE_SIZE)) {
-  // extractFeatures gives 8 features; the DQN uses these 4, in this order.
+// Feature scaling: divide each feature by roughly its largest value, so every
+// input lands around 0-1. Without this, big inputs (total height up to 240)
+// drown out small ones (lines 0-4) and training barely moves.
+export const FEATURE_SCALE = {
+  linesCleared: 4,
+  holes: 100,
+  bumpiness: 30,
+  aggregateHeight: 240,
+  maxHeight: 24,
+  rowTransitions: 120,
+  colTransitions: 60,
+  wells: 50,
+};
+
+/** Positions in extractFeatures' output for a list of feature names. */
+export function featureIndex(names) {
+  return names.map((n) => {
+    const i = FEATURE_NAMES.indexOf(ALIASES[n] ?? n);
+    if (i === -1) throw new Error(`unknown feature: ${n}`);
+    return i;
+  });
+}
+
+const scratch = new Float64Array(NUM_FEATURES);
+
+/**
+ * How a network reads a board: which features (idx) and what to divide each
+ * one by (scale). Models from v0.4 were trained unscaled, so scale is 1 there.
+ */
+export function makeInput(names, scaled = true) {
+  return {
+    idx: featureIndex(names),
+    scale: names.map((n) => (scaled ? FEATURE_SCALE[ALIASES[n] ?? n] : 1)),
+  };
+}
+
+/** The numbers the network sees for a board after a move. */
+export function boardState(board, linesCleared, input, out = new Float64Array(input.idx.length)) {
   const f = extractFeatures(board, linesCleared, scratch);
-  out[0] = f[1]; // lines cleared by the move
-  out[1] = f[2]; // holes
-  out[2] = f[3]; // bumpiness
-  out[3] = f[0]; // total (aggregate) height
+  for (let i = 0; i < out.length; i++) out[i] = f[input.idx[i]] / input.scale[i];
   return out;
 }
 
 /** Every legal move for a piece, with the board it produces and its state. */
-export function nextStates(board, pieceIdx) {
+export function nextStates(board, pieceIdx, input) {
   const out = [];
   for (const move of placements(board, pieceIdx)) {
     const after = copyBoard(board);
     placePiece(after, PIECES[pieceIdx].rotations[move.rotation], move.row, move.col);
     const lines = clearLines(after);
-    out.push({ move, board: after, lines, state: boardState(after, lines) });
+    out.push({ move, board: after, lines, state: boardState(after, lines, input) });
   }
   return out;
 }
@@ -59,8 +98,12 @@ export function nextStates(board, pieceIdx) {
  * a forward pass is "multiply by a matrix, add a bias, ReLU, repeat".
  */
 export class MLP {
-  constructor(sizes, rand = Math.random) {
+  constructor(sizes, rand = Math.random, features = DEFAULT_FEATURES, scaled = true) {
     this.sizes = sizes;
+    this.features = features; // names of the inputs, in order
+    this.scaled = scaled;
+    this.input = makeInput(features, scaled);
+    if (features.length !== sizes[0]) throw new Error(`${features.length} features but ${sizes[0]} inputs`);
     this.W = []; // W[l] is sizes[l] x sizes[l+1], row-major
     this.b = [];
     for (let l = 0; l < sizes.length - 1; l++) {
@@ -196,7 +239,8 @@ export class MLP {
   toJSON() {
     return {
       kind: 'dqn',
-      state: STATE_NAMES,
+      state: this.features,
+      scaled: this.scaled,
       sizes: this.sizes,
       W: this.W.map((w) => Array.from(w)),
       b: this.b.map((b) => Array.from(b)),
@@ -204,7 +248,7 @@ export class MLP {
   }
 
   static fromJSON(json) {
-    const net = new MLP(json.sizes, () => 0.5);
+    const net = new MLP(json.sizes, () => 0.5, json.state, json.scaled === true);
     net.W = json.W.map((w) => Float64Array.from(w));
     net.b = json.b.map((b) => Float64Array.from(b));
     return net;
@@ -223,7 +267,7 @@ export function loadDqn(json) {
 export function chooseDqnMove(board, pieceIdx, net) {
   let best = null;
   let bestScore = -Infinity;
-  for (const s of nextStates(board, pieceIdx)) {
+  for (const s of nextStates(board, pieceIdx, net.input)) {
     const v = net.predict(s.state);
     if (v > bestScore) {
       bestScore = v;
