@@ -14,8 +14,11 @@
  *   garbage5               7-bag, preview, a garbage row rises every 5 pieces
  *
  * The bot uses the next piece when it can see it (2-ply search). The DQN, like
- * the reference implementation, always decides on the current piece alone, so
- * "normal" vs "no-preview" only changes things for the bot.
+ * the reference implementation, decides on the current piece alone unless you
+ * add --lookahead, which also runs it with 2-ply search.
+ *
+ *   --lookahead   also play each network with 2-ply search (sees the next piece)
+ *   --no-bot      leave the search bot out
  *
  * Per player: pieces survived (median and mean), lines, and how many games
  * ended in a top-out before the cap. Every player plays the same seeds, so the
@@ -37,6 +40,7 @@ const games = Number(flag('games', 10));
 const cap = Number(flag('cap', 2000));
 const seedBase = Number(flag('seed', 20000));
 const only = flag('mode', null);
+// --no-bot skips the search bot (handy when only comparing networks)
 const modelFiles = flag('model', 'dqn-model.json').split(',').filter(Boolean);
 
 const MODES = {
@@ -52,15 +56,19 @@ try {
   weights = JSON.parse(readFileSync('weights.json', 'utf8')).weights;
 } catch {}
 
-const players = {
-  bot: (b, c, n) => {
+const players = {};
+if (!argv.includes('--no-bot')) {
+  players.bot = (b, c, n) => {
     const m = chooseMove(b, c, n, weights, { lookahead: n != null });
     return m && m.score !== -Infinity ? m : null;
-  },
-};
+  };
+}
 for (const file of modelFiles) {
   const net = loadDqn(JSON.parse(readFileSync(file, 'utf8')));
-  players[file.replace(/\.json$/, '').replace(/^.*\//, '')] = (b, c) => chooseDqnMove(b, c, net);
+  const name = file.replace(/\.json$/, '').replace(/^.*\//, '');
+  players[name] = (b, c) => chooseDqnMove(b, c, net);
+  // --lookahead: also run each network with 2-ply search (uses the preview)
+  if (argv.includes('--lookahead')) players[`${name}+2ply`] = (b, c, n) => chooseDqnMove(b, c, net, n, { lookahead: true });
 }
 
 const median = (xs) => {
@@ -71,8 +79,8 @@ const median = (xs) => {
 
 console.log(`\nbenchmark: bot vs ${modelFiles.join(', ')}`);
 console.log(`${games} games per player per mode, seeds ${seedBase}+, cap ${cap} pieces\n`);
-console.log('  mode                    player        pieces med   pieces mean   lines mean   topped out   time');
-console.log('  ----------------------  ----------    ----------   -----------   ----------   ----------   ----');
+console.log('  mode                    player              pieces med   pieces mean   lines mean   topped out   time');
+console.log('  ----------------------  ----------------    ----------   -----------   ----------   ----------   ----');
 
 for (const [mode, opts] of Object.entries(MODES)) {
   if (only && mode !== only) continue;
@@ -83,7 +91,7 @@ for (const [mode, opts] of Object.entries(MODES)) {
     const pcs = r.map((x) => x.pieces);
     const lines = r.map((x) => x.lines);
     console.log(
-      `  ${mode.padEnd(22)}  ${name.padEnd(10)}    ${String(median(pcs)).padStart(10)}   ` +
+      `  ${mode.padEnd(22)}  ${name.padEnd(16)}    ${String(median(pcs)).padStart(10)}   ` +
         `${(pcs.reduce((a, b) => a + b, 0) / games).toFixed(1).padStart(11)}   ` +
         `${(lines.reduce((a, b) => a + b, 0) / games).toFixed(1).padStart(10)}   ` +
         `${`${r.filter((x) => x.died).length}/${games}`.padStart(10)}   ${((Date.now() - t0) / 1000).toFixed(0)}s`

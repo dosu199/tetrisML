@@ -263,12 +263,42 @@ export function loadDqn(json) {
   return MLP.fromJSON(json);
 }
 
-/** The network's move for this piece, or null if no move fits (game over). */
-export function chooseDqnMove(board, pieceIdx, net) {
+/** Reward for one move, the same formula training uses. */
+export const moveReward = (lines) => 1 + 10 * lines * lines;
+
+/**
+ * The network's move for this piece, or null if no move fits (game over).
+ *
+ * Without `next` (or with lookahead off) it is 1-ply: score every placement of
+ * the current piece with the network and take the best.
+ *
+ * With `next` and { lookahead: true } it is 2-ply: for every placement of the
+ * current piece, also try every placement of the next piece, and score the
+ * pair as
+ *
+ *     reward(move 1) + 0.99 x best over move 2 of [ reward(move 2) + 0.99 x V(board after both) ]
+ *
+ * which is the Bellman equation from training, unrolled one step with the
+ * next piece known instead of guessed. Same network, no retraining - only the
+ * way moves are chosen changes. About 30x slower, still fast enough to watch.
+ */
+export function chooseDqnMove(board, pieceIdx, net, next = null, { lookahead = false, gamma = 0.99 } = {}) {
   let best = null;
   let bestScore = -Infinity;
+  const twoPly = lookahead && next != null;
   for (const s of nextStates(board, pieceIdx, net.input)) {
-    const v = net.predict(s.state);
+    let v;
+    if (!twoPly) {
+      v = net.predict(s.state);
+    } else {
+      let follow = -Infinity;
+      for (const t of nextStates(s.board, next, net.input)) {
+        const w = moveReward(t.lines) + gamma * net.predict(t.state);
+        if (w > follow) follow = w;
+      }
+      // no room for the next piece: this move loses the game
+      v = follow === -Infinity ? -1e9 : moveReward(s.lines) + gamma * follow;
+    }
     if (v > bestScore) {
       bestScore = v;
       best = s.move;

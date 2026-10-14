@@ -4,7 +4,8 @@
  * 1. Gradient check: the backward pass in MLP.trainStep must agree with a
  *    numerical derivative (nudge each weight a tiny bit, see how the loss
  *    moves). If backprop had a bug, training would quietly learn nonsense.
- * 2. Smoke test: dqn-model.json loads and plays a legal game.
+ * 2. Smoke test: dqn-model.json loads and plays a legal game, with and
+ *    without the 2-ply lookahead.
  */
 
 import { readFileSync } from 'node:fs';
@@ -61,6 +62,8 @@ try {
 if (model) {
   const res = playEpisode((b, c) => chooseDqnMove(b, c, model), 1, { cap: 300 });
   check('dqn-model.json plays a game', res.pieces > 0, `${res.pieces} pieces, ${res.lines} lines`);
+  const res2 = playEpisode((b, c, n) => chooseDqnMove(b, c, model, n, { lookahead: true }), 1, { cap: 60 });
+  check('2-ply lookahead plays a game', res2.pieces > 0, `${res2.pieces} pieces, ${res2.lines} lines`);
 }
 
 console.log(failed ? `\n${failed} check(s) failed\n` : '\nall DQN checks passed\n');

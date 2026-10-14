@@ -1,14 +1,16 @@
 {
   "name": "tetris-ml",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Tetris with a neural network that learns to play by deep Q-learning, plus a search bot to compare it against",
   "type": "module",
   "scripts": {
     "test": "node bench.js --test && node test_dqn.js",
     "test:dqn": "node test_dqn.js",
     "train:dqn": "node train_dqn.js",
+    "train:many": "node train_many.js",
     "hard": "node hardmode.js --model dqn-model.json --games 10 --cap 2000",
     "hard:full": "node hardmode.js --model dqn-model.json --games 50 --seed 90000 --mode no-preview",
+    "hard:lookahead": "node hardmode.js --model dqn-model.json --lookahead --games 50 --seed 90000 --mode garbage5",
     "bench": "node bench.js",
     "train": "node train.js",
     "compare": "node compare.js"

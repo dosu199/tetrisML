@@ -1,30 +1,29 @@
 # Plan — Tetris ML
 
-Last updated: 14 October 2026 (v0.6).
+Last updated: 14 October 2026 (v0.7).
 
 **Goal:** a neural network that plays Tetris well and learns by itself.
 
-## Where we are (v0.6)
+## Where we are (v0.7)
 
-- One DQN in plain JavaScript: `src/tetris-dqn.js` + `train_dqn.js`.
-- `dqn-model.json`: 4 features, trained on random pieces, seed 124. 50 fresh
-  games, no preview:
-  - 7-bag, up to 10,000 pieces: DQN **1/50** topped out, bot 8/50.
-  - Fully random pieces, up to 2,000: DQN **16/50**, bot 9/50 (was 25/50).
-- Done: 8 features + scaling (did not help); training on random pieces
-  (helped, 25 → 16).
-- Lesson: the difference between seeds (16/50 vs 33/50) is still bigger than
-  any setting. Checkpoint selection is the weakest part.
+- Network: `dqn-model.json` (4 features, trained on random pieces, seed 124).
+- New: **2-ply lookahead** (`chooseDqnMove(..., next, { lookahead: true })`).
+  50 fresh games:
+  - random pieces + preview: DQN 2-ply **0/50** lost, bot 0/50, DQN 1-ply 16/50
+  - garbage every 5 pieces: DQN 2-ply **321** pieces, bot 254, DQN 1-ply 148
+  - 7-bag, no preview, cap 10,000: DQN 1/50 lost, bot 8/50
+- Tried without success: 8 features, a stricter checkpoint check. A typical
+  training run lands around 30/50 lost on random pieces without preview; our
+  network (16–22/50) is a lucky seed.
 
-## Possible next steps (in order)
+## Possible next steps
 
-1. **Better checkpoint selection.** The check inside training uses 5 games
-   capped at 1,000 pieces; good networks all hit 1,000, so it cannot tell
-   them apart. Use 20 games with a cap of 3,000, and train 3+ seeds per setting
-   automatically (one command), keeping the best on a separate test.
-2. **Look one piece ahead** (2-ply search with the network as the
-   evaluator). No training needed.
-3. Retry `--features full` with longer training, once 1 is in place.
+1. **Speed up the 2-ply search** (reuse memory in `predict`, skip duplicate
+   placements). It is about 30× slower than 1-ply.
+2. **More stable training**, so that a typical run is as good as our lucky
+   one: lower the learning rate toward the end, or average the weights of the
+   last checkpoints. Measure with `train_many.js`.
+3. **Train with garbage rows**, the only mode where everyone still loses.
 4. **Later:** the raw board (240 cells) as input.
 
 ## Rules we work by
