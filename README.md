@@ -74,13 +74,15 @@ pieces survived; higher is better.)
 games (70000+), so the final test (90000+) stays fair. It is the train /
 validation / test split.
 
+It never makes your model worse: the current `dqn-model.json` takes part in
+the selection test and is replaced only if a new run beats it.
+
 We also tried a stricter check inside training: 20 games capped at 3,000
-pieces instead of 5 capped at 1,000. It did **not** help. All four new
-networks (seeds 1–4) lost 32–38 of 50 selection games, while the v0.6 network
-lost 22. A likely reason: choosing the highest of 30 noisy checkpoint scores
-favours lucky ones (the "winner's curse"). The v0.6 network is a lucky seed,
-and plain DQN training typically lands around 30/50. So we kept it, and the
-default check is back to 5 games.
+pieces instead of 5 capped at 1,000. It made **no difference**: on seeds 1–4
+it picked exactly the same checkpoints as the default check. Those four
+networks lost 32–38 of 50 selection games, while our network lost 22. So a
+typical training run is weaker than ours; seed 124 was lucky. Making a typical
+run as good is a job for more stable training, not for a stricter check.
 
 ### Training on random pieces (v0.6)
 

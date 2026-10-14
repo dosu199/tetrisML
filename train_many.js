@@ -24,12 +24,13 @@
  * run that happened to suit them. A separate selection set avoids that. It is
  * the train / validation / test split from the course.
  *
- * Each run is saved as runs/seed-N.json; the winner is copied to --out
- * (default dqn-model.json).
+ * Each run is saved as runs/seed-N.json. The current --out file (default
+ * dqn-model.json) takes part in the selection test too, and it is replaced
+ * only if a new run beats it. So running this can never make your model worse.
  */
 
 import { spawn } from 'node:child_process';
-import { copyFileSync, mkdirSync, readFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { playEpisode } from './src/tetris-core.js';
 import { loadDqn, chooseDqnMove } from './src/tetris-dqn.js';
 
@@ -103,11 +104,19 @@ await Promise.all(
 );
 
 console.log(`\nselection test: ${SELECT_GAMES} games on seeds 70000+, ${RANDOMIZER} pieces, cap ${SELECT_CAP}\n`);
-const results = files.sort().map(select);
+// the current model competes too, so it is only replaced by something better
+const contenders = existsSync(OUT) ? [OUT, ...files.sort()] : files.sort();
+const results = contenders.map(select);
 results.sort((a, b) => a.lost - b.lost || b.mean - a.mean);
 for (const [i, r] of results.entries()) {
-  console.log(`  ${r.file.padEnd(18)} lost ${String(r.lost).padStart(2)}/${SELECT_GAMES}   mean ${r.mean.toFixed(0).padStart(5)} pieces${i === 0 ? '   <- best' : ''}`);
+  const label = r.file === OUT ? `${OUT} (current)` : r.file;
+  console.log(`  ${label.padEnd(30)} lost ${String(r.lost).padStart(2)}/${SELECT_GAMES}   mean ${r.mean.toFixed(0).padStart(5)} pieces${i === 0 ? '   <- best' : ''}`);
 }
-copyFileSync(results[0].file, OUT);
-console.log(`\n${results[0].file} -> ${OUT}   (${((Date.now() - t0) / 60000).toFixed(1)} min)`);
+const minutes = ((Date.now() - t0) / 60000).toFixed(1);
+if (results[0].file === OUT) {
+  console.log(`\nno new run beat the current ${OUT}; it is unchanged   (${minutes} min)`);
+} else {
+  copyFileSync(results[0].file, OUT);
+  console.log(`\n${results[0].file} -> ${OUT}   (${minutes} min)`);
+}
 console.log(`final check: node hardmode.js --model ${OUT} --games 50 --seed 90000 --mode memoryless-no-preview\n`);

@@ -12,7 +12,8 @@ Last updated: 14 October 2026 (v0.7).
   - random pieces + preview: DQN 2-ply **0/50** lost, bot 0/50, DQN 1-ply 16/50
   - garbage every 5 pieces: DQN 2-ply **321** pieces, bot 254, DQN 1-ply 148
   - 7-bag, no preview, cap 10,000: DQN 1/50 lost, bot 8/50
-- Tried without success: 8 features, a stricter checkpoint check. A typical
+- Tried without success: 8 features, a stricter checkpoint check (it picked
+  the same checkpoints). A typical
   training run lands around 30/50 lost on random pieces without preview; our
   network (16–22/50) is a lucky seed.
 
