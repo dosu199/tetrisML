@@ -1,6 +1,6 @@
 {
   "name": "tetris-ml",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Tetris with a neural network that learns to play by deep Q-learning, plus a search bot to compare it against",
   "type": "module",
   "scripts": {

@@ -41,20 +41,40 @@ For each new piece:
 
 ## Results
 
-The shipped `dqn-model.json`. 50 games per row on seeds 90000+ (never seen in
-training), no next-piece preview:
+The shipped `dqn-model.json`, trained on random pieces (v0.6). 50 games per row
+on seeds 90000+ (never seen in training), no next-piece preview:
 
 | pieces | cap | player | mean pieces | topped out |
 |---|---|---|---|---|
 | 7-bag | 10,000 | bot (search) | 9068 | 8/50 |
-| 7-bag | 10,000 | **DQN** | **10000** | **0/50** |
+| 7-bag | 10,000 | **DQN** | **9875** | **1/50** |
 | fully random | 2,000 | bot (search) | 1878 | 9/50 |
-| fully random | 2,000 | DQN | 1514 | 25/50 |
+| fully random | 2,000 | DQN | 1773 | 16/50 |
 
-With normal pieces the network beats the hand-tuned bot: it never lost a game
-in 500,000 pieces. With fully random pieces the bot is still better. The
-network trained on 7-bag only. The DQN decides from the current piece alone,
-so showing it the next piece makes no difference.
+With normal pieces the network beats the hand-tuned bot. With fully random
+pieces it is close, but the bot still loses fewer games. The DQN decides from
+the current piece alone, so showing it the next piece makes no difference.
+
+### Training on random pieces (v0.6)
+
+`--pieces bag|random|mix` picks what the network trains on. The check inside
+training then uses the same kind of pieces. Same 50-game test as above, random
+pieces:
+
+| trained on | seed | topped out (random) | topped out (7-bag, 10k cap) |
+|---|---|---|---|
+| 7-bag (v0.5 model) | 125 | 25/50 | 0/50 |
+| random | 123 | 30/50 | |
+| **random** | **124** | **16/50** | **1/50** |
+| mix | 123 | 19/50 | 1/50 |
+| mix | 124 | 33/50 | |
+| mix | 125 | 33/50 | |
+
+Training on harder pieces made the best network better on random pieces
+(25 → 16) without losing its strength on normal ones. A network trained on
+hard cases handles easy ones too; the reverse is not true. But the gap between
+seeds (16 vs 33) is still bigger than the gain itself. The weak point is now
+how we pick the checkpoint, not what we train on.
 
 ### What we learned getting here (v0.5)
 
@@ -100,7 +120,7 @@ npx serve .              # then open index.html in the browser
 ```
 
 Training options (all have defaults): `--epochs 3000 --decay 2000 --batch 512
---lr 1e-3 --gamma 0.99 --memory 30000 --seed 125 --features basic --out dqn-model.json`.
+--lr 1e-3 --gamma 0.99 --memory 30000 --seed 124 --pieces random --features basic --out dqn-model.json`.
 `--features full` uses all 8 bot features (scaled automatically); `--scale`
 turns scaling on for the 4 basic ones. Training is deterministic: the
 defaults reproduce the shipped `dqn-model.json` exactly.
@@ -162,4 +182,4 @@ learning, where networks copied the bot (MLP, ranking net, CNN, DAgger). That
 works, but it can never beat its teacher, and it needed a large Python
 pipeline. Version 0.4 replaced it with this much smaller DQN, which learns from
 the reward alone. Version 0.5 added feature sets and scaling, and picked the
-best of several training seeds. The old code is in git history if you ever want it.
+best of several training seeds. Version 0.6 trains on random pieces. The old code is in git history if you ever want it.

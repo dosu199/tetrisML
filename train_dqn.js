@@ -45,7 +45,7 @@
  */
 
 import { writeFileSync } from 'node:fs';
-import { createBoard, Bag, mulberry32, placements, playEpisode } from './src/tetris-core.js';
+import { createBoard, Bag, MemorylessGen, mulberry32, placements, playEpisode } from './src/tetris-core.js';
 import { MLP, FEATURE_SETS, boardState, nextStates, chooseDqnMove } from './src/tetris-dqn.js';
 
 const argv = process.argv.slice(2);
@@ -63,9 +63,17 @@ const MEMORY = Number(flag('memory', 30000));
 const EPS_START = Number(flag('eps-start', 1));
 const EPS_END = Number(flag('eps-end', 1e-3));
 const MAX_PIECES = Number(flag('max-pieces', 2000)); // per training game
-const SEED = Number(flag('seed', 125)); // 125 trains the shipped dqn-model.json
+const SEED = Number(flag('seed', 124)); // the defaults train the shipped dqn-model.json
 const OUT = flag('out', 'dqn-model.json');
 const LOG = Number(flag('log', 100));
+// Which pieces to train on:
+//   bag     the normal 7-bag
+//   random  every piece independent and random ("memoryless"; default, the
+//           shipped model - it plays normal pieces just as well)
+//   mix     alternate: even games 7-bag, odd games random
+const PIECES_MODE = flag('pieces', 'random');
+if (!['bag', 'random', 'mix'].includes(PIECES_MODE)) throw new Error('--pieces must be bag, random or mix');
+const useRandom = (game) => PIECES_MODE === 'random' || (PIECES_MODE === 'mix' && game % 2 === 1);
 const EVAL_GAMES = Number(flag('eval-games', 5)); // greedy test games per check
 const EVAL_CAP = Number(flag('eval-cap', 1000));
 
@@ -119,9 +127,9 @@ function trainOnBatch() {
 /* ------------------------------------------------------------------ games */
 
 /** One game with the epsilon-greedy policy; every move goes into memory. */
-function playTrainingGame(seed, epsilon) {
+function playTrainingGame(seed, epsilon, random) {
   const board0 = createBoard();
-  const bag = new Bag(seed);
+  const bag = random ? new MemorylessGen(seed) : new Bag(seed);
   let board = board0;
   let state = boardState(board, 0, IDX);
   let current = bag.next();
@@ -176,11 +184,15 @@ function playTrainingGame(seed, epsilon) {
  * benchmark seeds in hardmode.js (20000+, 90000+).
  */
 function evaluateGreedy() {
+  // Test on the same kind of pieces the network trains on ('mix' tests both).
+  const kinds = PIECES_MODE === 'mix' ? ['bag', 'memoryless'] : [PIECES_MODE === 'random' ? 'memoryless' : 'bag'];
   let total = 0;
-  for (let g = 0; g < EVAL_GAMES; g++) {
-    total += playEpisode((b, c) => chooseDqnMove(b, c, net), 500000 + g, { cap: EVAL_CAP }).pieces;
+  for (const randomizer of kinds) {
+    for (let g = 0; g < EVAL_GAMES; g++) {
+      total += playEpisode((b, c) => chooseDqnMove(b, c, net), 500000 + g, { cap: EVAL_CAP, randomizer }).pieces;
+    }
   }
-  return total / EVAL_GAMES;
+  return total / (EVAL_GAMES * kinds.length);
 }
 
 /* ------------------------------------------------------------------- main */
@@ -189,6 +201,7 @@ console.log(`\ntraining a DQN to play Tetris`);
 console.log(`  network   ${net.sizes.join(' -> ')}  (input: ${FEATURES.join(', ')}${SCALED ? ', scaled' : ''})`);
 console.log(`  games     ${EPOCHS} after warm-up, epsilon ${EPS_START} -> ${EPS_END} over ${DECAY}`);
 console.log(`  learning  batch ${BATCH}, lr ${LR}, gamma ${GAMMA}, memory ${MEMORY}`);
+console.log(`  pieces    ${PIECES_MODE}${PIECES_MODE === 'mix' ? ' (half 7-bag, half random)' : ''}`);
 console.log(`  cap       ${MAX_PIECES} pieces per training game\n`);
 console.log('   game   epsilon    pieces (avg last 100)   lines (avg)   greedy test   elapsed');
 console.log('  -----   -------    ---------------------   -----------   -----------   -------');
@@ -202,7 +215,7 @@ let bestEpoch = 0;
 
 while (epoch < EPOCHS) {
   const epsilon = EPS_END + (Math.max(DECAY - epoch, 0) * (EPS_START - EPS_END)) / DECAY;
-  const result = playTrainingGame(1_000_000 + game, epsilon);
+  const result = playTrainingGame(1_000_000 + game, epsilon, useRandom(game));
   game++;
 
   // Like the reference: no learning until the memory holds a tenth of its size.
