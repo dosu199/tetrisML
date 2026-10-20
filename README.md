@@ -48,25 +48,63 @@ which is still fast enough to watch.
 
 ## Results
 
-The shipped `dqn-model.json`. 50 games per row on seeds 90000+ (never seen in
-training). "1-ply" means it decides on the current piece only. "2-ply" means
-it also looks at the next piece.
+The shipped `dqn-model.json` (v0.8: random pieces, seed 8). 50 games per row on
+seeds 90000+ (never seen in training). "1-ply" means it decides on the current
+piece only. "2-ply" means it also looks at the next piece.
 
 | pieces | preview | cap | bot (search) | DQN 1-ply | DQN 2-ply |
 |---|---|---|---|---|---|
-| 7-bag | no | 10,000 | 8/50 lost | **1/50 lost** | (needs preview) |
-| fully random | no | 2,000 | **9/50 lost** | 16/50 lost | (needs preview) |
-| fully random | yes | 2,000 | **0/50 lost** | 16/50 lost | **0/50 lost** |
-| 7-bag + garbage row every 5 pieces | yes | — | 254 pieces | 148 pieces | **321 pieces** |
+| 7-bag | no | 10,000 | 8/50 lost | **0/50 lost** | (needs preview) |
+| fully random | no | 2,000 | **9/50 lost** | 12/50 lost | (needs preview) |
+| fully random | yes | 2,000 | **0/50 lost** | 12/50 lost | 2/50 lost |
+| 7-bag + garbage row every 5 pieces | yes | — | 254 pieces | 136 pieces | **319 pieces** |
 
 (In the garbage mode everyone eventually tops out, so the number is mean
 pieces survived; higher is better.)
 
-- **Without preview:** the network beats the bot on normal pieces. The bot is
-  still better on fully random pieces.
-- **With preview:** the network with lookahead matches the bot on random
-  pieces (neither lost a game) and beats it clearly in the hardest mode, 321
+- **Without preview:** the network beats the bot on normal pieces. On fully
+  random pieces the bot is still a little better (9 vs 12 lost).
+- **With preview:** the network with lookahead nearly matches the bot on
+  random pieces (2 vs 0 lost) and beats it clearly in the hardest mode, 319
   vs 254 pieces with rising garbage. It never trained on garbage at all.
+
+### Making training stable (v0.8)
+
+Our network came from a lucky run, so we tried to make every run good. Each
+setting was trained on 8 seeds with `train_many.js` and scored on the same 50
+selection games (random pieces, no preview, seeds 70000+). The numbers are
+games lost out of 50; lower is better.
+
+| setting | seeds 1–8, games lost | average |
+|---|---|---|
+| plain DQN (default) | 38, 36, 37, 32, 48, 44, 22, **14** | 34 |
+| learning rate 1e-3 → 1e-4 after exploration (`--lr-end 1e-4`) | 20, 42, 31, 23, 42, 45, 22, 48 | 34 |
+| 4 training steps per game (`--updates 4`) | 50, 50, 43, 29, 50, 50, 45, 45 | 45 |
+| weight averaging (`--avg 0.99`), seeds 1–4 only | 50, 50, 50, 34 | 46 |
+| learning-rate decay from the start, seeds 1–4 only | 50, 50, 50, 50 | 50 |
+
+None of them made a typical run better.
+
+- **Learning-rate decay** looked like a clear win after 4 seeds (average 29
+  vs 36). With 4 more seeds it was exactly even. Four runs were not enough to
+  tell.
+- **Decay from the start** stopped learning entirely. The network learns most
+  near the end of exploration, and by then the rate was already too low.
+- **More steps per game and weight averaging** both made things worse. Extra
+  steps let the network chase its own moving targets faster. Averaging mixes
+  networks that are too different from each other.
+
+So for this setup, the honest answer to "how do we make every run good?" is
+that we can't yet. The spread between seeds (14 to 48 lost) is part of how DQN
+behaves here. What works is to **train many seeds and keep the best on a
+separate test**, which is what `train_many.js` does. Seed 8 came out of these
+runs. On the final test it beats the old network without preview (12 vs 16
+lost on random pieces, 0 vs 1 on normal pieces up to 10,000). With lookahead
+it is level (2 vs 0 lost on random pieces, 319 vs 321 pieces with garbage).
+Those differences are within luck, so overall it is a modest step forward.
+
+All three options stay in `train_dqn.js` (off by default), so you can
+experiment with them.
 
 ### Picking the best of several runs (v0.7)
 
@@ -81,7 +119,7 @@ We also tried a stricter check inside training: 20 games capped at 3,000
 pieces instead of 5 capped at 1,000. It made **no difference**: on seeds 1–4
 it picked exactly the same checkpoints as the default check. Those four
 networks lost 32–38 of 50 selection games, while our network lost 22. So a
-typical training run is weaker than ours; seed 124 was lucky. Making a typical
+typical training run is weaker than that network; seed 124 was lucky. Making a typical
 run as good is a job for more stable training, not for a stricter check.
 
 ### Training on random pieces (v0.6)
@@ -152,7 +190,8 @@ npx serve .              # then open index.html in the browser
 ```
 
 Training options (all have defaults): `--epochs 3000 --decay 2000 --batch 512
---lr 1e-3 --gamma 0.99 --memory 30000 --seed 124 --pieces random --features basic --out dqn-model.json`.
+--lr 1e-3 --gamma 0.99 --memory 30000 --seed 8 --pieces random --features basic --out dqn-model.json`.
+Experimental, off by default: `--lr-end`, `--avg`, `--updates` (see v0.8 above).
 `--features full` uses all 8 bot features (scaled automatically); `--scale`
 turns scaling on for the 4 basic ones. Training is deterministic: the
 defaults reproduce the shipped `dqn-model.json` exactly.
@@ -217,4 +256,5 @@ works, but it can never beat its teacher, and it needed a large Python
 pipeline. Version 0.4 replaced it with this much smaller DQN, which learns from
 the reward alone. Version 0.5 added feature sets and scaling, and picked the
 best of several training seeds. Version 0.6 trains on random pieces.
-Version 0.7 adds the 2-ply lookahead and `train_many.js`. The old code is in git history if you ever want it.
+Version 0.7 adds the 2-ply lookahead and `train_many.js`. Version 0.8
+tests three ways to stabilise training (none helped) and ships seed 8. The old code is in git history if you ever want it.

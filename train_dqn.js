@@ -58,12 +58,27 @@ const EPOCHS = Number(flag('epochs', 3000)); // training games (after warm-up)
 const DECAY = Number(flag('decay', 2000)); // games over which epsilon falls
 const BATCH = Number(flag('batch', 512));
 const LR = Number(flag('lr', 1e-3));
+// --lr-end: learning rate at the last game. The rate stays at --lr while the
+// network explores (the first --decay games, which is when it learns the
+// most), then falls smoothly (exponentially) to --lr-end, so the end of
+// training only fine-tunes instead of knocking a good network over.
+// Decaying from the very start stops it learning at all. Default: no decay.
+const LR_END = Number(flag('lr-end', LR));
+// --avg B: also keep a running average of the weights,
+//   avg = B x avg + (1 - B) x current     after every training step,
+// and test/save that average instead of the raw network. An average of many
+// recent networks wobbles much less than any one of them. 0 = off (default);
+// 0.99 averages roughly the last 100 steps.
+const AVG = Number(flag('avg', 0));
+// --updates N: training steps after each game (default 1, like the reference).
+// With 1, the whole run is only ~3,000 steps, which is very little learning.
+const UPDATES = Number(flag('updates', 1));
 const GAMMA = Number(flag('gamma', 0.99));
 const MEMORY = Number(flag('memory', 30000));
 const EPS_START = Number(flag('eps-start', 1));
 const EPS_END = Number(flag('eps-end', 1e-3));
 const MAX_PIECES = Number(flag('max-pieces', 2000)); // per training game
-const SEED = Number(flag('seed', 124)); // the defaults train the shipped dqn-model.json
+const SEED = Number(flag('seed', 8)); // the defaults train the shipped dqn-model.json
 const OUT = flag('out', 'dqn-model.json');
 const LOG = Number(flag('log', 100));
 // Which pieces to train on:
@@ -89,6 +104,10 @@ const STATE_SIZE = FEATURES.length;
 const rand = mulberry32(SEED);
 const net = new MLP([STATE_SIZE, 64, 64, 1], rand, FEATURES, SCALED);
 const IDX = net.input;
+// The averaged network (see --avg). It starts as a copy of the network.
+const avgNet = AVG > 0 ? MLP.fromJSON(net.toJSON()) : null;
+// The network we test and save: the average if there is one.
+const keeper = () => avgNet ?? net;
 
 
 /* ---------------------------------------------------------- replay memory */
@@ -121,7 +140,17 @@ function trainOnBatch() {
     // Bellman target: reward now, plus the discounted value of where we went
     y[n] = memD[k] ? memR[k] : memR[k] + GAMMA * net.predict(next);
   }
-  return net.trainStep(X, y, LR);
+  const late = Math.max(0, epoch - DECAY) / Math.max(1, EPOCHS - DECAY);
+  const lr = LR * (LR_END / LR) ** late;
+  const loss = net.trainStep(X, y, lr);
+  if (avgNet) {
+    for (let l = 0; l < net.W.length; l++) {
+      for (const [a, w] of [[avgNet.W[l], net.W[l]], [avgNet.b[l], net.b[l]]]) {
+        for (let k = 0; k < w.length; k++) a[k] = AVG * a[k] + (1 - AVG) * w[k];
+      }
+    }
+  }
+  return loss;
 }
 
 /* ------------------------------------------------------------------ games */
@@ -189,7 +218,7 @@ function evaluateGreedy() {
   let total = 0;
   for (const randomizer of kinds) {
     for (let g = 0; g < EVAL_GAMES; g++) {
-      total += playEpisode((b, c) => chooseDqnMove(b, c, net), 500000 + g, { cap: EVAL_CAP, randomizer }).pieces;
+      total += playEpisode((b, c) => chooseDqnMove(b, c, keeper()), 500000 + g, { cap: EVAL_CAP, randomizer }).pieces;
     }
   }
   return total / (EVAL_GAMES * kinds.length);
@@ -200,7 +229,7 @@ function evaluateGreedy() {
 console.log(`\ntraining a DQN to play Tetris`);
 console.log(`  network   ${net.sizes.join(' -> ')}  (input: ${FEATURES.join(', ')}${SCALED ? ', scaled' : ''})`);
 console.log(`  games     ${EPOCHS} after warm-up, epsilon ${EPS_START} -> ${EPS_END} over ${DECAY}`);
-console.log(`  learning  batch ${BATCH}, lr ${LR}, gamma ${GAMMA}, memory ${MEMORY}`);
+console.log(`  learning  batch ${BATCH}, lr ${LR}${LR_END !== LR ? ` -> ${LR_END}` : ''}, gamma ${GAMMA}, memory ${MEMORY}${UPDATES !== 1 ? `, ${UPDATES} updates per game` : ''}${AVG ? `, weight average ${AVG}` : ''}`);
 console.log(`  pieces    ${PIECES_MODE}${PIECES_MODE === 'mix' ? ' (half 7-bag, half random)' : ''}`);
 console.log(`  cap       ${MAX_PIECES} pieces per training game\n`);
 console.log('   game   epsilon    pieces (avg last 100)   lines (avg)   greedy test   elapsed');
@@ -221,7 +250,7 @@ while (epoch < EPOCHS) {
   // Like the reference: no learning until the memory holds a tenth of its size.
   if (memCount < MEMORY / 10) continue;
 
-  trainOnBatch();
+  for (let u = 0; u < UPDATES; u++) trainOnBatch();
   epoch++;
   recent.push(result);
   if (recent.length > 100) recent.shift();
@@ -236,7 +265,7 @@ while (epoch < EPOCHS) {
       bestEpoch = epoch;
       writeFileSync(
         OUT,
-        JSON.stringify({ ...net.toJSON(), trainedGames: epoch, greedyTest: greedy, reward: '1 + 10 * lines^2 per piece' })
+        JSON.stringify({ ...keeper().toJSON(), trainedGames: epoch, greedyTest: greedy, reward: '1 + 10 * lines^2 per piece' })
       );
     }
     console.log(
@@ -248,7 +277,7 @@ while (epoch < EPOCHS) {
   }
 }
 
-writeFileSync(OUT.replace(/\.json$/, '-last.json'), JSON.stringify(net.toJSON()));
+writeFileSync(OUT.replace(/\.json$/, '-last.json'), JSON.stringify(keeper().toJSON()));
 console.log(`\nbest network: game ${bestEpoch}, ${bestGreedy.toFixed(0)} pieces in the greedy test -> ${OUT}`);
 console.log(`last network saved separately as ${OUT.replace(/\.json$/, '-last.json')}`);
 console.log(`${game} games in ${((Date.now() - started) / 60000).toFixed(1)} min`);
