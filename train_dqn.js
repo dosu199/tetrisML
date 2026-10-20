@@ -45,7 +45,7 @@
  */
 
 import { writeFileSync } from 'node:fs';
-import { createBoard, Bag, MemorylessGen, mulberry32, placements, playEpisode } from './src/tetris-core.js';
+import { createBoard, Bag, MemorylessGen, mulberry32, placements, playEpisode, addGarbageRow, PLAY_COLS } from './src/tetris-core.js';
 import { MLP, FEATURE_SETS, boardState, nextStates, chooseDqnMove } from './src/tetris-dqn.js';
 
 const argv = process.argv.slice(2);
@@ -89,6 +89,15 @@ const LOG = Number(flag('log', 100));
 const PIECES_MODE = flag('pieces', 'random');
 if (!['bag', 'random', 'mix'].includes(PIECES_MODE)) throw new Error('--pieces must be bag, random or mix');
 const useRandom = (game) => PIECES_MODE === 'random' || (PIECES_MODE === 'mix' && game % 2 === 1);
+// --garbage N: in some training games a garbage row (full except one random
+// hole) rises from the bottom every N pieces, like hardmode's garbage5.
+// --garbage-share: the fraction of games that get garbage (default 0.5), so
+// the network keeps practising normal play too. 0 = off (default).
+const GARBAGE = Number(flag('garbage', 0));
+const GARBAGE_SHARE = Number(flag('garbage-share', 0.5));
+// spreads the garbage games evenly: with share 0.5, every second game
+const hasGarbage = (game) =>
+  GARBAGE > 0 && Math.floor((game + 1) * GARBAGE_SHARE) !== Math.floor(game * GARBAGE_SHARE);
 const EVAL_GAMES = Number(flag('eval-games', 5)); // greedy test games per check
 const EVAL_CAP = Number(flag('eval-cap', 1000));
 
@@ -156,9 +165,10 @@ function trainOnBatch() {
 /* ------------------------------------------------------------------ games */
 
 /** One game with the epsilon-greedy policy; every move goes into memory. */
-function playTrainingGame(seed, epsilon, random) {
+function playTrainingGame(seed, epsilon, random, garbageEvery = 0) {
   const board0 = createBoard();
   const bag = random ? new MemorylessGen(seed) : new Bag(seed);
+  const holeRand = mulberry32(seed * 7 + 12345); // where the garbage holes go
   let board = board0;
   let state = boardState(board, 0, IDX);
   let current = bag.next();
@@ -191,8 +201,17 @@ function playTrainingGame(seed, epsilon, random) {
     score += reward;
     current = bag.next();
 
-    // The game is over when the next piece has nowhere to go.
-    const done = placements(board, current).length === 0;
+    // Garbage pushes everything up a row. pick.state is still the board as
+    // the move left it; the garbage is part of what happens next, so the
+    // network learns how much a board is worth with garbage still to come.
+    let buried = false;
+    if (garbageEvery > 0 && pieces % garbageEvery === 0) {
+      buried = !addGarbageRow(board, Math.floor(holeRand() * PLAY_COLS));
+    }
+
+    // The game is over when the stack is pushed out of the top, or when the
+    // next piece has nowhere to go.
+    const done = buried || placements(board, current).length === 0;
     remember(state, reward, pick.state, done);
     state = pick.state;
     if (done) return { pieces, lines, score, died: true };
@@ -221,7 +240,22 @@ function evaluateGreedy() {
       total += playEpisode((b, c) => chooseDqnMove(b, c, keeper()), 500000 + g, { cap: EVAL_CAP, randomizer }).pieces;
     }
   }
-  return total / (EVAL_GAMES * kinds.length);
+  let score = total / (EVAL_GAMES * kinds.length);
+  // With --garbage, add the average survival in garbage games (no cap needed:
+  // garbage always wins in the end). Normal games of a good network mostly
+  // hit the cap, so this is what tells good checkpoints apart.
+  if (GARBAGE > 0) {
+    let g = 0;
+    for (let k = 0; k < EVAL_GAMES; k++) {
+      g += playEpisode((b, c) => chooseDqnMove(b, c, keeper()), 600000 + k, {
+        cap: EVAL_CAP,
+        randomizer: kinds[k % kinds.length],
+        garbageEvery: GARBAGE,
+      }).pieces;
+    }
+    score += g / EVAL_GAMES;
+  }
+  return score;
 }
 
 /* ------------------------------------------------------------------- main */
@@ -231,7 +265,8 @@ console.log(`  network   ${net.sizes.join(' -> ')}  (input: ${FEATURES.join(', '
 console.log(`  games     ${EPOCHS} after warm-up, epsilon ${EPS_START} -> ${EPS_END} over ${DECAY}`);
 console.log(`  learning  batch ${BATCH}, lr ${LR}${LR_END !== LR ? ` -> ${LR_END}` : ''}, gamma ${GAMMA}, memory ${MEMORY}${UPDATES !== 1 ? `, ${UPDATES} updates per game` : ''}${AVG ? `, weight average ${AVG}` : ''}`);
 console.log(`  pieces    ${PIECES_MODE}${PIECES_MODE === 'mix' ? ' (half 7-bag, half random)' : ''}`);
-console.log(`  cap       ${MAX_PIECES} pieces per training game\n`);
+console.log(`  cap       ${MAX_PIECES} pieces per training game`);
+console.log(`  garbage   ${GARBAGE > 0 ? `a row every ${GARBAGE} pieces in ${Math.round(GARBAGE_SHARE * 100)}% of games` : 'off'}\n`);
 console.log('   game   epsilon    pieces (avg last 100)   lines (avg)   greedy test   elapsed');
 console.log('  -----   -------    ---------------------   -----------   -----------   -------');
 
@@ -244,7 +279,7 @@ let bestEpoch = 0;
 
 while (epoch < EPOCHS) {
   const epsilon = EPS_END + (Math.max(DECAY - epoch, 0) * (EPS_START - EPS_END)) / DECAY;
-  const result = playTrainingGame(1_000_000 + game, epsilon, useRandom(game));
+  const result = playTrainingGame(1_000_000 + game, epsilon, useRandom(game), hasGarbage(game) ? GARBAGE : 0);
   game++;
 
   // Like the reference: no learning until the memory holds a tenth of its size.

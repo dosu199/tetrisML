@@ -106,6 +106,38 @@ Those differences are within luck, so overall it is a modest step forward.
 All three options stay in `train_dqn.js` (off by default), so you can
 experiment with them.
 
+### Training with garbage rows (v0.9)
+
+`--garbage 5` adds a rising garbage row every 5 pieces in half of the training
+games (`--garbage-share` changes the half). The check inside training then also
+plays garbage games. We trained 16 seeds with it. Same selection games as in
+v0.8: random pieces, no preview, seeds 70000+, games lost out of 50.
+
+| training | seeds | games lost | average |
+|---|---|---|---|
+| plain (v0.8 table) | 1–8 | 38, 36, 37, 32, 48, 44, 22, 14 | 34 |
+| with garbage | 1–8 | 31, 37, 19, 30, 16, 27, 14, 40 | 27 |
+| with garbage | 9–16 | 40, 32, 29, 26, 24, 39, 37, 31 | 32 |
+
+Training with garbage makes a typical run a bit better, 30 lost on average
+over 16 seeds vs 34. Its worst runs were also less bad (40 vs 48). It is the
+same lesson as v0.6: practising on harder games helps on easier ones. The gain
+is small, though, and the seed spread is still large.
+
+The best garbage-trained network (seed 7) did **not** beat the shipped one on
+the final games:
+
+| final test, 50 games | shipped (seed 8) | garbage seed 7 |
+|---|---|---|
+| random pieces, no preview, lost | **12/50** | 15/50 |
+| 7-bag, cap 10,000, lost | 0/50 | 0/50 |
+| garbage, with lookahead, mean pieces | 319 | **349** |
+
+It is better at garbage and worse at random pieces, and both differences are
+within luck. So `dqn-model.json` is unchanged in v0.9. Garbage survival itself
+barely moved without lookahead (about 130–150 pieces for every network).
+Digging out of garbage needs planning that 4 board numbers cannot describe.
+
 ### Picking the best of several runs (v0.7)
 
 `train_many.js` trains several seeds and picks the winner on a separate set of
@@ -191,7 +223,8 @@ npx serve .              # then open index.html in the browser
 
 Training options (all have defaults): `--epochs 3000 --decay 2000 --batch 512
 --lr 1e-3 --gamma 0.99 --memory 30000 --seed 8 --pieces random --features basic --out dqn-model.json`.
-Experimental, off by default: `--lr-end`, `--avg`, `--updates` (see v0.8 above).
+Experimental, off by default: `--lr-end`, `--avg`, `--updates` (see v0.8 above),
+`--garbage N` and `--garbage-share` (see v0.9).
 `--features full` uses all 8 bot features (scaled automatically); `--scale`
 turns scaling on for the 4 basic ones. Training is deterministic: the
 defaults reproduce the shipped `dqn-model.json` exactly.
@@ -257,4 +290,5 @@ pipeline. Version 0.4 replaced it with this much smaller DQN, which learns from
 the reward alone. Version 0.5 added feature sets and scaling, and picked the
 best of several training seeds. Version 0.6 trains on random pieces.
 Version 0.7 adds the 2-ply lookahead and `train_many.js`. Version 0.8
-tests three ways to stabilise training (none helped) and ships seed 8. The old code is in git history if you ever want it.
+tests three ways to stabilise training (none helped) and ships seed 8.
+Version 0.9 adds training with garbage rows. The old code is in git history if you ever want it.

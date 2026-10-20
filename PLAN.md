@@ -1,10 +1,10 @@
 # Plan — Tetris ML
 
-Last updated: 20 October 2026 (v0.8).
+Last updated: 20 October 2026 (v0.9).
 
 **Goal:** a neural network that plays Tetris well and learns by itself.
 
-## Where we are (v0.8)
+## Where we are (v0.9)
 
 - Network: `dqn-model.json` (4 features, random pieces, seed 8), picked from
   8 seeds with `train_many.js`. 50 fresh games:
@@ -15,15 +15,23 @@ Last updated: 20 October 2026 (v0.8).
 - Stability experiments (8 seeds each): learning-rate decay, weight
   averaging, more steps per game. **None** made a typical run better. Seed
   spread (14–48 lost) is the real limit; train many seeds and select.
+- Garbage training (`--garbage 5`, 16 seeds): typical run a bit better (30 vs
+  34 lost) and fewer very bad runs, but no network beat the shipped one. The
+  model is unchanged.
+- **We have hit the ceiling of "4 numbers + 1-ply".** Further gains need a
+  network that sees more of the board, or a different learning signal.
 
 ## Possible next steps
 
-1. **Train with garbage rows**, the only mode where everyone still loses.
-2. **Speed up the 2-ply search** (about 30x slower than 1-ply).
-3. **A different learning signal:** a reward that also penalises holes or
-   height directly (reward shaping), or n-step targets. These change *what*
-   it learns, not just how steadily.
-4. **Later:** the raw board (240 cells) as input.
+1. **Raw board as input (a CNN).** The network sees all 240 cells instead of
+   4 numbers and learns its own features: wells, overhangs, where an I piece
+   fits. This is the real "deep" in deep Q-learning, and the biggest
+   remaining step. Training is much slower in plain JavaScript (hours, not
+   minutes), and it needs a careful plan first.
+2. **n-step targets:** learn from the reward of the next few moves instead
+   of just one. This often makes DQN learn faster and steadier. It is a small
+   change.
+3. **Speed up the 2-ply search** (about 30x slower than 1-ply).
 
 ## Rules we work by
 
