@@ -5,10 +5,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="nav.css">
     <title>Tetris</title>
 </head>
 
 <body>
+    <nav class="topnav" aria-label="Main">
+      <a class="topnav-brand" href="index.html"><span class="topnav-logo" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span>Tetris ML</span></a>
+      <ul class="topnav-links">
+        <li><a href="index.html" aria-current="page">Play</a></li>
+        <li><a href="presentation.html">How it works</a></li>
+      </ul>
+    </nav>
+
     <div id="wrapper">
         <div id="gameContainer"></div>
         <div id="gameStuff">
@@ -21,22 +30,14 @@
             <div class="agent-panel">
   <label for="agent">Ko igra</label>
   <select id="agent">
-    <option value="search">Pretraga + naucene tezine (Faza 1)</option>
-    <option value="value">Mreza vrijednosti - regresija</option>
-    <option value="rank">Ranking mreza - RankNet</option>
-    <option value="dagger">Ranking mreza + DAgger, 2 poteza</option>
+    <option value="dqn2">Neural network + lookahead</option>
+    <option value="dqn">Neural network (DQN)</option>
+    <option value="bot">Bot (search)</option>
   </select>
   <div id="agentStats"></div>
 </div>
         </div>
     </div>
-    </div>   
-   <select id="agent">
-  <option value="dqn2">Neural network + lookahead</option>
-  <option value="dqn">Neural network (DQN)</option>
-  <option value="bot">Bot (search)</option>
-</select>
-<div id="agentStats"></div>
 
 <script type="module">
   import { startVisualGame } from './src/tetris-visual.js';

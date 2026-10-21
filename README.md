@@ -205,6 +205,7 @@ train_dqn.js             trains the network        -> dqn-model.json
 train_many.js            trains several seeds, keeps the best on a validation set
 hardmode.js              bot vs network, 5 rule modes (--lookahead adds 2-ply)
 test_dqn.js              gradient check + smoke tests for the network
+presentation.html/.css/.js   visual explanation page, network playing live
 bench.js                 26 tests for the game core
 train.js / compare.js    genetic algorithm for the bot -> weights.json
 ```
@@ -234,6 +235,25 @@ Training writes over `dqn-model.json`, so use `--out` to keep the old one
 (for example `--out dqn-try2.json`). You can then compare the two networks in
 one run:
 `node hardmode.js --model dqn-model.json,dqn-try2.json --games 50 --seed 90000`.
+
+## Presentation page
+
+`presentation.html` is a visual explanation of the project, with the real
+network playing live:
+
+1. **Watch it think:** every option for the current piece is drawn on the
+   board, coloured from red (bad) to green (good), with the 4 numbers the
+   network sees and its top choices. Pause and step through one move at a
+   time.
+2. **How it learned:** what it sees, the reward, the Bellman rule (checked
+   live against the game), exploration (a mini-game with a slider for random
+   moves), and the real training curve.
+3. **How good is it:** the 50-game results against the bot.
+
+Open it like the game: `npx serve .`, then click **How it works** in the top
+bar (or go to `/presentation.html`). Both pages share the bar from `nav.css`. It only
+reads `src/` and `dqn-model.json`, and has its own `presentation.css`. The
+game page (`index.html`, `style.css`) is not touched.
 
 ## Watching it play in the browser
 

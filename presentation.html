@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tetris Neural Network</title>
+    <meta name="description" content="A small neural network that taught itself to play Tetris, playing live in your browser, with an explanation of how it decides and how it learned." />
+    <link rel="stylesheet" href="presentation.css" />
+    <link rel="stylesheet" href="nav.css" />
+  </head>
+  <body>
+    <nav class="topnav" aria-label="Main">
+      <a class="topnav-brand" href="index.html"><span class="topnav-logo" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span>Tetris ML</span></a>
+      <ul class="topnav-links">
+        <li><a href="index.html">Play</a></li>
+        <li><a href="presentation.html" aria-current="page">How it works</a></li>
+      </ul>
+    </nav>
+
+    <header class="hero">
+      <div class="wrap">
+        <p class="eyebrow">Tetris ML · deep Q-learning in plain JavaScript</p>
+        <h1>A neural network that taught itself Tetris</h1>
+        <p class="lede">
+          Nobody showed it a single good move. It played a few thousand games and was only told its
+          score. What came out is about 4,500 numbers that now play better than a hand-tuned bot.
+          Below, the real network is playing live in your browser.
+        </p>
+        <div class="stats">
+          <div class="stat"><span class="stat-num">4</span><span class="stat-label">numbers it looks at per move</span></div>
+          <div class="stat"><span class="stat-num">~4 min</span><span class="stat-label">of training, from nothing</span></div>
+          <div class="stat"><span class="stat-num">0 / 50</span><span class="stat-label">games lost on normal pieces (bot: 8)</span></div>
+        </div>
+        <nav class="toc" aria-label="Sections">
+          <a href="#watch">1 · Watch it think</a>
+          <a href="#learn">2 · How it learned</a>
+          <a href="#score">3 · How good is it</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <!-- ------------------------------------------------------------ 1 -->
+      <section id="watch" class="section">
+        <div class="wrap">
+          <h2><span class="num">1</span> Watch it think</h2>
+          <p class="intro">
+            For every piece the network tries <b>every rotation in every column</b>. Each faint outline
+            on the board is one option, coloured by how much the network likes it: <span class="swatch bad"></span>
+            red is bad, <span class="swatch good"></span> green is good. The solid outline is the move it picks.
+            Pause and use <b>Next move</b> to go through it one decision at a time.
+          </p>
+
+          <div class="demo">
+            <div class="board-col">
+              <div class="board-frame">
+                <canvas id="board" aria-label="Tetris board with the network's candidate moves"></canvas>
+                <div id="gameOver" class="overlay">Loading the network… If this message stays, open the page through a local server (<code>npx serve .</code>), not by double-clicking the file.</div>
+              </div>
+              <div class="controls">
+                <button id="playBtn" class="primary" type="button">Pause</button>
+                <button id="stepBtn" type="button">Next move</button>
+                <button id="resetBtn" type="button">New game</button>
+              </div>
+              <label class="slider">
+                <span>Speed</span>
+                <input id="speed" type="range" min="0" max="5" step="1" value="2" />
+                <output id="speedOut">2 moves/s</output>
+              </label>
+              <div class="toggles">
+                <label><input id="randomPieces" type="checkbox" /> Fully random pieces</label>
+                <label><input id="lookahead" type="checkbox" /> Look one piece ahead</label>
+              </div>
+            </div>
+
+            <div class="panel-col">
+              <div class="card pieces-card">
+                <div>
+                  <h3>Now</h3>
+                  <canvas id="curPiece" class="mini-piece"></canvas>
+                </div>
+                <div>
+                  <h3>Next</h3>
+                  <canvas id="nextPiece" class="mini-piece"></canvas>
+                </div>
+                <dl class="counters">
+                  <div><dt>Lines</dt><dd id="lines">0</dd></div>
+                  <div><dt>Pieces</dt><dd id="pieces">0</dd></div>
+                  <div><dt>Game</dt><dd id="games">1</dd></div>
+                  <div><dt>Best</dt><dd id="best">0</dd></div>
+                </dl>
+              </div>
+
+              <div class="card">
+                <h3>What it sees for <span id="seeWhich">its pick</span></h3>
+                <p class="hint">After placing the piece, the board is boiled down to these 4 numbers. That's all the network gets.</p>
+                <div id="features" class="features"></div>
+                <div class="verdict">
+                  <span>Network's score for this board</span>
+                  <strong id="verdict">–</strong>
+                </div>
+              </div>
+
+              <div class="card">
+                <h3>Its top choices <span class="muted" id="optCount"></span></h3>
+                <p class="hint">Hover a row to see that option on the board.</p>
+                <ol id="options" class="options"></ol>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ------------------------------------------------------------ 2 -->
+      <section id="learn" class="section alt">
+        <div class="wrap">
+          <h2><span class="num">2</span> How it learned</h2>
+          <p class="intro">
+            The method is deep Q-learning, following the open-source project
+            <a href="https://github.com/vietnh1009/Tetris-deep-Q-learning-pytorch" target="_blank" rel="noopener">Tetris-deep-Q-learning-pytorch</a>,
+            rewritten in plain JavaScript. Five ideas carry the whole thing.
+          </p>
+
+          <ol class="steps">
+            <!-- a -->
+            <li class="step">
+              <div class="step-text">
+                <h3>It sees 4 numbers, not the picture</h3>
+                <p>
+                  For each possible move, the board that move would leave is reduced to four numbers:
+                </p>
+                <ul class="defs">
+                  <li><b>Lines</b>: rows cleared by this move.</li>
+                  <li><b>Holes</b>: empty cells with a block somewhere above them. <span class="mark-hole">●</span></li>
+                  <li><b>Bumpiness</b>: how jagged the surface is. It adds up the height jumps between neighbouring columns.</li>
+                  <li><b>Height</b>: all column heights added together.</li>
+                </ul>
+                <p>
+                  The network (4 → 64 → 64 → 1 neurons) turns those 4 numbers into one score.
+                  It never learned what a hole <i>is</i>. It only learned that boards with a high
+                  "holes" number tend to end badly.
+                </p>
+              </div>
+              <div class="step-visual">
+                <canvas id="exampleBoard" aria-label="Example board with holes and column heights marked"></canvas>
+                <div id="exampleFeatures" class="example-features"></div>
+              </div>
+            </li>
+
+            <!-- b -->
+            <li class="step">
+              <div class="step-text">
+                <h3>Its only teacher is the score</h3>
+                <p>
+                  Every piece placed earns a reward: <code>1 + 10 × lines²</code>. Just staying alive earns 1, and
+                  clearing lines earns much more. Clearing four at once (a "tetris") is worth 16 times a single.
+                  Losing simply means no more rewards. That's the entire instruction it gets.
+                </p>
+              </div>
+              <div class="step-visual">
+                <div class="reward-chart" id="rewardChart"></div>
+              </div>
+            </li>
+
+            <!-- c -->
+            <li class="step">
+              <div class="step-text">
+                <h3>One rule: a board is worth what it pays now plus what comes next</h3>
+                <p>
+                  The network guesses how many points a board will still earn. After each move, the guess is
+                  checked against what actually happened: the reward it just got, plus its own guess for the
+                  new board (slightly discounted, × 0.99). The gap between the two is the error it trains on.
+                  Repeat that over thousands of training steps and real rewards flow backwards to the moves
+                  that earned them. This is the <b>Bellman equation</b>.
+                </p>
+                <p class="hint">Live from the game above: after training, both sides should nearly agree.</p>
+              </div>
+              <div class="step-visual">
+                <div class="bellman card">
+                  <div class="b-row">
+                    <span class="b-label">Its guess for the board before this move</span>
+                    <span class="b-val" id="bBefore">–</span>
+                  </div>
+                  <div class="b-eq">≈</div>
+                  <div class="b-row">
+                    <span class="b-label">Reward from the move</span>
+                    <span class="b-val" id="bReward">–</span>
+                  </div>
+                  <div class="b-row">
+                    <span class="b-label">+ 0.99 × its guess for the new board</span>
+                    <span class="b-val" id="bAfter">–</span>
+                  </div>
+                  <div class="b-row total">
+                    <span class="b-label">= what actually followed</span>
+                    <span class="b-val" id="bTarget">–</span>
+                  </div>
+                  <div class="b-gap">
+                    <span>Gap on this move: <b id="bGap">–</b></span>
+                    <span>Average gap: <b id="bAvg">–</b></span>
+                  </div>
+                </div>
+              </div>
+            </li>
+
+            <!-- d -->
+            <li class="step">
+              <div class="step-text">
+                <h3>First it plays randomly, then it trusts itself</h3>
+                <p>
+                  At the start the network knows nothing, so it plays random moves to find out what happens.
+                  This is called <b>exploration</b>. Over 2,000 games the share of random moves falls from 100% to
+                  0.1%, and it relies more and more on what it learned. Drag the slider to make the trained network
+                  explore again, and watch how quickly random moves ruin a game.
+                </p>
+              </div>
+              <div class="step-visual explore">
+                <canvas id="exploreBoard" aria-label="Small board played with a chosen amount of random moves"></canvas>
+                <div class="explore-side">
+                  <label class="slider vertical-ish">
+                    <span>Random moves</span>
+                    <input id="epsilon" type="range" min="0" max="4" step="1" value="2" />
+                    <output id="epsOut">10%</output>
+                  </label>
+                  <dl class="counters small">
+                    <div><dt>This game</dt><dd id="exPieces">0</dd></div>
+                    <div><dt>Games</dt><dd id="exGames">0</dd></div>
+                    <div><dt>Avg pieces / game</dt><dd id="exAvg">–</dd></div>
+                  </dl>
+                  <p class="hint">Pieces survived per game, at this setting.</p>
+                </div>
+              </div>
+            </li>
+
+            <!-- e -->
+            <li class="step wide">
+              <div class="step-text">
+                <h3>Training is bumpy, so keep the best version</h3>
+                <p>
+                  This is the real training run of the network you're watching (3,000 games, about 4 minutes).
+                  It learned slowly while exploring, then took off. But it didn't improve steadily: a
+                  network that survived 1,000 pieces could fall to 83 one hundred games later. So every
+                  100 games it plays a short test with no random moves, and only a new best result is saved
+                  (<span class="dot-best"></span>). The saved network is from game 2,800.
+                </p>
+              </div>
+              <div class="step-visual">
+                <div id="trainChart" class="train-chart"></div>
+              </div>
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <!-- ------------------------------------------------------------ 3 -->
+      <section id="score" class="section">
+        <div class="wrap">
+          <h2><span class="num">3</span> How good is it?</h2>
+          <p class="intro">
+            The network against a classic search bot with hand-tuned weights. Each line is 50 games
+            the network never saw in training, and every player gets exactly the same pieces.
+            <b>Network + lookahead</b> is the same network, also trying every placement of the next piece.
+          </p>
+          <div id="scoreboard" class="scoreboard"></div>
+          <p class="footnote">
+            Where it's still behind: with fully random pieces and no preview, the bot loses 9 games
+            and the network 12. With the preview and lookahead, the network beats the bot in the hardest mode.
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="wrap">
+        <p>
+          Tetris ML · the network is <code>dqn-model.json</code> from this repo, running on
+          <code>src/tetris-dqn.js</code>. Method after
+          <a href="https://github.com/vietnh1009/Tetris-deep-Q-learning-pytorch" target="_blank" rel="noopener">vietnh1009/Tetris-deep-Q-learning-pytorch</a>.
+        </p>
+      </div>
+    </footer>
+
+    <script type="module" src="presentation.js"></script>
+  </body>
+</html>

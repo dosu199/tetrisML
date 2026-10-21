@@ -1,143 +1,292 @@
-html ,body {
-    overflow: hidden;
-    box-sizing: border-box;
-    display: flex;
-    align-items: center;
-    font-family: Arial, Helvetica, sans-serif;
-    background-color: #E6EAF4;
-    margin: 95px 320px;
-}
-#gameContainer {
-    width:560px;
-    display: flex;
-    flex-direction: column;
-    flex-wrap: wrap;
-    margin: 0px auto;
-    position: relative;
-    bottom: 133px;
-    box-sizing: content-box;
-    background-image: url("images/background.png");
-    background-repeat:no-repeat ;
+/*
+ * style.css - the Tetris game page.
+ *
+ * Same element ids and class names as before (#gameContainer, .row, .block,
+ * #nextTetromino, #score, #name, #scoreBoard, .agent-panel, #agent,
+ * #agentStats), so no HTML or JavaScript has to change.
+ */
+
+:root {
+  /* one cell of the board: as big as fits the window, never above 34px */
+  --cell: clamp(14px, min(calc((100vh - 100px - var(--topnav-h, 0px)) / 24), calc((100vw - 48px) / 10)), 34px);
+  --page: #0b0f1d;
+  --panel: rgba(23, 29, 51, 0.82);
+  --panel-line: rgba(255, 255, 255, 0.09);
+  --text: #e8ebf3;
+  --muted: #98a2bb;
+  --accent: #8b85ff;
+  --accent-2: #4ec3e0;
+  --radius: 16px;
 }
 
-.block {
-    width: 35px;
-    height: 35px;
-    box-sizing: border-box;
-    
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  box-sizing: border-box;
+  min-height: 100vh;
+  padding: calc(var(--topnav-h, 0px) + 24px) 16px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  color: var(--text);
+  background:
+    radial-gradient(900px 500px at 15% 10%, rgba(139, 133, 255, 0.16), transparent 60%),
+    radial-gradient(800px 500px at 90% 90%, rgba(78, 195, 224, 0.12), transparent 60%),
+    var(--page);
+}
+
+#wrapper {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 28px;
+  flex-wrap: wrap;
+}
+
+/* ------------------------------------------------------------ the board */
+
+#gameContainer {
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--panel-line);
+  background:
+    linear-gradient(rgba(8, 11, 24, 0.6), rgba(8, 11, 24, 0.6)),
+    url('images/background.png') center / cover no-repeat,
+    #080b18;
+  box-shadow:
+    0 0 0 1px rgba(139, 133, 255, 0.15),
+    0 20px 60px rgba(0, 0, 0, 0.55),
+    0 0 80px rgba(139, 133, 255, 0.12);
+}
+
+/* The game keeps a 3-cell frame round the playfield (walls and floor). It is
+   part of the game logic, not something to look at, so it is hidden here. */
+#gameContainer .row .block:nth-child(-n + 3),
+#gameContainer .row .block:nth-child(n + 14),
+#gameContainer .row_24,
+#gameContainer .row_25,
+#gameContainer .row_26 {
+  display: none;
 }
 
 .row {
-    display: flex;
-    box-sizing: border-box;
+  display: flex;
+  box-sizing: border-box;
 }
 
-.row :last-child {
-    border-right: none;
-}
-
-#gameContainer :nth-child(25) .block {
-    border-bottom: none;
+.block {
+  width: var(--cell);
+  height: var(--cell);
+  box-sizing: border-box;
+  border-radius: 3px;
+  background-size: 100% 100%;
+  /* faint grid on empty cells; filled cells get their image and colour */
+  background-color: rgba(255, 255, 255, 0.025);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
 }
 
 .border {
-    border: 1px solid white;
+  border: 1px solid white;
 }
 
-#score {
-    background-image: url("images/backgroundStuff.png");
-    color: white;
-    font-size: 19px;
-    width: 50px;
-    height: 50px;
-    padding: 50px;
-    position: relative;
-    right: 100px;
-    top:-346px;
-    text-align: center;
-    border-radius: 5px;
-    display: flex;
-    flex-direction: column;
-}
-#scoreBoard {
-    color: white;
-    font-size: 22px;
-    width: 50px;
-    height: 50px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+/* ------------------------------------------------------------ side panel */
+
+#gameStuff {
+  width: 230px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
-#name {
-    margin-bottom: 20px;
-    color: white;
-    font-size: 19px;
-    width: 50px;
-    height: 25px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+#gameStuff::before {
+  content: 'TETRIS';
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: 0.32em;
+  line-height: 1;
+  padding: 4px 0 6px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+#nextTetromino,
+#score,
+.agent-panel {
+  box-sizing: border-box;
+  background-color: var(--panel);
+  border: 1px solid var(--panel-line);
+  border-radius: var(--radius);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
 }
 
 #nextTetromino {
-    background-position: 50% 50%;
-    background-repeat:no-repeat ;
-    background-color:rgb(6, 9, 24);
-    width: 150px;
-    height: 150px;
-    position: relative;
-    right: 100px;
-    top: -284px;
-    border-radius: 5px;
-    margin-bottom: 80px;
+  position: relative;
+  width: 100%;
+  height: 150px;
+  background-position: 50% 58%;
+  background-repeat: no-repeat;
 }
 
-#gameStuff {
-   
+#nextTetromino::before {
+  content: 'NEXT';
+  position: absolute;
+  top: 12px;
+  left: 16px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--muted);
 }
 
-
-
-#wrapper {
-    display: contents;
+#score {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
 }
+
+#name {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+#scoreBoard {
+  margin-top: 4px;
+  font-size: 2.6rem;
+  font-weight: 800;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.agent-panel {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.agent-panel label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+select {
+  width: 100%;
+  max-width: 320px;
+  font: inherit;
+  font-size: 0.92rem;
+  color: var(--text);
+  background-color: #12182c;
+  border: 1px solid var(--panel-line);
+  border-radius: 10px;
+  padding: 9px 10px;
+  cursor: pointer;
+}
+
+select:hover,
+select:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+#agentStats {
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+#agentStats:empty {
+  display: none;
+}
+
+/* ------------------------------------------------ small screens: stack */
+
+@media (max-width: 720px) {
+  #wrapper {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  #gameStuff {
+    order: -1;
+    width: 100%;
+    max-width: calc(var(--cell) * 10 + 22px);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  #gameStuff::before {
+    grid-column: 1 / -1;
+    font-size: 1.5rem;
+  }
+
+  #nextTetromino {
+    height: 110px;
+    background-size: auto 60%;
+  }
+
+  .agent-panel {
+    grid-column: 1 / -1;
+  }
+}
+
+/* ----------------------------- leaderboard (kept from the original page) */
 
 #content {
-    width: 80%;
-    height: 736px;
-    background-image: url("images/background.png");
-    background-position: center;
-    background-repeat: no-repeat;
+  width: 80%;
+  height: 736px;
+  background-image: url('images/background.png');
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
 .orderNode {
-    color: white;
-    margin-right: 100px;
-    margin-left: 10px;
-    font-size: 20px;
+  color: white;
+  margin-right: 100px;
+  margin-left: 10px;
+  font-size: 20px;
 }
 
 .nameNode {
-    color: white;
-   display: flex;
-   flex: 1;
-   font-size: 20px;
-   align-items: center;
+  color: white;
+  display: flex;
+  flex: 1;
+  font-size: 20px;
+  align-items: center;
 }
 
 .scoreNode {
-    color: white;
-    display: flex;
-    font-size: 20px;
-    flex: 1;
-    justify-content: flex-end;
-    margin-right: 20px;
+  color: white;
+  display: flex;
+  font-size: 20px;
+  flex: 1;
+  justify-content: flex-end;
+  margin-right: 20px;
 }
 
 .rowLeaderboard {
-    display: flex;
-    margin-bottom: 48px;
+  display: flex;
+  margin-bottom: 48px;
 }
-
-
