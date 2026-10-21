@@ -93,6 +93,12 @@ const useRandom = (game) => PIECES_MODE === 'random' || (PIECES_MODE === 'mix' &
 // hole) rises from the bottom every N pieces, like hardmode's garbage5.
 // --garbage-share: the fraction of games that get garbage (default 0.5), so
 // the network keeps practising normal play too. 0 = off (default).
+// --nstep N: learn from the next N moves' rewards instead of just one.
+//   1-step (the reference):  V(s0) ~ r0 + 0.99 V(s1)
+//   3-step:                  V(s0) ~ r0 + 0.99 r1 + 0.99^2 r2 + 0.99^3 V(s3)
+// Real rewards travel back N moves at once instead of one move per training
+// step, so the network depends less on its own (often wrong) guesses.
+const NSTEP = Number(flag('nstep', 1));
 const GARBAGE = Number(flag('garbage', 0));
 const GARBAGE_SHARE = Number(flag('garbage-share', 0.5));
 // spreads the garbage games evenly: with share 0.5, every second game
@@ -125,10 +131,12 @@ const memS = new Float64Array(MEMORY * STATE_SIZE);
 const memN = new Float64Array(MEMORY * STATE_SIZE);
 const memR = new Float64Array(MEMORY);
 const memD = new Uint8Array(MEMORY);
+const memG = new Float64Array(MEMORY); // discount on V(next): 0.99^(steps)
 let memCount = 0;
 let memPos = 0;
 
-function remember(state, reward, next, done) {
+function remember(state, reward, next, done, discount = GAMMA) {
+  memG[memPos] = discount;
   memS.set(state, memPos * STATE_SIZE);
   memN.set(next, memPos * STATE_SIZE);
   memR[memPos] = reward;
@@ -147,7 +155,7 @@ function trainOnBatch() {
     X.set(memS.subarray(k * STATE_SIZE, (k + 1) * STATE_SIZE), n * STATE_SIZE);
     next.set(memN.subarray(k * STATE_SIZE, (k + 1) * STATE_SIZE));
     // Bellman target: reward now, plus the discounted value of where we went
-    y[n] = memD[k] ? memR[k] : memR[k] + GAMMA * net.predict(next);
+    y[n] = memD[k] ? memR[k] : memR[k] + memG[k] * net.predict(next);
   }
   const late = Math.max(0, epoch - DECAY) / Math.max(1, EPOCHS - DECAY);
   const lr = LR * (LR_END / LR) ** late;
@@ -175,6 +183,7 @@ function playTrainingGame(seed, epsilon, random, garbageEvery = 0) {
   let pieces = 0;
   let lines = 0;
   let score = 0;
+  const pending = []; // moves waiting for their N-step return
 
   while (true) {
     const options = nextStates(board, current, IDX);
@@ -212,7 +221,23 @@ function playTrainingGame(seed, epsilon, random, garbageEvery = 0) {
     // The game is over when the stack is pushed out of the top, or when the
     // next piece has nowhere to go.
     const done = buried || placements(board, current).length === 0;
-    remember(state, reward, pick.state, done);
+    // Collect the last NSTEP moves; once there are NSTEP, the oldest one gets
+    // its N-step return. At game over every waiting move is stored, each
+    // with the rewards it had left and no bootstrap (the game ended).
+    pending.push({ state, reward });
+    if (done) {
+      for (let i = 0; i < pending.length; i++) {
+        let ret = 0;
+        for (let j = pending.length - 1; j >= i; j--) ret = pending[j].reward + GAMMA * ret;
+        remember(pending[i].state, ret, pick.state, true);
+      }
+      pending.length = 0;
+    } else if (pending.length === NSTEP) {
+      let ret = 0;
+      for (let j = NSTEP - 1; j >= 0; j--) ret = pending[j].reward + GAMMA * ret;
+      remember(pending[0].state, ret, pick.state, false, GAMMA ** NSTEP);
+      pending.shift();
+    }
     state = pick.state;
     if (done) return { pieces, lines, score, died: true };
     if (pieces >= MAX_PIECES) return { pieces, lines, score, died: false };
@@ -263,7 +288,7 @@ function evaluateGreedy() {
 console.log(`\ntraining a DQN to play Tetris`);
 console.log(`  network   ${net.sizes.join(' -> ')}  (input: ${FEATURES.join(', ')}${SCALED ? ', scaled' : ''})`);
 console.log(`  games     ${EPOCHS} after warm-up, epsilon ${EPS_START} -> ${EPS_END} over ${DECAY}`);
-console.log(`  learning  batch ${BATCH}, lr ${LR}${LR_END !== LR ? ` -> ${LR_END}` : ''}, gamma ${GAMMA}, memory ${MEMORY}${UPDATES !== 1 ? `, ${UPDATES} updates per game` : ''}${AVG ? `, weight average ${AVG}` : ''}`);
+console.log(`  learning  batch ${BATCH}, lr ${LR}${LR_END !== LR ? ` -> ${LR_END}` : ''}, gamma ${GAMMA}, memory ${MEMORY}${NSTEP !== 1 ? `, ${NSTEP}-step targets` : ''}${UPDATES !== 1 ? `, ${UPDATES} updates per game` : ''}${AVG ? `, weight average ${AVG}` : ''}`);
 console.log(`  pieces    ${PIECES_MODE}${PIECES_MODE === 'mix' ? ' (half 7-bag, half random)' : ''}`);
 console.log(`  cap       ${MAX_PIECES} pieces per training game`);
 console.log(`  garbage   ${GARBAGE > 0 ? `a row every ${GARBAGE} pieces in ${Math.round(GARBAGE_SHARE * 100)}% of games` : 'off'}\n`);

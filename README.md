@@ -224,7 +224,8 @@ npx serve .              # then open index.html in the browser
 Training options (all have defaults): `--epochs 3000 --decay 2000 --batch 512
 --lr 1e-3 --gamma 0.99 --memory 30000 --seed 8 --pieces random --features basic --out dqn-model.json`.
 Experimental, off by default: `--lr-end`, `--avg`, `--updates` (see v0.8 above),
-`--garbage N` and `--garbage-share` (see v0.9).
+`--garbage N` and `--garbage-share` (see v0.9), and `--nstep N`: learn from
+the next N moves' rewards instead of one (in testing, see PLAN.md).
 `--features full` uses all 8 bot features (scaled automatically); `--scale`
 turns scaling on for the 4 basic ones. Training is deterministic: the
 defaults reproduce the shipped `dqn-model.json` exactly.
