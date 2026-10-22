@@ -1,6 +1,6 @@
 # Plan — Tetris ML
 
-Last updated: 22 October 2026 (v0.16).
+Last updated: 22 October 2026 (v0.17).
 
 **Goal:** a neural network that plays Tetris well and learns by itself.
 
@@ -65,6 +65,12 @@ stage B (retrain with the held piece as an input) and proposal 1 (5-step).
   NOT better. Final test, both with hold, cap 10,000: random lost 3 (current)
   vs 9 / 8; garbage3 114 vs 106 / 96; garbage4 215 vs 203 / 161.
   Conclusion: best setup = network trained WITHOUT hold, using hold to play.
+
+## Done on 22 October (v0.17): Play vs Bot
+
+`versus.html`: you vs the network / bot on the same pieces, Battle (garbage)
+and Race (40 lines) modes, adjustable opponent speed, keyboard and touch
+controls, hold and next for both. New top-bar item on every page.
 
 ## ▶ NEXT: options
 

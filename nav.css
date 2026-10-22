@@ -65,6 +65,13 @@ html {
   margin: 0;
   padding: 0;
   list-style: none;
+  min-width: 0;
+  /* on narrow phones the links scroll sideways instead of overflowing */
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.topnav-links::-webkit-scrollbar {
+  display: none;
 }
 
 .topnav-links a {

@@ -275,6 +275,7 @@ train_dqn.js             trains the network        -> dqn-model.json
 train_many.js            trains several seeds, keeps the best on a validation set
 hardmode.js              bot vs network, 5 rule modes (--lookahead adds 2-ply)
 test_dqn.js              gradient check + smoke tests for the network
+versus.html/.css/.js     play against the network, side by side
 presentation.html/.css/.js   visual explanation page, network playing live
 learning.html/.css/.js   six training snapshots playing side by side
 snapshots/               the network saved at 6 moments of training
@@ -308,6 +309,22 @@ Training writes over `dqn-model.json`, so use `--out` to keep the old one
 (for example `--out dqn-try2.json`). You can then compare the two networks in
 one run:
 `node hardmode.js --model dqn-model.json,dqn-try2.json --games 50 --seed 90000`.
+
+## Play vs Bot page
+
+`versus.html` lets you play against the network (or the search bot) on two
+boards side by side, with exactly the same pieces. Both of you see the next
+piece and can hold.
+
+- **Battle:** clearing 2 / 3 / 4 lines at once sends 1 / 2 / 4 garbage rows to
+  the other board, and your own clears cancel garbage coming at you. Whoever
+  tops out first loses.
+- **Race:** first to 40 lines wins; topping out loses.
+- **Opponent:** network + lookahead (strongest), network, or search bot, at a
+  speed you choose (from 1 piece every 2 seconds up to 5 per second).
+- **Keys:** ← → move, ↑ or X rotate, Z rotate the other way, ↓ soft drop,
+  Space hard drop, C or Shift hold, P or Esc pause. On phones and tablets,
+  touch buttons appear under the boards.
 
 ## Presentation page
 

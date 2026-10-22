@@ -1,0 +1,358 @@
+/* versus.css - the "Play vs Bot" page (it also uses presentation.css and nav.css). */
+
+body {
+  background:
+    radial-gradient(900px 500px at 15% 10%, rgba(139, 133, 255, 0.14), transparent 60%),
+    radial-gradient(800px 500px at 90% 90%, rgba(78, 195, 224, 0.1), transparent 60%),
+    var(--bg);
+}
+
+.vs-main {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 20px 16px 40px;
+  display: grid;
+  gap: 16px;
+}
+
+/* ------------------------------------------------------------ settings */
+.vs-setup {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto auto;
+  gap: 12px;
+  align-items: end;
+}
+.vs-field {
+  display: grid;
+  gap: 4px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.vs-field select {
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 10px;
+  width: 100%;
+}
+.vs-setup button {
+  min-width: 96px;
+  height: 40px;
+}
+
+/* --------------------------------------------------------------- arena */
+.vs-arena {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.vs-player {
+  display: grid;
+  gap: 8px;
+}
+.vs-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.vs-head h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+.vs-head .short {
+  display: none;
+}
+.vs-badge {
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 2px 10px;
+  border-radius: 999px;
+}
+.vs-badge.win {
+  background: color-mix(in srgb, var(--good) 20%, transparent);
+  color: var(--good);
+}
+.vs-badge.lose {
+  background: color-mix(in srgb, var(--bad) 18%, transparent);
+  color: var(--bad);
+}
+.vs-body {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.vs-ai .vs-body {
+  justify-content: flex-start;
+}
+.vs-player:not(.vs-ai) .vs-body {
+  justify-content: flex-end;
+}
+.vs-boardwrap {
+  display: flex;
+  gap: 4px;
+}
+.vs-board {
+  position: relative;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--board-bg);
+  box-shadow: var(--shadow), 0 0 0 1px var(--line);
+  line-height: 0;
+}
+.vs-board canvas {
+  display: block;
+  height: min(calc(100vh - 230px), 600px);
+  width: auto;
+  min-height: 360px;
+}
+.vs-garbage {
+  width: 7px;
+  border-radius: 4px;
+  background: var(--bg-alt);
+  position: relative;
+  overflow: hidden;
+}
+.vs-garbage i {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 0;
+  background: var(--bad);
+  transition: height 0.15s ease;
+}
+.vs-side {
+  display: grid;
+  gap: 8px;
+  width: 104px;
+}
+.vs-mini {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 6px 8px 8px;
+  display: grid;
+  gap: 2px;
+}
+.vs-mini span {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.vs-mini canvas {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.vs-stats {
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+.vs-stats div {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 4px 8px;
+}
+.vs-stats dt {
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+.vs-stats dd {
+  margin: 0;
+  font-weight: 800;
+  font-size: 1.1rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.vs-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  text-align: center;
+  background: rgba(8, 11, 24, 0.78);
+  color: #fff;
+  line-height: 1.45;
+  font-size: 0.92rem;
+}
+.vs-overlay[hidden] {
+  display: none;
+}
+.vs-overlay p {
+  margin: 0 0 8px;
+}
+.vs-overlay-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+.vs-overlay .big {
+  font-size: 4rem;
+  font-weight: 800;
+}
+
+.vs-center {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding-top: 40px;
+  min-width: 64px;
+}
+.vs-timer {
+  font-size: 1.4rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.vs-goal {
+  font-size: 0.78rem;
+  color: var(--muted);
+  text-align: center;
+}
+.vs-vs {
+  margin-top: 16px;
+  font-size: 1.5rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  background: linear-gradient(90deg, var(--accent), #4ec3e0);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* --------------------------------------------------------------- touch */
+.vs-touch {
+  display: none;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+}
+.vs-touch button {
+  height: 52px;
+  font-size: 1.2rem;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.vs-touch .wide {
+  grid-column: 1 / -1;
+}
+@media (pointer: coarse) {
+  .vs-touch {
+    display: grid;
+  }
+}
+
+/* ---------------------------------------------------------------- help */
+.vs-help h3 {
+  margin: 0 0 6px;
+}
+.vs-keys {
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  font-size: 0.92rem;
+}
+kbd {
+  display: inline-block;
+  min-width: 22px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  background: var(--bg);
+  font: 600 0.8rem ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  text-align: center;
+}
+
+/* ---------------------------------------------------------- small screens */
+@media (max-width: 860px) {
+  .vs-setup {
+    grid-template-columns: 1fr 1fr;
+  }
+  .vs-setup .vs-field:first-child {
+    grid-column: 1 / -1;
+  }
+  .vs-arena {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    gap: 10px;
+  }
+  .vs-center {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+    padding-top: 0;
+  }
+  .vs-vs {
+    display: none;
+  }
+  .vs-body {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .vs-player:not(.vs-ai) .vs-body,
+  .vs-ai .vs-body {
+    justify-content: flex-start;
+  }
+  .vs-side {
+    width: 100%;
+    grid-template-columns: 1fr 1fr;
+    order: -1;
+  }
+  .vs-stats {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .vs-stats div {
+    padding: 3px 6px;
+  }
+  .vs-stats dd {
+    font-size: 0.95rem;
+  }
+  /* boards short enough that board + touch buttons fit on one screen */
+  .vs-board canvas {
+    height: 48vh;
+    width: auto;
+    min-height: 0;
+  }
+  .vs-ai .vs-board canvas {
+    height: 32vh;
+  }
+  .vs-boardwrap {
+    justify-content: center;
+  }
+  .vs-head h2 {
+    font-size: 0.95rem;
+  }
+  .vs-head .long {
+    display: none;
+  }
+  .vs-head .short {
+    display: inline;
+  }
+  .vs-overlay {
+    font-size: 0.8rem;
+  }
+  .vs-overlay-title {
+    font-size: 1.1rem;
+  }
+}
