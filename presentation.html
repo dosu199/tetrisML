@@ -14,6 +14,7 @@
       <ul class="topnav-links">
         <li><a href="index.html">Play</a></li>
         <li><a href="presentation.html" aria-current="page">How it works</a></li>
+        <li><a href="learning.html">Watch it learn</a></li>
       </ul>
     </nav>
 
@@ -67,6 +68,7 @@
                 <input id="speed" type="range" min="0" max="5" step="1" value="2" />
                 <output id="speedOut">2 moves/s</output>
               </label>
+              <p id="demoStatus" class="hint demo-status" aria-live="polite"></p>
               <div class="toggles">
                 <label><input id="randomPieces" type="checkbox" /> Fully random pieces</label>
                 <label><input id="lookahead" type="checkbox" /> Look one piece ahead</label>

@@ -44,7 +44,7 @@
  * correlation between consecutive moves, which keeps training stable.
  */
 
-import { writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { createBoard, Bag, MemorylessGen, mulberry32, placements, playEpisode, addGarbageRow, PLAY_COLS } from './src/tetris-core.js';
 import { MLP, FEATURE_SETS, boardState, nextStates, chooseDqnMove } from './src/tetris-dqn.js';
 
@@ -81,6 +81,11 @@ const MAX_PIECES = Number(flag('max-pieces', 2000)); // per training game
 const SEED = Number(flag('seed', 8)); // the defaults train the shipped dqn-model.json
 const OUT = flag('out', 'dqn-model.json');
 const LOG = Number(flag('log', 100));
+// --snapshots 0,1000,2800: also save the network as it was after these many
+// training games (0 = before any training), to snapshots/game-N.json. Used by
+// learning.html to replay how the network improved. Does not change training.
+const SNAPSHOTS = new Set(String(flag('snapshots', '')).split(',').filter(Boolean).map(Number));
+const SNAPSHOT_DIR = flag('snapshot-dir', 'snapshots');
 // Which pieces to train on:
 //   bag     the normal 7-bag
 //   random  every piece independent and random ("memoryless"; default, the
@@ -119,6 +124,11 @@ const STATE_SIZE = FEATURES.length;
 const rand = mulberry32(SEED);
 const net = new MLP([STATE_SIZE, 64, 64, 1], rand, FEATURES, SCALED);
 const IDX = net.input;
+function saveSnapshot(games) {
+  mkdirSync(SNAPSHOT_DIR, { recursive: true });
+  writeFileSync(`${SNAPSHOT_DIR}/game-${games}.json`, JSON.stringify({ ...net.toJSON(), trainedGames: games }));
+}
+if (SNAPSHOTS.has(0)) saveSnapshot(0);
 // The averaged network (see --avg). It starts as a copy of the network.
 const avgNet = AVG > 0 ? MLP.fromJSON(net.toJSON()) : null;
 // The network we test and save: the average if there is one.
@@ -312,6 +322,7 @@ while (epoch < EPOCHS) {
 
   for (let u = 0; u < UPDATES; u++) trainOnBatch();
   epoch++;
+  if (SNAPSHOTS.has(epoch)) saveSnapshot(epoch);
   recent.push(result);
   if (recent.length > 100) recent.shift();
 

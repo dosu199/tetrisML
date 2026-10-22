@@ -19,6 +19,7 @@
  *
  *   --lookahead   also play each network with 2-ply search (sees the next piece)
  *   --no-bot      leave the search bot out
+ *   --hold        everyone may use the hold box
  *
  * Per player: pieces survived (median and mean), lines, and how many games
  * ended in a top-out before the cap. Every player plays the same seeds, so the
@@ -27,8 +28,8 @@
 
 import { readFileSync } from 'node:fs';
 import { playEpisode } from './src/tetris-core.js';
-import { chooseMove, PUBLISHED_WEIGHTS } from './src/tetris-ai.js';
-import { loadDqn, chooseDqnMove } from './src/tetris-dqn.js';
+import { chooseMoveAction, PUBLISHED_WEIGHTS } from './src/tetris-ai.js';
+import { loadDqn, chooseDqnAction } from './src/tetris-dqn.js';
 
 const argv = process.argv.slice(2);
 const flag = (n, d) => {
@@ -40,6 +41,8 @@ const games = Number(flag('games', 10));
 const cap = Number(flag('cap', 2000));
 const seedBase = Number(flag('seed', 20000));
 const only = flag('mode', null);
+// --hold: every player may use the hold box (modern Tetris rule)
+const HOLD_ON = argv.includes('--hold');
 // --no-bot skips the search bot (handy when only comparing networks)
 const modelFiles = flag('model', 'dqn-model.json').split(',').filter(Boolean);
 
@@ -58,17 +61,19 @@ try {
 
 const players = {};
 if (!argv.includes('--no-bot')) {
-  players.bot = (b, c, n) => {
-    const m = chooseMove(b, c, n, weights, { lookahead: n != null });
+  players.bot = (b, c, n, h) => {
+    const m = chooseMoveAction(b, c, n, weights, h, { lookahead: n != null });
     return m && m.score !== -Infinity ? m : null;
   };
 }
 for (const file of modelFiles) {
   const net = loadDqn(JSON.parse(readFileSync(file, 'utf8')));
   const name = file.replace(/\.json$/, '').replace(/^.*\//, '');
-  players[name] = (b, c) => chooseDqnMove(b, c, net);
+  // 1-ply: decides on the current piece; with hold it may still use the
+  // preview to judge what holding would bring in
+  players[name] = (b, c, n, h) => chooseDqnAction(b, c, net, h ? n : null, h);
   // --lookahead: also run each network with 2-ply search (uses the preview)
-  if (argv.includes('--lookahead')) players[`${name}+2ply`] = (b, c, n) => chooseDqnMove(b, c, net, n, { lookahead: true });
+  if (argv.includes('--lookahead')) players[`${name}+2ply`] = (b, c, n, h) => chooseDqnAction(b, c, net, n, h, { lookahead: true });
 }
 
 const median = (xs) => {
@@ -78,7 +83,7 @@ const median = (xs) => {
 };
 
 console.log(`\nbenchmark: bot vs ${modelFiles.join(', ')}`);
-console.log(`${games} games per player per mode, seeds ${seedBase}+, cap ${cap} pieces\n`);
+console.log(`${games} games per player per mode, seeds ${seedBase}+, cap ${cap} pieces, hold ${HOLD_ON ? 'ON' : 'off'}\n`);
 console.log('  mode                    player              pieces med   pieces mean   lines mean   topped out   time');
 console.log('  ----------------------  ----------------    ----------   -----------   ----------   ----------   ----');
 
@@ -87,14 +92,15 @@ for (const [mode, opts] of Object.entries(MODES)) {
   for (const [name, chooser] of Object.entries(players)) {
     const t0 = Date.now();
     const r = [];
-    for (let g = 0; g < games; g++) r.push(playEpisode(chooser, seedBase + g, { cap, ...opts }));
+    for (let g = 0; g < games; g++) r.push(playEpisode(chooser, seedBase + g, { cap, ...opts, hold: HOLD_ON }));
     const pcs = r.map((x) => x.pieces);
     const lines = r.map((x) => x.lines);
     console.log(
       `  ${mode.padEnd(22)}  ${name.padEnd(16)}    ${String(median(pcs)).padStart(10)}   ` +
         `${(pcs.reduce((a, b) => a + b, 0) / games).toFixed(1).padStart(11)}   ` +
         `${(lines.reduce((a, b) => a + b, 0) / games).toFixed(1).padStart(10)}   ` +
-        `${`${r.filter((x) => x.died).length}/${games}`.padStart(10)}   ${((Date.now() - t0) / 1000).toFixed(0)}s`
+        `${`${r.filter((x) => x.died).length}/${games}`.padStart(10)}   ${((Date.now() - t0) / 1000).toFixed(0)}s` +
+        (HOLD_ON ? `   holds/100 pieces ${((100 * r.reduce((a, x) => a + x.holds, 0)) / Math.max(1, pcs.reduce((a, b) => a + b, 0))).toFixed(1)}` : '')
     );
   }
 }

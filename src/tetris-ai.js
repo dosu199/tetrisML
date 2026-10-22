@@ -24,6 +24,7 @@ import {
   placePiece,
   clearLines,
   placements,
+  decideWithHold,
 } from './tetris-core.js';
 
 /* ---------------------------------------------------------------- features */
@@ -220,4 +221,18 @@ export function chooseMove(board, pieceIdx, nextIdx, weights, { lookahead = true
     return { rotation: m.rotation, col: m.col, row: m.row, score: -Infinity };
   }
   return best;
+}
+
+/**
+ * Like chooseMove, but understands hold: pass the 4th chooser argument
+ * ({ held, canHold }) as `holdCtx`. Returns a placement or HOLD. Without
+ * holdCtx it plays exactly like chooseMove.
+ */
+export function chooseMoveAction(board, pieceIdx, nextIdx, weights, holdCtx = null, { lookahead = true } = {}) {
+  if (!holdCtx) return chooseMove(board, pieceIdx, nextIdx, weights, { lookahead });
+  const best = (piece, follower) => {
+    const m = chooseMove(board, piece, follower, weights, { lookahead });
+    return m && m.score !== -Infinity ? { move: m, score: m.score } : null;
+  };
+  return decideWithHold(best, pieceIdx, nextIdx, holdCtx.held, holdCtx.canHold, lookahead);
 }

@@ -120,6 +120,7 @@ body {
   color: transparent;
 }
 
+#holdTetromino,
 #nextTetromino,
 #score,
 .agent-panel {
@@ -132,6 +133,7 @@ body {
   backdrop-filter: blur(6px);
 }
 
+#holdTetromino,
 #nextTetromino {
   position: relative;
   width: 100%;
@@ -140,6 +142,28 @@ body {
   background-repeat: no-repeat;
 }
 
+/* hold and next side by side, a little shorter */
+#holdTetromino,
+#holdTetromino + #nextTetromino {
+  width: calc(50% - 7px);
+  height: 130px;
+  /* the piece image is fitted inside the box, below the label */
+  padding: 36px 14px 14px;
+  background-origin: content-box;
+  background-position: center;
+  background-size: contain;
+}
+#gameStuff:has(#holdTetromino) {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+#gameStuff:has(#holdTetromino) > #score,
+#gameStuff:has(#holdTetromino) > .agent-panel,
+#gameStuff:has(#holdTetromino)::before {
+  width: 100%;
+}
+
+#holdTetromino::before,
 #nextTetromino::before {
   content: 'NEXT';
   position: absolute;
@@ -149,6 +173,10 @@ body {
   font-weight: 700;
   letter-spacing: 0.14em;
   color: var(--muted);
+}
+
+#holdTetromino::before {
+  content: 'HOLD';
 }
 
 #score {
@@ -244,7 +272,17 @@ select:focus {
 
   #nextTetromino {
     height: 110px;
-    background-size: auto 60%;
+    background-size: auto 52%;
+  }
+
+  #holdTetromino,
+  #holdTetromino + #nextTetromino {
+    width: auto;
+    height: 110px;
+  }
+
+  #gameStuff:has(#holdTetromino) > #score {
+    grid-column: 1 / -1;
   }
 
   .agent-panel {

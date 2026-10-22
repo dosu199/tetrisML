@@ -9,8 +9,8 @@
  */
 
 import { readFileSync } from 'node:fs';
-import { mulberry32, playEpisode } from './src/tetris-core.js';
-import { MLP, FEATURE_SETS, loadDqn, chooseDqnMove } from './src/tetris-dqn.js';
+import { mulberry32, playEpisode, HOLD } from './src/tetris-core.js';
+import { MLP, FEATURE_SETS, loadDqn, chooseDqnMove, chooseDqnAction } from './src/tetris-dqn.js';
 
 let failed = 0;
 const check = (name, ok, detail = '') => {
@@ -64,6 +64,17 @@ if (model) {
   check('dqn-model.json plays a game', res.pieces > 0, `${res.pieces} pieces, ${res.lines} lines`);
   const res2 = playEpisode((b, c, n) => chooseDqnMove(b, c, model, n, { lookahead: true }), 1, { cap: 60 });
   check('2-ply lookahead plays a game', res2.pieces > 0, `${res2.pieces} pieces, ${res2.lines} lines`);
+
+  // hold rules: a chooser that tries to hold every time may hold only once
+  // per piece, so every turn is exactly one hold and then one placement
+  const always = (b, c, n, h) => (h && h.canHold ? HOLD : chooseDqnMove(b, c, model));
+  const r3 = playEpisode(always, 3, { cap: 100, hold: true });
+  check('hold: once per piece, game stays legal', r3.holds === r3.pieces, `${r3.pieces} pieces, ${r3.holds} holds`);
+  const r4 = playEpisode((b, c, n, h) => chooseDqnAction(b, c, model, n, h), 3, { cap: 300, hold: true });
+  check('hold-aware network plays a game', r4.pieces > 0, `${r4.pieces} pieces, ${r4.holds} holds`);
+  const r5 = playEpisode((b, c, n, h) => chooseDqnAction(b, c, model, n, h), 3, { cap: 300 });
+  const r6 = playEpisode((b, c) => chooseDqnMove(b, c, model), 3, { cap: 300 });
+  check('without hold, the new chooser plays exactly like before', r5.lines === r6.lines && r5.pieces === r6.pieces, `${r5.lines} = ${r6.lines} lines`);
 }
 
 console.log(failed ? `\n${failed} check(s) failed\n` : '\nall DQN checks passed\n');

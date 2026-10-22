@@ -1,6 +1,6 @@
 # Plan — Tetris ML
 
-Last updated: 20 October 2026 (v0.10, work in progress).
+Last updated: 22 October 2026 (v0.14).
 
 **Goal:** a neural network that plays Tetris well and learns by itself.
 
@@ -21,7 +21,39 @@ Last updated: 20 October 2026 (v0.10, work in progress).
 - **We have hit the ceiling of "4 numbers + 1-ply".** Further gains need a
   network that sees more of the board, or a different learning signal.
 
-## ▶ WHERE WE STOPPED (20 October)
+## Done on 21 October (v0.11–v0.13), no change to the network
+
+- `presentation.html` ("How it works"): the live network with every option
+  coloured, the 4 numbers it sees, its top choices, a status line saying
+  what is happening, the learning steps (reward, Bellman check, exploration,
+  training curve), and the scoreboard against the bot.
+- `learning.html` ("Watch it learn"): six training snapshots
+  (`snapshots/game-0 … 2900.json`) playing side by side, plus the same six
+  measured on 50 games: 21 → 61 → 217 → 376 → 2,000 (never lost) → 91.
+- New look for the game (`style.css`), a shared top bar (`nav.css`), and a
+  fix in `index.html` for the duplicate dropdown that stopped the game.
+- `train_dqn.js --snapshots …` saves copies during training.
+
+## Done on 22 October (v0.14): hold box
+
+Hold in the game, the bot and the network (no retraining). 50 games, cap
+2,000, classic → with hold:
+- random pieces, no preview, lost: network 12 → 1, bot 9 → 0
+- random pieces, next visible, lost: network + lookahead 2 → 0, bot 0 → 0
+- rising garbage, pieces survived: network + lookahead 319 → 2,000 (never
+  lost), bot 254 → 1,946 (4 lost)
+
+Next: with hold, the 2,000-piece cap is too easy to separate the players.
+Raise it (`--cap 10000`) before comparing further. Then decide between
+stage B (retrain with the held piece as an input) and proposal 1 (5-step).
+
+## Proposal 1 (still open)
+
+Finish the 5-step check, then train more networks and keep the best.
+Expected: 15–30% fewer lost games on random pieces (12 → about 8–10/50),
+enough to beat the bot (9/50). Then try proposal 2 (a penalty for losing).
+
+## Where we stopped on 20 October
 
 **Task:** combine the repo's approach with our additions into one best recipe.
 We keep the repo's core (4 features, 4→64→64→1, same reward) and add

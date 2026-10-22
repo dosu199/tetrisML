@@ -1,0 +1,190 @@
+/* learning.css - extra styles for learning.html (it also uses presentation.css and nav.css). */
+
+.howto {
+  max-width: 780px;
+  margin-top: 4px;
+}
+.howto ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+.howto li {
+  margin: 4px 0;
+  color: var(--muted);
+}
+.howto li b {
+  color: var(--text);
+}
+
+.race-controls {
+  display: grid;
+  grid-template-columns: auto auto minmax(220px, 340px) 1fr;
+  gap: 12px 16px;
+  align-items: center;
+  margin-bottom: 20px;
+}
+.race-controls button {
+  min-width: 110px;
+}
+.race-status {
+  margin: 0;
+}
+
+.race {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.stage {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+.stage-board {
+  position: relative;
+  width: 132px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--board-bg);
+  line-height: 0;
+}
+.stage-board canvas {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.stage-board .overlay {
+  font-size: 0.82rem;
+  padding: 8px;
+}
+.stage h3 {
+  font-size: 1rem;
+  margin: 0 0 4px;
+}
+.chip {
+  display: inline-block;
+  font-size: 0.74rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+.chip.good {
+  background: color-mix(in srgb, var(--good) 16%, transparent);
+  color: var(--good);
+}
+.chip.bad {
+  background: color-mix(in srgb, var(--bad) 14%, transparent);
+  color: var(--bad);
+}
+.stage p {
+  margin: 0 0 10px;
+  font-size: 0.88rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.stage-stats {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.stage-stats div {
+  background: var(--bg);
+  border-radius: 8px;
+  padding: 4px 8px;
+}
+.stage-stats dt {
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+.stage-stats dd {
+  margin: 0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.stage-stats .wide {
+  grid-column: 1 / -1;
+}
+
+.measured {
+  display: grid;
+  gap: 10px;
+}
+.mrow {
+  display: grid;
+  grid-template-columns: 170px 1fr 150px;
+  gap: 12px;
+  align-items: center;
+  font-size: 0.92rem;
+}
+.mrow .track {
+  height: 16px;
+  background: var(--bg);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.mrow .fill {
+  height: 100%;
+  border-radius: 99px;
+  background: var(--accent);
+}
+.mrow.best .fill {
+  background: var(--good);
+}
+.mrow.drop .fill {
+  background: var(--bad);
+}
+.mrow b {
+  font-variant-numeric: tabular-nums;
+}
+.mrow small {
+  color: var(--muted);
+}
+.measured .hint {
+  margin: 4px 0 0;
+}
+
+.lessons {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 18px;
+}
+.lessons p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.94rem;
+}
+
+@media (max-width: 980px) {
+  .race {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .lessons {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 720px) {
+  .race-controls {
+    grid-template-columns: 1fr 1fr;
+  }
+  .race-controls .slider,
+  .race-status {
+    grid-column: 1 / -1;
+  }
+  .race {
+    grid-template-columns: 1fr;
+  }
+  .mrow {
+    grid-template-columns: 1fr 120px;
+  }
+  .mrow .track {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}

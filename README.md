@@ -68,6 +68,32 @@ pieces survived; higher is better.)
   random pieces (2 vs 0 lost) and beats it clearly in the hardest mode, 319
   vs 254 pieces with rising garbage. It never trained on garbage at all.
 
+### Hold (v0.14)
+
+The game now has a **hold box**, as in modern Tetris. Instead of placing the
+current piece, a player may put it in the box and take the held piece (or the
+next one, if the box is empty), once per piece. The bot and the network both
+use it, so comparisons stay fair. The network was **not retrained**: it scores
+boards, and hold simply gives it more boards to choose from. The rule they
+share is `decideWithHold` in `src/tetris-core.js`. It compares "place this
+piece" with "hold, then place what you get", averaging over all 7 pieces when
+that piece is still unknown.
+
+50 games per row, seeds 90000+, games stopped at 2,000 pieces. Classic rules
+first, then with hold:
+
+| test | bot | network | network + lookahead |
+|---|---|---|---|
+| random pieces, no preview, games lost | 9 → **0** | 12 → **1** | — |
+| random pieces, next visible, games lost | 0 → 0 | 12 → 2 | 2 → **0** |
+| rising garbage, average pieces survived | 254 → 1,946 (4 lost) | 136 → 486 | 319 → **2,000 (0 lost)** |
+
+Hold removes almost all losses on random pieces: 92% fewer for the network,
+100% fewer for the bot. With rising garbage, the network with lookahead now
+never loses in 2,000 pieces; it used to survive about 320. Both players hold
+about one piece in four. Turn it on in a test with `node hardmode.js --hold`.
+The game page has hold switched on (`startVisualGame({ hold: true })`).
+
 ### Making training stable (v0.8)
 
 Our network came from a lucky run, so we tried to make every run good. Each
@@ -206,6 +232,9 @@ train_many.js            trains several seeds, keeps the best on a validation se
 hardmode.js              bot vs network, 5 rule modes (--lookahead adds 2-ply)
 test_dqn.js              gradient check + smoke tests for the network
 presentation.html/.css/.js   visual explanation page, network playing live
+learning.html/.css/.js   six training snapshots playing side by side
+snapshots/               the network saved at 6 moments of training
+nav.css                  the top bar shared by all pages
 bench.js                 26 tests for the game core
 train.js / compare.js    genetic algorithm for the bot -> weights.json
 ```
@@ -251,7 +280,19 @@ network playing live:
 3. **How good is it:** the 50-game results against the bot.
 
 Open it like the game: `npx serve .`, then click **How it works** in the top
-bar (or go to `/presentation.html`). Both pages share the bar from `nav.css`. It only
+bar (or go to `/presentation.html`). All pages share the bar from `nav.css`.
+
+## Watch it learn page
+
+`learning.html` replays the training: six copies of the network, saved after
+0, 1,000, 1,700, 2,200, 2,800 and 2,900 training games, play side by side with
+the same pieces. Below them are the same six measured on 50 test games
+(average pieces survived: 21, 61, 217, 376, 2,000 = never lost, and 91 after
+training knocked it over).
+
+The copies are in `snapshots/`, made with
+`node train_dqn.js --snapshots 0,1000,1700,2200,2800,2900`. Training is
+repeatable, so `snapshots/game-2800.json` is exactly `dqn-model.json`. It only
 reads `src/` and `dqn-model.json`, and has its own `presentation.css`. The
 game page (`index.html`, `style.css`) is not touched.
 
@@ -312,4 +353,5 @@ the reward alone. Version 0.5 added feature sets and scaling, and picked the
 best of several training seeds. Version 0.6 trains on random pieces.
 Version 0.7 adds the 2-ply lookahead and `train_many.js`. Version 0.8
 tests three ways to stabilise training (none helped) and ships seed 8.
+Version 0.14 adds the hold box.
 Version 0.9 adds training with garbage rows. The old code is in git history if you ever want it.

@@ -405,23 +405,96 @@ export class MemorylessGen {
  * Every random stream is derived from the seed, so two agents on the same
  * seed face exactly the same pieces and the same garbage.
  */
+/* ------------------------------------------------------------------- hold */
+
+/**
+ * HOLD (modern Tetris rule): instead of placing the current piece, put it in
+ * the hold box. If the box was empty, the next piece comes in; otherwise the
+ * held piece comes back. You can hold once per piece, so after a hold the
+ * player must place what it got.
+ *
+ * A chooser that supports hold gets a 4th argument { held, canHold } and may
+ * return HOLD instead of a placement. Choosers that ignore the 4th argument
+ * simply never hold, so every existing chooser keeps working unchanged.
+ */
+export const HOLD = Object.freeze({ hold: true });
+
+/**
+ * The hold decision, shared by the bot and the network.
+ *
+ *   best(piece, follower) -> { move, score } | null
+ *     the chooser's best placement for `piece`; `follower` is the piece that
+ *     comes after it, or null when unknown. Higher score = better.
+ *   usesFollower: whether best() looks at the follower at all (2-ply).
+ *
+ * Compares "place the current piece" with "hold, then place what you get".
+ * When that piece or its follower is still unknown (empty hold box), it
+ * averages over all 7 pieces, so both sides are scored the same way.
+ */
+export function decideWithHold(best, current, next, held, canHold, usesFollower = false) {
+  const place = best(current, next);
+  if (!canHold) return place ? place.move : null;
+
+  const avg = (fn) => {
+    let sum = 0;
+    for (let p = 0; p < PIECES.length; p++) {
+      const r = fn(p);
+      if (!r) return -Infinity;
+      sum += r.score;
+    }
+    return sum / PIECES.length;
+  };
+  let holdScore;
+  if (held != null) {
+    // the held piece comes back; the next piece is unchanged
+    holdScore = best(held, next)?.score ?? -Infinity;
+  } else if (next != null) {
+    // the next piece comes in; the one after it is not known yet
+    holdScore = usesFollower ? avg((f) => best(next, f)) : best(next, null)?.score ?? -Infinity;
+  } else {
+    // no preview and an empty box: the piece we'd get is unknown
+    holdScore = avg((p) => best(p, null));
+  }
+
+  if (!place) return holdScore > -Infinity ? HOLD : null;
+  return holdScore > place.score ? HOLD : place.move;
+}
+
+/**
+ * One full game with any chooser, under a chosen rule set. The hard-mode
+ * benchmark and the RL trainer both use this, so they measure the same game.
+ * With hold: true the chooser may hold (see HOLD above).
+ */
 export function playEpisode(
   chooser,
   seed,
-  { cap = 500, garbageEvery = 0, randomizer = 'bag', preview = true } = {}
+  { cap = 500, garbageEvery = 0, randomizer = 'bag', preview = true, hold = false } = {}
 ) {
   const board = createBoard();
   const gen = randomizer === 'memoryless' ? new MemorylessGen(seed) : new Bag(seed);
   const holes = mulberry32(seed * 7 + 12345);
   let current = gen.next();
   let next = gen.next();
+  let held = null;
   let lines = 0;
   let pieces = 0;
+  let holds = 0;
   let died = false;
 
   while (pieces < cap) {
-    const move = chooser(board, current, preview ? next : null);
-    if (move === null || move.score === -Infinity) {
+    let move = chooser(board, current, preview ? next : null, hold ? { held, canHold: true } : undefined);
+    if (hold && move && move.hold) {
+      holds++;
+      if (held == null) {
+        held = current;
+        current = next;
+        next = gen.next();
+      } else {
+        [held, current] = [current, held];
+      }
+      move = chooser(board, current, preview ? next : null, { held, canHold: false });
+    }
+    if (move === null || move.hold || move.score === -Infinity) {
       died = true;
       break;
     }
@@ -437,5 +510,5 @@ export function playEpisode(
     current = next;
     next = gen.next();
   }
-  return { lines, pieces, died };
+  return { lines, pieces, died, holds };
 }

@@ -309,6 +309,14 @@ button:disabled {
   color: var(--text);
   font-variant-numeric: tabular-nums;
 }
+.demo-status {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--text);
+  line-height: 1.45;
+}
 .toggles {
   display: flex;
   flex-direction: column;

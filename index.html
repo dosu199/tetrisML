@@ -15,12 +15,14 @@
       <ul class="topnav-links">
         <li><a href="index.html" aria-current="page">Play</a></li>
         <li><a href="presentation.html">How it works</a></li>
+        <li><a href="learning.html">Watch it learn</a></li>
       </ul>
     </nav>
 
     <div id="wrapper">
         <div id="gameContainer"></div>
         <div id="gameStuff">
+            <div id="holdTetromino"></div>
             <div id="nextTetromino">
             </div>
             <div id="score">
@@ -41,26 +43,28 @@
 
 <script type="module">
   import { startVisualGame } from './src/tetris-visual.js';
-  import { chooseMove } from './src/tetris-ai.js';
-  import { loadDqn, chooseDqnMove } from './src/tetris-dqn.js';
+  import { chooseMoveAction } from './src/tetris-ai.js';
+  import { loadDqn, chooseDqnAction } from './src/tetris-dqn.js';
 
   const json = (f) => fetch(f).then((r) => r.json());
   const weights = (await json('./weights.json')).weights;
   const net = loadDqn(await json('./dqn-model.json'));
 
+  // every player may use the hold box: `hold` is { held, canHold }
   const choosers = {
-    dqn2: (board, cur, next) => chooseDqnMove(board, cur, net, next, { lookahead: true }),
-    dqn: (board, cur) => chooseDqnMove(board, cur, net),
-    bot: (board, cur, next) => chooseMove(board, cur, next, weights, { lookahead: true }),
+    dqn2: (board, cur, next, hold) => chooseDqnAction(board, cur, net, next, hold, { lookahead: true }),
+    dqn: (board, cur, next, hold) => chooseDqnAction(board, cur, net, next, hold),
+    bot: (board, cur, next, hold) => chooseMoveAction(board, cur, next, weights, hold, { lookahead: true }),
   };
 
   const statsEl = document.getElementById('agentStats');
   const game = startVisualGame({
     chooser: choosers.dqn2,
+    hold: true,
     msPerRow: 45,
     imagePath: 'images/',
     onStats: (s) => {
-      statsEl.textContent = `game ${s.games} · lines ${s.lines} · pieces ${s.pieces} · best ${s.bestLines} lines`;
+      statsEl.textContent = `game ${s.games} · lines ${s.lines} · pieces ${s.pieces} · holds ${s.holds} · best ${s.bestLines} lines`;
     },
   });
 

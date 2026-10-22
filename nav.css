@@ -99,7 +99,15 @@ html {
   .topnav-brand > span:last-child {
     display: none;
   }
+  .topnav {
+    padding: 0 10px;
+    gap: 8px;
+  }
+  .topnav-links {
+    gap: 2px;
+  }
   .topnav-links a {
-    padding: 7px 11px;
+    padding: 6px 9px;
+    font-size: 0.84rem;
   }
 }

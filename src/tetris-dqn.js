@@ -18,7 +18,7 @@
  * the browser.
  */
 
-import { PIECES, copyBoard, placePiece, clearLines, placements } from './tetris-core.js';
+import { PIECES, copyBoard, placePiece, clearLines, placements, decideWithHold } from './tetris-core.js';
 import { extractFeatures, FEATURE_NAMES, NUM_FEATURES } from './tetris-ai.js';
 
 /* ----------------------------------------------------------------- state */
@@ -263,6 +263,8 @@ export function loadDqn(json) {
   return MLP.fromJSON(json);
 }
 
+const GAMMA_DEFAULT = 0.99;
+
 /** Reward for one move, the same formula training uses. */
 export const moveReward = (lines) => 1 + 10 * lines * lines;
 
@@ -305,4 +307,46 @@ export function chooseDqnMove(board, pieceIdx, net, next = null, { lookahead = f
     }
   }
   return best;
+}
+
+/**
+ * The network's best placement for one piece, as a function the hold
+ * decision can call: (piece, follower) -> { move, score } | null.
+ *
+ *   no lookahead:   score = V(board after the move)
+ *   lookahead:      score = reward + 0.99 x (the best the follower can do), or
+ *                   reward + 0.99 x V(board after) when the follower is unknown
+ */
+export function dqnBest(net, board, { lookahead = false, gamma = GAMMA_DEFAULT } = {}) {
+  return (piece, follower) => {
+    let best = null;
+    for (const s of nextStates(board, piece, net.input)) {
+      let v;
+      if (!lookahead) {
+        v = net.predict(s.state);
+      } else if (follower == null) {
+        v = moveReward(s.lines) + gamma * net.predict(s.state);
+      } else {
+        let follow = -Infinity;
+        for (const t of nextStates(s.board, follower, net.input)) {
+          const w = moveReward(t.lines) + gamma * net.predict(t.state);
+          if (w > follow) follow = w;
+        }
+        v = follow === -Infinity ? -1e9 : moveReward(s.lines) + gamma * follow;
+      }
+      if (!best || v > best.score) best = { move: s.move, score: v };
+    }
+    return best;
+  };
+}
+
+/**
+ * Like chooseDqnMove, but understands hold: pass the 4th chooser argument
+ * ({ held, canHold }) as `holdCtx`. Returns a placement or HOLD.
+ * Without holdCtx it plays exactly like chooseDqnMove.
+ */
+export function chooseDqnAction(board, pieceIdx, net, next = null, holdCtx = null, { lookahead = false } = {}) {
+  const best = dqnBest(net, board, { lookahead });
+  if (!holdCtx) return best(pieceIdx, next)?.move ?? null;
+  return decideWithHold(best, pieceIdx, next, holdCtx.held, holdCtx.canHold, lookahead);
 }

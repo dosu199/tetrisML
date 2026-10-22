@@ -134,12 +134,15 @@ export function startVisualGame(options = {}) {
     containerId = 'gameContainer',
     scoreId = 'scoreBoard',
     nextId = 'nextTetromino',
+    holdId = 'holdTetromino',
+    hold = false, // modern Tetris hold box; choosers that ignore it never hold
   } = options;
 
   const container = document.getElementById(containerId);
   if (!container) throw new Error(`No #${containerId} element on the page`);
   const scoreBoard = document.getElementById(scoreId);
   const nextBoard = document.getElementById(nextId);
+  const holdBoard = document.getElementById(holdId);
 
   const renderer = new Renderer(container, { imagePath });
 
@@ -149,6 +152,8 @@ export function startVisualGame(options = {}) {
   let next = bag.next();
   let score = 0;
   let lines = 0;
+  let held = null; // the piece in the hold box, or null
+  let holds = 0;
 
   // Stats that survive a game ending, so the page can show what an agent is
   // actually worth over several games rather than one lucky or unlucky run.
@@ -162,7 +167,9 @@ export function startVisualGame(options = {}) {
    * point: the search bot, the regression network and the ranking network all
    * satisfy the same signature, so you can watch them play the same game.
    *
-   *   (board, currentPiece, nextPiece) -> { rotation, col, row } | null
+   *   (board, currentPiece, nextPiece, holdCtx) -> { rotation, col, row } | HOLD | null
+   *
+   * holdCtx = { held, canHold } is passed only when the game has hold on.
    */
   let chooser =
     options.chooser || ((b, c, n) => chooseMove(b, c, n, weights, { lookahead }));
@@ -176,6 +183,10 @@ export function startVisualGame(options = {}) {
     if (nextBoard) nextBoard.style.backgroundImage = `url(${imagePath}${NEXT_IMAGES[next]}.png)`;
   }
 
+  function showHold() {
+    if (holdBoard) holdBoard.style.backgroundImage = held == null ? 'none' : `url(${imagePath}${NEXT_IMAGES[held]}.png)`;
+  }
+
   function showScore() {
     if (scoreBoard) scoreBoard.innerHTML = String(score);
     options.onStats?.({
@@ -183,6 +194,7 @@ export function startVisualGame(options = {}) {
       lines,
       pieces,
       games,
+      holds,
       bestLines,
       avgLines: totalLines / Math.max(games - 1, 1),
       finishedGames: games - 1,
@@ -192,8 +204,23 @@ export function startVisualGame(options = {}) {
   function spawn() {
     // A network chooser returns no score field; only the search bot does, and
     // -Infinity is its way of saying every remaining move loses.
-    const move = chooser(board, current, next);
-    if (move === null || move.score === -Infinity) return false;
+    let move = chooser(board, current, next, hold ? { held, canHold: true } : undefined);
+    if (hold && move && move.hold) {
+      // put the current piece in the hold box and take the held one (or the
+      // next one, if the box was empty); then the piece we got must be placed
+      holds++;
+      if (held == null) {
+        held = current;
+        current = next;
+        next = bag.next();
+      } else {
+        [held, current] = [current, held];
+      }
+      showHold();
+      showNext();
+      move = chooser(board, current, next, { held, canHold: false });
+    }
+    if (move === null || move.hold || move.score === -Infinity) return false;
     active = {
       rotation: PIECES[current].rotations[move.rotation],
       row: 0,
@@ -220,7 +247,10 @@ export function startVisualGame(options = {}) {
     score = 0;
     lines = 0;
     pieces = 0;
+    held = null;
+    holds = 0;
     active = null;
+    showHold();
     showScore();
   }
 
@@ -271,6 +301,7 @@ export function startVisualGame(options = {}) {
 
   showScore();
   showNext();
+  showHold();
   window.requestAnimationFrame(frame);
 
   return {

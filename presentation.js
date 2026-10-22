@@ -261,6 +261,22 @@ function render() {
 
   renderFeatures();
   if (!fast || game.pieces % 10 === 0) renderOptions();
+  renderStatus();
+}
+
+/** One plain sentence under the controls: what is happening right now. */
+function renderStatus() {
+  const el = $('demoStatus');
+  const n = game.cands.length;
+  const ahead = $('lookahead').checked ? ' (each option scored together with the best place for the next piece)' : '';
+  if (game.over) {
+    el.textContent = 'The stack reached the top, so this game is lost. A new game starts in a moment.';
+  } else if (game.playing) {
+    const v = SPEEDS[$('speed').value];
+    el.textContent = `▶ Playing: the network places ${v} piece${v === 1 ? '' : 's'} per second. Before each one it scores all ${n} possible spots${ahead} and drops the piece on the best one.`;
+  } else {
+    el.textContent = `⏸ Paused before piece ${game.pieces + 1}. The outlines show all ${n} spots this piece could go${ahead}. Hover a row in "Its top choices" to inspect one, or press Next move to let it play its pick.`;
+  }
 }
 
 function renderFeatures() {
