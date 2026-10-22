@@ -61,14 +61,18 @@ stage B (retrain with the held piece as an input) and proposal 1 (5-step).
   networks hold less and make almost no tetrises.
 - `dqn-model.json` unchanged.
 
+- Stage B with hold + garbage (`--hold --garbage 3`, 8 runs): closer but
+  NOT better. Final test, both with hold, cap 10,000: random lost 3 (current)
+  vs 9 / 8; garbage3 114 vs 106 / 96; garbage4 215 vs 203 / 161.
+  Conclusion: best setup = network trained WITHOUT hold, using hold to play.
+
 ## ▶ NEXT: options
 
-1. Stage B again, but trained where it matters: hold + garbage in training
-   (`--hold --garbage 3`), since ordinary hold games almost never end and
-   give little to learn from.
-2. Deeper lookahead with hold (piece after next, averaged over 7).
-3. Presentation polish: network diagram, hold in the demo, score label.
-4. The CNN (raw board), as a separate learning project.
+1. Deeper lookahead with hold (piece after next, averaged over 7).
+2. Presentation polish: network diagram, hold in the demo, score label.
+3. The CNN (raw board), as a separate learning project.
+4. (Optional) More hold-training ideas: longer training, a penalty for
+   losing, or starting from the current network instead of from scratch.
 
 ## Proposal 1 (closed: 5-step did not help)
 

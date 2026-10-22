@@ -92,8 +92,25 @@ pieces survived; higher is better.)
   pieces with garbage every 3. The hold-trained networks hold less and make
   almost no tetrises (0.04 vs 1.9 per 100 pieces); some barely hold at all.
   The option stays in `train_dqn.js` for future experiments.
+- **Training with hold + garbage: closer, still no.** The suspicion was that
+  with hold, training games almost never end, so the network rarely sees a
+  loss. `--hold --garbage 3` puts a garbage row every 3 pieces into half of
+  the training games. Of 8 runs, two tied the current network on the
+  selection games (98 and 96 vs 97 pieces). On the final test, both play with
+  hold, 50 games, up to 10,000 pieces:
 
-`dqn-model.json` is unchanged.
+  | test | current | hold + garbage, best | second |
+  |---|---|---|---|
+  | random pieces, no preview, games lost | **3** | 9 | 8 |
+  | garbage every 3 pieces, pieces survived | **114** | 106 | 96 |
+  | garbage every 4 pieces, pieces survived | **215** | 203 | 161 |
+
+  Garbage closed most of the gap (106 vs 97 last time), but the current
+  network still wins every test. The hold-trained networks hold less (13–22%
+  of pieces vs 24–30%) and make fewer tetrises.
+
+`dqn-model.json` is unchanged. The best setup so far is the network trained
+**without** hold, using hold when it plays.
 
 ### Hold (v0.14)
 
