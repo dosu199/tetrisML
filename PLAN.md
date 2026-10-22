@@ -1,6 +1,6 @@
 # Plan — Tetris ML
 
-Last updated: 22 October 2026 (v0.14).
+Last updated: 22 October 2026 (v0.15).
 
 **Goal:** a neural network that plays Tetris well and learns by itself.
 
@@ -47,7 +47,30 @@ Next: with hold, the 2,000-piece cap is too easy to separate the players.
 Raise it (`--cap 10000`) before comparing further. Then decide between
 stage B (retrain with the held piece as an input) and proposal 1 (5-step).
 
-## Proposal 1 (still open)
+## Done on 22 October (v0.15)
+
+- Faster: 2–2.5x on lookahead tests (no allocations in predict / 2-ply,
+  `hardmode.js --workers`, results identical).
+- Harder tests with hold: `garbage3`, `garbage4`, cap 10,000; tetrises/100.
+  Baseline (50 games): random no-preview cap 10k lost bot 0 / net 3;
+  garbage3 pieces bot 202 / net 114 / net+2ply 210; garbage4 bot 1,000 /
+  net 215 / net+2ply 992.
+- 5-step: NOT better over 16 runs (35.5 vs 33.6 lost). Dropped.
+- Stage B (`train_dqn.js --hold`, 11 inputs): NOT better. Best of 8 runs:
+  6 vs 3 lost (random, cap 10k), 97 vs 114 (garbage3). The hold-trained
+  networks hold less and make almost no tetrises.
+- `dqn-model.json` unchanged.
+
+## ▶ NEXT: options
+
+1. Stage B again, but trained where it matters: hold + garbage in training
+   (`--hold --garbage 3`), since ordinary hold games almost never end and
+   give little to learn from.
+2. Deeper lookahead with hold (piece after next, averaged over 7).
+3. Presentation polish: network diagram, hold in the demo, score label.
+4. The CNN (raw board), as a separate learning project.
+
+## Proposal 1 (closed: 5-step did not help)
 
 Finish the 5-step check, then train more networks and keep the best.
 Expected: 15–30% fewer lost games on random pieces (12 → about 8–10/50),

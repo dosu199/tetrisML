@@ -479,6 +479,7 @@ export function playEpisode(
   let lines = 0;
   let pieces = 0;
   let holds = 0;
+  let tetrises = 0;
   let died = false;
 
   while (pieces < cap) {
@@ -499,7 +500,9 @@ export function playEpisode(
       break;
     }
     placePiece(board, PIECES[current].rotations[move.rotation], move.row, move.col);
-    lines += clearLines(board);
+    const cleared = clearLines(board);
+    lines += cleared;
+    if (cleared === 4) tetrises++;
     pieces++;
     if (garbageEvery > 0 && pieces % garbageEvery === 0) {
       if (!addGarbageRow(board, Math.floor(holes() * PLAY_COLS))) {
@@ -510,5 +513,5 @@ export function playEpisode(
     current = next;
     next = gen.next();
   }
-  return { lines, pieces, died, holds };
+  return { lines, pieces, died, holds, tetrises };
 }

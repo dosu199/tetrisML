@@ -18,7 +18,7 @@
  * the browser.
  */
 
-import { PIECES, copyBoard, placePiece, clearLines, placements, decideWithHold } from './tetris-core.js';
+import { PIECES, copyBoard, createBoard, placePiece, clearLines, placements, decideWithHold, HOLD } from './tetris-core.js';
 import { extractFeatures, FEATURE_NAMES, NUM_FEATURES } from './tetris-ai.js';
 
 /* ----------------------------------------------------------------- state */
@@ -31,6 +31,8 @@ export const FEATURE_SETS = {
   // all 8 the search bot uses: the 4 above plus the shape of the surface
   full: ['linesCleared', 'holes', 'bumpiness', 'aggregateHeight', 'maxHeight', 'rowTransitions', 'colTransitions', 'wells'],
 };
+// the 4 basic numbers plus 7 inputs saying which piece is in the hold box
+FEATURE_SETS.hold = [...FEATURE_SETS.basic, ...PIECES.map((p) => `held:${p.name}`)];
 export const DEFAULT_FEATURES = FEATURE_SETS.full;
 
 const ALIASES = { totalHeight: 'aggregateHeight' }; // name used by v0.4 models
@@ -65,27 +67,37 @@ const scratch = new Float64Array(NUM_FEATURES);
  * one by (scale). Models from v0.4 were trained unscaled, so scale is 1 there.
  */
 export function makeInput(names, scaled = true) {
-  return {
-    idx: featureIndex(names),
-    scale: names.map((n) => (scaled ? FEATURE_SCALE[ALIASES[n] ?? n] : 1)),
-  };
+  const input = { n: names.length, board: [], held: [] };
+  names.forEach((name, pos) => {
+    if (name.startsWith('held:')) {
+      // one input per piece type: 1 if that piece is in the hold box, else 0
+      input.held.push({ pos, piece: PIECES.findIndex((p) => p.name === name.slice(5)) });
+    } else {
+      const [fi] = featureIndex([name]);
+      input.board.push({ pos, fi, scale: scaled ? FEATURE_SCALE[ALIASES[name] ?? name] : 1 });
+    }
+  });
+  if (input.held.some((h) => h.piece < 0)) throw new Error(`unknown piece in ${names.join(', ')}`);
+  return input;
 }
 
-/** The numbers the network sees for a board after a move. */
-export function boardState(board, linesCleared, input, out = new Float64Array(input.idx.length)) {
+/** The numbers the network sees for a board after a move (and, for a network
+ * with hold inputs, the piece left in the hold box). */
+export function boardState(board, linesCleared, input, out = new Float64Array(input.n), held = null) {
   const f = extractFeatures(board, linesCleared, scratch);
-  for (let i = 0; i < out.length; i++) out[i] = f[input.idx[i]] / input.scale[i];
+  for (const b of input.board) out[b.pos] = f[b.fi] / b.scale;
+  for (const h of input.held) out[h.pos] = held === h.piece ? 1 : 0;
   return out;
 }
 
 /** Every legal move for a piece, with the board it produces and its state. */
-export function nextStates(board, pieceIdx, input) {
+export function nextStates(board, pieceIdx, input, held = null) {
   const out = [];
   for (const move of placements(board, pieceIdx)) {
     const after = copyBoard(board);
     placePiece(after, PIECES[pieceIdx].rotations[move.rotation], move.row, move.col);
     const lines = clearLines(after);
-    out.push({ move, board: after, lines, state: boardState(after, lines, input) });
+    out.push({ move, board: after, lines, state: boardState(after, lines, input, undefined, held) });
   }
   return out;
 }
@@ -125,13 +137,17 @@ export class MLP {
 
   /** Score one input vector. */
   predict(x) {
+    // Reuses one buffer per layer instead of allocating new arrays on every
+    // call; predict runs hundreds of thousands of times per second.
+    if (!this._bufs) this._bufs = this.sizes.slice(1).map((n) => new Float64Array(n));
     let a = x;
     for (let l = 0; l < this.W.length; l++) {
       const nIn = this.sizes[l];
       const nOut = this.sizes[l + 1];
-      const out = new Float64Array(nOut);
+      const out = this._bufs[l];
       const W = this.W[l];
-      for (let j = 0; j < nOut; j++) out[j] = this.b[l][j];
+      const bias = this.b[l];
+      for (let j = 0; j < nOut; j++) out[j] = bias[j];
       for (let i = 0; i < nIn; i++) {
         const xi = a[i];
         if (xi === 0) continue;
@@ -143,6 +159,7 @@ export class MLP {
     }
     return a[0];
   }
+
 
   /**
    * One gradient step on a batch, minimising mean squared error between the
@@ -265,6 +282,29 @@ export function loadDqn(json) {
 
 const GAMMA_DEFAULT = 0.99;
 
+const followBoard = createBoard();
+const followState = new Float64Array(NUM_FEATURES);
+
+/**
+ * The best the follower piece can do on `board`:
+ *   max over its placements of  reward + gamma x V(board after it),
+ * or -Infinity if it has nowhere to go. Same result as looping over
+ * nextStates(), but reuses one scratch board instead of allocating a board
+ * and an object per placement, which makes the 2-ply search much faster.
+ */
+export function bestFollow(board, piece, net, gamma = GAMMA_DEFAULT) {
+  let best = -Infinity;
+  const rotations = PIECES[piece].rotations;
+  for (const m of placements(board, piece)) {
+    followBoard.set(board);
+    placePiece(followBoard, rotations[m.rotation], m.row, m.col);
+    const lines = clearLines(followBoard);
+    const v = moveReward(lines) + gamma * net.predict(boardState(followBoard, lines, net.input, followState));
+    if (v > best) best = v;
+  }
+  return best;
+}
+
 /** Reward for one move, the same formula training uses. */
 export const moveReward = (lines) => 1 + 10 * lines * lines;
 
@@ -293,11 +333,7 @@ export function chooseDqnMove(board, pieceIdx, net, next = null, { lookahead = f
     if (!twoPly) {
       v = net.predict(s.state);
     } else {
-      let follow = -Infinity;
-      for (const t of nextStates(s.board, next, net.input)) {
-        const w = moveReward(t.lines) + gamma * net.predict(t.state);
-        if (w > follow) follow = w;
-      }
+      const follow = bestFollow(s.board, next, net, gamma);
       // no room for the next piece: this move loses the game
       v = follow === -Infinity ? -1e9 : moveReward(s.lines) + gamma * follow;
     }
@@ -327,11 +363,7 @@ export function dqnBest(net, board, { lookahead = false, gamma = GAMMA_DEFAULT }
       } else if (follower == null) {
         v = moveReward(s.lines) + gamma * net.predict(s.state);
       } else {
-        let follow = -Infinity;
-        for (const t of nextStates(s.board, follower, net.input)) {
-          const w = moveReward(t.lines) + gamma * net.predict(t.state);
-          if (w > follow) follow = w;
-        }
+        const follow = bestFollow(s.board, follower, net, gamma);
         v = follow === -Infinity ? -1e9 : moveReward(s.lines) + gamma * follow;
       }
       if (!best || v > best.score) best = { move: s.move, score: v };
@@ -346,7 +378,40 @@ export function dqnBest(net, board, { lookahead = false, gamma = GAMMA_DEFAULT }
  * Without holdCtx it plays exactly like chooseDqnMove.
  */
 export function chooseDqnAction(board, pieceIdx, net, next = null, holdCtx = null, { lookahead = false } = {}) {
+  // a network trained with hold sees the hold box: decide with that knowledge
+  if (holdCtx && net.input.held.length > 0) return chooseWithHoldInputs(board, pieceIdx, net, next, holdCtx);
   const best = dqnBest(net, board, { lookahead });
   if (!holdCtx) return best(pieceIdx, next)?.move ?? null;
   return decideWithHold(best, pieceIdx, next, holdCtx.held, holdCtx.canHold, lookahead);
+}
+
+/**
+ * The hold decision for a network that also sees which piece is in the hold
+ * box (trained with --hold). Every option is scored on the board it leaves
+ * AND the piece it leaves in the box:
+ *   place the current piece  -> the box keeps what it had
+ *   hold, place the other    -> the box now holds the current piece
+ * When the piece we'd get is unknown (empty box, no preview) we average over
+ * all 7. Decides on the current position only (no 2-ply lookahead yet).
+ */
+function chooseWithHoldInputs(board, cur, net, next, { held, canHold }) {
+  const best = (piece, heldAfter) => {
+    let b = null;
+    for (const s of nextStates(board, piece, net.input, heldAfter)) {
+      const v = net.predict(s.state);
+      if (!b || v > b.score) b = { move: s.move, score: v };
+    }
+    return b;
+  };
+  const place = best(cur, held);
+  if (!canHold) return place ? place.move : null;
+  let holdScore;
+  if (held != null) holdScore = best(held, cur)?.score ?? -Infinity;
+  else if (next != null) holdScore = best(next, cur)?.score ?? -Infinity;
+  else {
+    holdScore = 0;
+    for (let p = 0; p < PIECES.length; p++) holdScore += (best(p, cur)?.score ?? -Infinity) / PIECES.length;
+  }
+  if (!place) return holdScore > -Infinity ? HOLD : null;
+  return holdScore > place.score ? HOLD : place.move;
 }

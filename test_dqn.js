@@ -5,7 +5,8 @@
  *    numerical derivative (nudge each weight a tiny bit, see how the loss
  *    moves). If backprop had a bug, training would quietly learn nonsense.
  * 2. Smoke test: dqn-model.json loads and plays a legal game, with and
- *    without the 2-ply lookahead.
+ *    without the 2-ply lookahead, and with the hold box.
+ * 3. A network that sees the hold box (11 inputs) saves, loads and plays.
  */
 
 import { readFileSync } from 'node:fs';
@@ -75,6 +76,14 @@ if (model) {
   const r5 = playEpisode((b, c, n, h) => chooseDqnAction(b, c, model, n, h), 3, { cap: 300 });
   const r6 = playEpisode((b, c) => chooseDqnMove(b, c, model), 3, { cap: 300 });
   check('without hold, the new chooser plays exactly like before', r5.lines === r6.lines && r5.pieces === r6.pieces, `${r5.lines} = ${r6.lines} lines`);
+}
+
+// 3. a network that sees the hold box (11 inputs) saves, loads and plays
+{
+  const hnet = new MLP([FEATURE_SETS.hold.length, 8, 1], mulberry32(3), FEATURE_SETS.hold, false);
+  const back = loadDqn({ ...hnet.toJSON(), kind: 'dqn' });
+  const r7 = playEpisode((b, c, n, h) => chooseDqnAction(b, c, back, n, h), 4, { cap: 40, hold: true });
+  check('hold-aware network (11 inputs) loads and plays', back.input.held.length === 7 && r7.pieces > 0, `${r7.pieces} pieces, ${r7.holds} holds`);
 }
 
 console.log(failed ? `\n${failed} check(s) failed\n` : '\nall DQN checks passed\n');

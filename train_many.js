@@ -32,7 +32,7 @@
 import { spawn } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { playEpisode } from './src/tetris-core.js';
-import { loadDqn, chooseDqnMove } from './src/tetris-dqn.js';
+import { loadDqn, chooseDqnMove, chooseDqnAction } from './src/tetris-dqn.js';
 
 const argv = process.argv.slice(2);
 const own = new Set(['seeds', 'parallel', 'out', 'select-games', 'select-cap']);
@@ -74,16 +74,28 @@ function train(seed) {
   });
 }
 
+// With --hold, ordinary games almost never end, so the selection test uses
+// hold on fast garbage (a row every 3 pieces): every game ends, and the
+// network that survives longest on average wins.
+const SELECT_HOLD = passThrough.includes('--hold');
+
 function select(file) {
   const net = loadDqn(JSON.parse(readFileSync(file, 'utf8')));
   let lost = 0;
   let pieces = 0;
   for (let g = 0; g < SELECT_GAMES; g++) {
-    const r = playEpisode((b, c) => chooseDqnMove(b, c, net), 70000 + g, {
-      cap: SELECT_CAP,
-      randomizer: RANDOMIZER,
-      preview: false,
-    });
+    const r = SELECT_HOLD
+      ? playEpisode((b, c, n, h) => chooseDqnAction(b, c, net, n, h), 70000 + g, {
+          cap: SELECT_CAP,
+          randomizer: RANDOMIZER,
+          garbageEvery: 3,
+          hold: true,
+        })
+      : playEpisode((b, c) => chooseDqnMove(b, c, net), 70000 + g, {
+          cap: SELECT_CAP,
+          randomizer: RANDOMIZER,
+          preview: false,
+        });
     if (r.died) lost++;
     pieces += r.pieces;
   }
@@ -103,7 +115,7 @@ await Promise.all(
   })
 );
 
-console.log(`\nselection test: ${SELECT_GAMES} games on seeds 70000+, ${RANDOMIZER} pieces, cap ${SELECT_CAP}\n`);
+console.log(`\nselection test: ${SELECT_GAMES} games on seeds 70000+, ${RANDOMIZER} pieces, cap ${SELECT_CAP}${SELECT_HOLD ? ', hold on, garbage every 3 pieces' : ''}\n`);
 // the current model competes too, so it is only replaced by something better
 const contenders = existsSync(OUT) ? [OUT, ...files.sort()] : files.sort();
 const results = contenders.map(select);

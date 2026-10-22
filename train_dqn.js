@@ -46,7 +46,7 @@
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { createBoard, Bag, MemorylessGen, mulberry32, placements, playEpisode, addGarbageRow, PLAY_COLS } from './src/tetris-core.js';
-import { MLP, FEATURE_SETS, boardState, nextStates, chooseDqnMove } from './src/tetris-dqn.js';
+import { MLP, FEATURE_SETS, boardState, nextStates, chooseDqnMove, chooseDqnAction } from './src/tetris-dqn.js';
 
 const argv = process.argv.slice(2);
 const flag = (n, d) => {
@@ -115,7 +115,11 @@ const EVAL_CAP = Number(flag('eval-cap', 1000));
 // --features basic (the reference's 4, default) or full (all 8 bot features).
 // 'full' needs feature scaling to learn at all, so it switches scaling on;
 // --scale turns it on for 'basic' too.
-const FEATURE_KIND = flag('features', 'basic');
+// --hold: train with the hold box (modern Tetris rule). The network then also
+// sees which piece is in the box (7 extra inputs), and every turn it may
+// either place the current piece or hold it and place the other one.
+const HOLD = argv.includes('--hold');
+const FEATURE_KIND = flag('features', HOLD ? 'hold' : 'basic');
 const FEATURES = FEATURE_SETS[FEATURE_KIND];
 if (!FEATURES) throw new Error('--features must be basic or full');
 const SCALED = FEATURE_KIND === 'full' || argv.includes('--scale');
@@ -255,6 +259,91 @@ function playTrainingGame(seed, epsilon, random, garbageEvery = 0) {
   return { pieces, lines, score, died: true };
 }
 
+/**
+ * One training game with the hold box. Each turn the options are every
+ * placement of the current piece (the box keeps its piece) plus every
+ * placement of the other piece after holding (the box then holds the current
+ * one). The network's state includes what is left in the box, so it can learn
+ * when keeping a piece back is worth it.
+ */
+function playTrainingGameHold(seed, epsilon, random, garbageEvery = 0) {
+  const bag = random ? new MemorylessGen(seed) : new Bag(seed);
+  const holeRand = mulberry32(seed * 7 + 12345);
+  let board = createBoard();
+  let current = bag.next();
+  let next = bag.next();
+  let held = null;
+  let state = boardState(board, 0, IDX, undefined, held);
+  let pieces = 0;
+  let lines = 0;
+  let score = 0;
+  const pending = [];
+
+  while (true) {
+    const options = nextStates(board, current, IDX, held).map((o) => ({ ...o, hold: false }));
+    for (const o of nextStates(board, held ?? next, IDX, current)) options.push({ ...o, hold: true });
+    if (options.length === 0) break;
+
+    let pick;
+    if (rand() < epsilon) {
+      pick = options[Math.floor(rand() * options.length)];
+    } else {
+      let best = -Infinity;
+      for (const o of options) {
+        const v = net.predict(o.state);
+        if (v > best) {
+          best = v;
+          pick = o;
+        }
+      }
+    }
+    if (pick.hold) {
+      if (held == null) {
+        held = current;
+        current = next;
+        next = bag.next();
+      } else {
+        [held, current] = [current, held];
+      }
+    }
+
+    const reward = 1 + 10 * pick.lines * pick.lines;
+    board = pick.board;
+    pieces++;
+    lines += pick.lines;
+    score += reward;
+    current = next;
+    next = bag.next();
+
+    let buried = false;
+    if (garbageEvery > 0 && pieces % garbageEvery === 0) {
+      buried = !addGarbageRow(board, Math.floor(holeRand() * PLAY_COLS));
+    }
+    // over only if neither the next piece nor the one hold would give fits
+    const done =
+      buried || (placements(board, current).length === 0 && placements(board, held ?? next).length === 0);
+
+    pending.push({ state, reward });
+    if (done) {
+      for (let i = 0; i < pending.length; i++) {
+        let ret = 0;
+        for (let j = pending.length - 1; j >= i; j--) ret = pending[j].reward + GAMMA * ret;
+        remember(pending[i].state, ret, pick.state, true);
+      }
+      pending.length = 0;
+    } else if (pending.length === NSTEP) {
+      let ret = 0;
+      for (let j = NSTEP - 1; j >= 0; j--) ret = pending[j].reward + GAMMA * ret;
+      remember(pending[0].state, ret, pick.state, false, GAMMA ** NSTEP);
+      pending.shift();
+    }
+    state = pick.state;
+    if (done) return { pieces, lines, score, died: true };
+    if (pieces >= MAX_PIECES) return { pieces, lines, score, died: false };
+  }
+  return { pieces, lines, score, died: true };
+}
+
 /* -------------------------------------------------------------- checkpoint */
 
 /**
@@ -269,6 +358,21 @@ function playTrainingGame(seed, epsilon, random, garbageEvery = 0) {
 function evaluateGreedy() {
   // Test on the same kind of pieces the network trains on ('mix' tests both).
   const kinds = PIECES_MODE === 'mix' ? ['bag', 'memoryless'] : [PIECES_MODE === 'random' ? 'memoryless' : 'bag'];
+  // With hold, ordinary games almost never end, so they can't tell good
+  // checkpoints apart. Test on fast garbage instead (a row every 3 pieces),
+  // where every game ends and longer survival means a better network.
+  if (HOLD) {
+    let total = 0;
+    for (let g = 0; g < EVAL_GAMES; g++) {
+      total += playEpisode((b, c, n, h) => chooseDqnAction(b, c, keeper(), n, h), 500000 + g, {
+        cap: EVAL_CAP,
+        randomizer: kinds[g % kinds.length],
+        garbageEvery: 3,
+        hold: true,
+      }).pieces;
+    }
+    return total / EVAL_GAMES;
+  }
   let total = 0;
   for (const randomizer of kinds) {
     for (let g = 0; g < EVAL_GAMES; g++) {
@@ -301,6 +405,7 @@ console.log(`  games     ${EPOCHS} after warm-up, epsilon ${EPS_START} -> ${EPS_
 console.log(`  learning  batch ${BATCH}, lr ${LR}${LR_END !== LR ? ` -> ${LR_END}` : ''}, gamma ${GAMMA}, memory ${MEMORY}${NSTEP !== 1 ? `, ${NSTEP}-step targets` : ''}${UPDATES !== 1 ? `, ${UPDATES} updates per game` : ''}${AVG ? `, weight average ${AVG}` : ''}`);
 console.log(`  pieces    ${PIECES_MODE}${PIECES_MODE === 'mix' ? ' (half 7-bag, half random)' : ''}`);
 console.log(`  cap       ${MAX_PIECES} pieces per training game`);
+console.log(`  hold      ${HOLD ? 'on (the network also sees the hold box)' : 'off'}`);
 console.log(`  garbage   ${GARBAGE > 0 ? `a row every ${GARBAGE} pieces in ${Math.round(GARBAGE_SHARE * 100)}% of games` : 'off'}\n`);
 console.log('   game   epsilon    pieces (avg last 100)   lines (avg)   greedy test   elapsed');
 console.log('  -----   -------    ---------------------   -----------   -----------   -------');
@@ -314,7 +419,7 @@ let bestEpoch = 0;
 
 while (epoch < EPOCHS) {
   const epsilon = EPS_END + (Math.max(DECAY - epoch, 0) * (EPS_START - EPS_END)) / DECAY;
-  const result = playTrainingGame(1_000_000 + game, epsilon, useRandom(game), hasGarbage(game) ? GARBAGE : 0);
+  const result = (HOLD ? playTrainingGameHold : playTrainingGame)(1_000_000 + game, epsilon, useRandom(game), hasGarbage(game) ? GARBAGE : 0);
   game++;
 
   // Like the reference: no learning until the memory holds a tenth of its size.

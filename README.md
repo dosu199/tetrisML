@@ -68,6 +68,33 @@ pieces survived; higher is better.)
   random pieces (2 vs 0 lost) and beats it clearly in the hardest mode, 319
   vs 254 pieces with rising garbage. It never trained on garbage at all.
 
+### Faster tests, harder tests, and two experiments that did not help (v0.15)
+
+- **Faster.** `predict` and the 2-ply search no longer allocate memory on every
+  call, and `hardmode.js` runs games on all CPU cores (`--workers N`, results
+  are identical). Lookahead tests are 2–2.5× faster overall.
+- **Harder tests.** With hold, almost every game reached the 2,000-piece cap.
+  New modes `garbage4` and `garbage3` (a garbage row every 4 / 3 pieces), plus
+  a tetrises-per-100-pieces column. Baseline with hold, 50 games:
+
+  | test | bot | network | network + lookahead |
+  |---|---|---|---|
+  | random pieces, no preview, cap 10,000, games lost | **0** | 3 | — |
+  | garbage every 3 pieces, pieces survived | 202 | 114 | **210** |
+  | garbage every 4 pieces, pieces survived | **1,000** | 215 | 992 |
+
+- **5-step learning: no.** Over 16 training runs, 5-step lost 35.5 of 50 games
+  on average and normal 1-step lost 33.6. Its lead after 8 runs was luck.
+- **Training with hold (stage B): no, so far.** `train_dqn.js --hold` gives
+  the network 7 extra inputs (which piece is in the hold box) and lets it hold
+  during training. Of 8 runs, the best was worse than the current network
+  using hold without training: 6 vs 3 games lost on random pieces, 97 vs 114
+  pieces with garbage every 3. The hold-trained networks hold less and make
+  almost no tetrises (0.04 vs 1.9 per 100 pieces); some barely hold at all.
+  The option stays in `train_dqn.js` for future experiments.
+
+`dqn-model.json` is unchanged.
+
 ### Hold (v0.14)
 
 The game now has a **hold box**, as in modern Tetris. Instead of placing the
@@ -353,5 +380,6 @@ the reward alone. Version 0.5 added feature sets and scaling, and picked the
 best of several training seeds. Version 0.6 trains on random pieces.
 Version 0.7 adds the 2-ply lookahead and `train_many.js`. Version 0.8
 tests three ways to stabilise training (none helped) and ships seed 8.
-Version 0.14 adds the hold box.
+Version 0.14 adds the hold box. Version 0.15 makes tests faster and harder,
+and tests 5-step learning and training with hold (neither helped).
 Version 0.9 adds training with garbage rows. The old code is in git history if you ever want it.
