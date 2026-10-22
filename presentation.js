@@ -11,7 +11,7 @@
  */
 
 import { createBoard, PIECES, Bag, MemorylessGen, PLAY_LEFT, PLAY_COLS, PLAY_ROWS, idx, FRAME } from './src/tetris-core.js';
-import { loadDqn, nextStates, moveReward } from './src/tetris-dqn.js';
+import { loadDqn, nextStates, moveReward, bestFollow } from './src/tetris-dqn.js';
 import { extractFeatures } from './src/tetris-ai.js';
 
 const GAMMA = 0.99;
@@ -129,7 +129,9 @@ const game = {
   gen: null,
   cur: 0,
   next: 0,
-  cands: [], // sorted best first
+  held: null, // piece in the hold box, or null
+  holds: 0,
+  cands: [], // sorted best first; each has .piece and .hold
   lines: 0,
   pieces: 0,
   games: 1,
@@ -144,21 +146,41 @@ const game = {
 const boardCanvas = $('board');
 const boardCtx = setupCanvas(boardCanvas, PLAY_COLS * CELL, PLAY_ROWS * CELL);
 
-/** Every option for the current piece, scored the way the network decides. */
+/**
+ * Every option, scored the way the network decides:
+ *   - every spot for the current piece (the hold box keeps its piece), and
+ *   - with the hold box on, every spot for the piece holding would give
+ *     (the held one, or the next one if the box is empty).
+ * Without lookahead the score is V(board after the move). With lookahead it
+ * is reward + 0.99 x the best the following piece can do; when that piece is
+ * still unknown (holding from an empty box) it averages over all 7 pieces.
+ */
 function scoreCandidates() {
   const lookahead = $('lookahead').checked;
-  const opts = nextStates(game.board, game.cur, net.input);
-  for (const o of opts) {
-    o.value = net.predict(o.state); // V(board after this move)
-    if (lookahead) {
-      let follow = -Infinity;
-      for (const t of nextStates(o.board, game.next, net.input)) {
-        const w = moveReward(t.lines) + GAMMA * net.predict(t.state);
-        if (w > follow) follow = w;
+  const holdOn = $('holdBox').checked;
+  const score = (o, follower) => {
+    o.value = net.predict(o.state);
+    if (!lookahead) return o.value;
+    if (follower == null) {
+      let sum = 0;
+      for (let p = 0; p < PIECES.length; p++) {
+        const f = bestFollow(o.board, p, net, GAMMA);
+        sum += f === -Infinity ? -1e9 : f;
       }
-      o.score = follow === -Infinity ? -Infinity : moveReward(o.lines) + GAMMA * follow;
-    } else {
-      o.score = o.value;
+      return moveReward(o.lines) + GAMMA * (sum / PIECES.length);
+    }
+    const f = bestFollow(o.board, follower, net, GAMMA);
+    return f === -Infinity ? -Infinity : moveReward(o.lines) + GAMMA * f;
+  };
+  const opts = [];
+  for (const o of nextStates(game.board, game.cur, net.input)) {
+    opts.push(Object.assign(o, { piece: game.cur, hold: false, score: score(o, game.next) }));
+  }
+  if (holdOn) {
+    const other = game.held ?? game.next;
+    const follower = game.held != null ? game.next : null; // after holding from an empty box, the next piece is unknown
+    for (const o of nextStates(game.board, other, net.input)) {
+      opts.push(Object.assign(o, { piece: other, hold: true, score: score(o, follower) }));
     }
   }
   opts.sort((a, b) => b.score - a.score);
@@ -173,7 +195,10 @@ function newGame(keepCounters = true) {
   game.next = game.gen.next();
   game.lines = 0;
   game.pieces = 0;
+  game.held = null;
+  game.holds = 0;
   game.over = false;
+  $('holdCol').hidden = !$('holdBox').checked;
   game.prevValue = null;
   if (!keepCounters) {
     game.games = 1;
@@ -202,6 +227,17 @@ function applyMove() {
     updateBellman(game.prevValue, moveReward(chosen.lines), chosen.value, target);
   }
   game.prevValue = chosen.value;
+  if (chosen.hold) {
+    // put the current piece in the box and take the other one
+    game.holds++;
+    if (game.held == null) {
+      game.held = game.cur;
+      game.cur = game.next;
+      game.next = game.gen.next();
+    } else {
+      [game.held, game.cur] = [game.cur, game.held];
+    }
+  }
   game.board = chosen.board;
   game.lines += chosen.lines;
   game.pieces++;
@@ -236,26 +272,33 @@ function render() {
     const lo = finite.length ? finite[finite.length - 1].score : 0;
     const t = (c) => (Number.isFinite(c.score) && hi > lo ? (c.score - lo) / (hi - lo) : 0);
 
+    const dash = (c) => boardCtx.setLineDash(c.hold ? [4, 3] : []);
     if (game.hover >= 0) {
       const c = cands[game.hover];
-      outlineCells(boardCtx, moveCells(game.cur, c.move), CELL, scoreColor(t(c)), 3, scoreColor(t(c), 0.45));
+      dash(c);
+      outlineCells(boardCtx, moveCells(c.piece, c.move), CELL, scoreColor(t(c)), 3, scoreColor(t(c), 0.45));
     } else {
       if (!fast) {
         // every option, faint; the better it scores, the greener and stronger
         for (let i = cands.length - 1; i >= 1; i--) {
           const k = t(cands[i]);
-          outlineCells(boardCtx, moveCells(game.cur, cands[i].move), CELL, scoreColor(k, 0.25 + 0.5 * k), 1.5);
+          dash(cands[i]);
+          outlineCells(boardCtx, moveCells(cands[i].piece, cands[i].move), CELL, scoreColor(k, 0.25 + 0.5 * k), 1.5);
         }
       }
-      const piece = PIECES[game.cur];
-      outlineCells(boardCtx, moveCells(game.cur, cands[0].move), CELL, '#ffffff', 2.5, PIECE_COLORS[piece.value] + 'cc');
+      const c0 = cands[0];
+      dash(c0);
+      outlineCells(boardCtx, moveCells(c0.piece, c0.move), CELL, '#ffffff', 2.5, PIECE_COLORS[PIECES[c0.piece].value] + 'cc');
     }
+    boardCtx.setLineDash([]);
   }
 
   $('lines').textContent = game.lines.toLocaleString('en-US');
   $('pieces').textContent = game.pieces.toLocaleString('en-US');
   $('games').textContent = game.games;
   $('best').textContent = Math.max(game.best, game.lines).toLocaleString('en-US');
+  drawMiniPiece($('holdPiece'), game.held);
+  $('holds').textContent = game.holds.toLocaleString('en-US');
   drawMiniPiece($('curPiece'), game.cur);
   drawMiniPiece($('nextPiece'), game.next);
 
@@ -268,14 +311,23 @@ function render() {
 function renderStatus() {
   const el = $('demoStatus');
   const n = game.cands.length;
-  const ahead = $('lookahead').checked ? ' (each option scored together with the best place for the next piece)' : '';
+  const holdOn = $('holdBox').checked;
+  const ahead = $('lookahead').checked ? ', each scored together with the best place for the next piece' : '';
+  const what = holdOn
+    ? `all ${n} options: every spot for the ${PIECES[game.cur].name} and every spot for the ${PIECES[game.held ?? game.next].name} it would get by holding (dashed)${ahead}`
+    : `all ${n} possible spots${ahead}`;
+  const pick = game.cands[0];
+  const pickText =
+    pick && pick.hold
+      ? ` Its pick: hold the ${PIECES[game.cur].name} and play the ${PIECES[pick.piece].name} instead.`
+      : '';
   if (game.over) {
     el.textContent = 'The stack reached the top, so this game is lost. A new game starts in a moment.';
   } else if (game.playing) {
     const v = SPEEDS[$('speed').value];
-    el.textContent = `▶ Playing: the network places ${v} piece${v === 1 ? '' : 's'} per second. Before each one it scores all ${n} possible spots${ahead} and drops the piece on the best one.`;
+    el.textContent = `\u25B6 Playing: the network places ${v} piece${v === 1 ? '' : 's'} per second. Before each one it scores ${what}, and plays the best.`;
   } else {
-    el.textContent = `⏸ Paused before piece ${game.pieces + 1}. The outlines show all ${n} spots this piece could go${ahead}. Hover a row in "Its top choices" to inspect one, or press Next move to let it play its pick.`;
+    el.textContent = `\u23F8 Paused before piece ${game.pieces + 1}. The outlines show ${what}.${pickText} Hover a row in "Its top choices" to inspect one, or press Next move to let it play its pick.`;
   }
 }
 
@@ -323,7 +375,8 @@ function renderOptions() {
       if (!item) return '<li class="sep">…</li>';
       const [c, i] = item;
       const rot = c.move.rotation;
-      const label = `${rot === 0 ? 'No turn' : `Turn ×${rot}`}, column ${c.move.col - PLAY_LEFT + 1}${c.lines ? ` · clears ${c.lines}` : ''}`;
+      const where = `${rot === 0 ? 'no turn' : `turn ×${rot}`}, column ${c.move.col - PLAY_LEFT + 1}${c.lines ? ` · clears ${c.lines}` : ''}`;
+      const label = c.hold ? `Hold → ${PIECES[c.piece].name}: ${where}` : where[0].toUpperCase() + where.slice(1);
       const k = t(c);
       return `<li data-i="${i}" class="${i === 0 ? 'chosen' : ''}${i === game.hover ? ' hover' : ''}">
         <span class="rank">${i === cands.length - 1 && i > 4 ? 'last' : `#${i + 1}`}</span>
@@ -376,6 +429,7 @@ $('speed').addEventListener('input', () => {
   schedule();
 });
 $('randomPieces').addEventListener('change', () => newGame(false));
+$('holdBox').addEventListener('change', () => newGame(false));
 $('lookahead').addEventListener('change', () => {
   if (!game.over) think();
 });
@@ -602,7 +656,7 @@ function drawTrainChart() {
 const SCORES = [
   {
     title: 'Normal pieces',
-    sub: '7-bag, no preview · games survived to 10,000 pieces',
+    sub: 'classic rules · 7-bag, no preview · games survived to 10,000 pieces',
     unit: '/ 50',
     rows: [
       ['Search bot', 42],
@@ -612,7 +666,7 @@ const SCORES = [
   },
   {
     title: 'Fully random pieces',
-    sub: 'no preview · games survived to 2,000 pieces',
+    sub: 'classic rules · no preview · games survived to 2,000 pieces',
     unit: '/ 50',
     rows: [
       ['Search bot', 41],
@@ -622,7 +676,7 @@ const SCORES = [
   },
   {
     title: 'Fully random pieces, next piece visible',
-    sub: 'games survived to 2,000 pieces',
+    sub: 'classic rules · games survived to 2,000 pieces',
     unit: '/ 50',
     rows: [
       ['Search bot', 50],
@@ -633,7 +687,7 @@ const SCORES = [
   },
   {
     title: 'Rising garbage, every 5 pieces',
-    sub: 'next piece visible · everyone loses eventually · average pieces survived',
+    sub: 'classic rules · next piece visible · everyone loses eventually · average pieces survived',
     unit: '',
     rows: [
       ['Search bot', 254],
@@ -641,6 +695,27 @@ const SCORES = [
       ['Network + lookahead', 319, 'net'],
     ],
     max: 340,
+  },
+  {
+    title: 'With Hold: fully random pieces',
+    sub: 'no preview · games survived to 2,000 pieces (classic rules: bot 41, network 38)',
+    unit: '/ 50',
+    rows: [
+      ['Search bot', 50],
+      ['Network', 49, 'net'],
+    ],
+    max: 50,
+  },
+  {
+    title: 'With Hold: rising garbage, every 5 pieces',
+    sub: 'next piece visible · average pieces survived, games stop at 2,000 (classic rules: 254 / 136 / 319)',
+    unit: '',
+    rows: [
+      ['Search bot', 1946],
+      ['Network', 486, 'net'],
+      ['Network + lookahead', 2000, 'net'],
+    ],
+    max: 2000,
   },
 ];
 

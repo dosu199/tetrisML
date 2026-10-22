@@ -317,11 +317,14 @@ network playing live:
 1. **Watch it think:** every option for the current piece is drawn on the
    board, coloured from red (bad) to green (good), with the 4 numbers the
    network sees and its top choices. Pause and step through one move at a
-   time.
-2. **How it learned:** what it sees, the reward, the Bellman rule (checked
-   live against the game), exploration (a mini-game with a slider for random
-   moves), and the real training curve.
-3. **How good is it:** the 50-game results against the bot.
+   time. With the Hold box on (as in the game), the options holding would
+   give are drawn dashed, and the status line says when it chooses to hold.
+2. **How it learned:** what it sees, a diagram of the network
+   (4 → 64 → 64 → 1), the reward, the Bellman rule (checked live against the
+   game), exploration (a mini-game with a slider for random moves), and the
+   real training curve.
+3. **How good is it:** the 50-game results against the bot, with classic
+   rules and with the Hold box.
 
 Open it like the game: `npx serve .`, then click **How it works** in the top
 bar (or go to `/presentation.html`). All pages share the bar from `nav.css`.

@@ -333,7 +333,7 @@ button:disabled {
 }
 .pieces-card {
   display: grid;
-  grid-template-columns: auto auto 1fr;
+  grid-template-columns: auto auto auto 1fr;
   gap: 18px;
   align-items: center;
 }
@@ -351,7 +351,7 @@ button:disabled {
 .counters {
   margin: 0;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 8px;
 }
 .counters div {
@@ -753,6 +753,64 @@ button:disabled {
   max-width: 780px;
 }
 
+.netdiag-wrap {
+  display: block;
+}
+.netdiag {
+  width: 100%;
+  height: auto;
+  display: block;
+  font-family: inherit;
+}
+.netdiag .nd-title {
+  fill: var(--text);
+  font-size: 17px;
+  font-weight: 700;
+}
+.netdiag .nd-edge {
+  stroke: var(--muted);
+  stroke-width: 1.1;
+  opacity: 0.7;
+}
+.netdiag .nd-arrow,
+.netdiag .nd-dot {
+  fill: var(--muted);
+}
+.netdiag .nd-node {
+  fill: var(--accent-soft);
+  stroke: var(--accent);
+  stroke-width: 1.6;
+}
+.netdiag .nd-in {
+  fill: color-mix(in srgb, var(--good) 18%, var(--surface));
+  stroke: var(--good);
+}
+.netdiag .nd-out {
+  fill: color-mix(in srgb, var(--accent) 30%, var(--surface));
+}
+.netdiag .nd-label {
+  fill: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+}
+.netdiag .nd-side,
+.netdiag .nd-cap {
+  fill: var(--text);
+  font-size: 14px;
+}
+.netdiag .nd-sub {
+  fill: var(--muted);
+  font-size: 13px;
+}
+.netdiag .nd-wbg {
+  fill: var(--surface);
+}
+.netdiag .nd-w {
+  fill: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .footer {
   border-top: 1px solid var(--line);
   padding: 22px 0 40px;
@@ -783,7 +841,7 @@ button:disabled {
     grid-template-columns: 1fr;
   }
   .pieces-card {
-    grid-template-columns: auto auto;
+    grid-template-columns: auto auto auto;
   }
   .pieces-card .counters {
     grid-column: 1 / -1;

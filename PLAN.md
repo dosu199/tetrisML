@@ -1,6 +1,6 @@
 # Plan — Tetris ML
 
-Last updated: 22 October 2026 (v0.15).
+Last updated: 22 October 2026 (v0.16).
 
 **Goal:** a neural network that plays Tetris well and learns by itself.
 
@@ -69,7 +69,8 @@ stage B (retrain with the held piece as an input) and proposal 1 (5-step).
 ## ▶ NEXT: options
 
 1. Deeper lookahead with hold (piece after next, averaged over 7).
-2. Presentation polish: network diagram, hold in the demo, score label.
+2. ~~Presentation polish~~ done in v0.16: network diagram, hold in the demo,
+   classic vs hold scoreboard, "Score" label on the game page.
 3. The CNN (raw board), as a separate learning project.
 4. (Optional) More hold-training ideas: longer training, a penalty for
    losing, or starting from the current network instead of from scratch.
