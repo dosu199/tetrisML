@@ -257,11 +257,12 @@ export function startVisualGame(options = {}) {
   function spawn() {
     // A network chooser returns no score field; only the search bot does, and
     // -Infinity is its way of saying every remaining move loses.
-    let move = chooser(board, current, next, hold ? { held, canHold: true } : undefined);
-    if (hold && move && move.hold) {
+    let move = chooser(board, current, next, hold ? { held, canHold } : undefined);
+    if (hold && canHold && move && move.hold) {
       // put the current piece in the hold box and take the held one (or the
       // next one, if the box was empty); then the piece we got must be placed
       swapHold();
+      canHold = false;
       move = chooser(board, current, next, { held, canHold: false });
     }
     if (move === null || move.hold || move.score === -Infinity) return false;
@@ -300,8 +301,8 @@ export function startVisualGame(options = {}) {
       bestLines = 0;
       totalLines = 0;
     } else {
-      if (!human) {
-        // (in human mode these were already counted when the game ended)
+      if (phase !== 'over') {
+        // (a game you lost was already counted when it ended)
         totalLines += lines;
         if (lines > bestLines) bestLines = lines;
       }
@@ -567,21 +568,47 @@ export function startVisualGame(options = {}) {
       weights = w;
     },
     /**
-     * Swap the agent mid-session. The board is wiped and the counters reset,
-     * because carrying a stack built by one agent into another's run would
-     * make the comparison meaningless.
+     * Swap the agent. The game goes on: the new agent takes over the board as
+     * it is, from the next piece.
      */
     setChooser(fn) {
       chooser = fn;
-      if (!human) reset(true);
     },
-    /** Switch between you playing (true) and the agent playing (false). New game. */
+    /**
+     * Hand the same game over between you (true) and the agent (false):
+     * board, score, lines, hold and the falling piece all carry over.
+     */
     setHuman(on) {
-      human = !!on;
-      phase = 'playing';
+      on = !!on;
+      if (on === human) return;
       accumulator = 0;
-      reset(true, true);
-      if (!human) options.onState?.('agent', {});
+      keys.left = keys.right = null;
+      keys.down = false;
+      if (on) {
+        human = true;
+        lastTime = 0;
+        if (active) {
+          // take over the agent's falling piece where it is
+          const rots = PIECES[current].rotations;
+          active = { r: Math.max(0, rots.indexOf(active.rotation)), rotation: active.rotation, row: active.row, col: active.col };
+          gravityAcc = 0;
+          lockStart = null;
+          lockResets = 0;
+          setPhase('playing');
+        } else if (spawnHuman()) {
+          setPhase('playing');
+        }
+      } else {
+        human = false;
+        if (phase === 'over') {
+          reset(); // your stack reached the top: the agent starts a new game
+        } else {
+          active = null; // the agent places the current piece again, from the top
+        }
+        phase = 'playing';
+        options.onState?.('agent', {});
+      }
+      showScore();
     },
     isHuman: () => human,
     /** For touch buttons: 'left' 'right' 'down' 'cw' 'ccw' 'drop' 'hold' 'pause' 'restart' 'start'. */

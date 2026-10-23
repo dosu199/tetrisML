@@ -408,6 +408,10 @@ game page (`index.html`, `style.css`) is not touched.
   **Who plays** (network + deep lookahead, network + lookahead, network, or
   the search bot) plays and you watch. Picking a player turns ML on. The page
   remembers which player you picked, but always starts with ML off.
+- Switching hands over **the same game**: board, score, lines and hold carry
+  over. Turning ML off mid-fall gives you the falling piece where it is;
+  turning it on lets the network place the current piece. Changing who plays
+  also keeps the game. If your stack topped out, the network starts a new game.
 - **Keys:** ← → move, ↑ or X rotate, Z rotate back, ↓ soft drop, Space hard
   drop, C or Shift hold, P or Esc pause, Enter (or Space) after game over to
   play again. On phones and tablets, touch buttons appear at the bottom.

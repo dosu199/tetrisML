@@ -163,7 +163,7 @@
     const ml = $('mlToggle').checked;
     document.body.classList.toggle('human', !ml);
     $('mlHint').innerHTML = ml ? 'The network is playing. Turn off to play yourself.' : 'You are playing. Turn on to let the network play.';
-    if (game.isHuman() === ml) game.setHuman(!ml);
+    if (game.isHuman() === ml) game.setHuman(!ml); // the same game carries on
     save();
   }
   document.body.classList.toggle('human', !$('mlToggle').checked);
