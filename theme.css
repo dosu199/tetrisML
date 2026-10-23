@@ -6,7 +6,8 @@
  *    --line, --accent, ...) and by style.css (--page, --panel, ...) all point
  *    at the same colours
  *  - one page background, one primary button, one <kbd>
- *  - the intro screen with falling blocks used on top of the boards
+ *  - the intro screen used on top of the boards
+ *  - falling tetrominoes (made by tetro-bg.js) behind every page
  */
 
 :root[data-theme='dark'] {
@@ -185,7 +186,27 @@ kbd {
   border: 1px solid var(--ui-line);
 }
 
-/* falling blocks in the background of an intro screen */
+/* falling tetrominoes (tetro-bg.js): a faint layer behind every page, and a
+   brighter one on the intro screens */
+.tetro-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+.tetro {
+  position: absolute;
+  top: 0;
+  line-height: 0;
+  will-change: transform;
+  animation-name: tetro-drop;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+.tetro-bg .tetro {
+  opacity: 0.08;
+}
 .intro-fall {
   display: none;
 }
@@ -193,28 +214,18 @@ kbd {
   display: block;
   position: absolute;
   inset: 0;
+  overflow: hidden;
   pointer-events: none;
 }
-.intro-fall i {
-  position: absolute;
-  top: -40px;
-  width: 20px;
-  height: 20px;
-  border-radius: 4px;
-  opacity: 0.28;
-  animation: intro-drop 7s linear infinite;
+.intro-fall .tetro {
+  opacity: 0.18;
 }
-.intro-fall i:nth-child(1) { left: 8%; background: #e6483d; animation-delay: 0s; }
-.intro-fall i:nth-child(2) { left: 22%; background: #4ec3e0; animation-delay: 2.1s; animation-duration: 8s; }
-.intro-fall i:nth-child(3) { left: 38%; background: #f2c94c; animation-delay: 4s; }
-.intro-fall i:nth-child(4) { left: 55%; background: #5fc27e; animation-delay: 1.2s; animation-duration: 6.5s; }
-.intro-fall i:nth-child(5) { left: 70%; background: #f2994a; animation-delay: 3.3s; }
-.intro-fall i:nth-child(6) { left: 84%; background: #4a7ef2; animation-delay: 0.6s; animation-duration: 7.5s; }
-.intro-fall i:nth-child(7) { left: 92%; background: #9b51e0; animation-delay: 4.8s; }
-
-@keyframes intro-drop {
+@keyframes tetro-drop {
+  from {
+    transform: translateY(-120px) rotate(var(--r, 0deg));
+  }
   to {
-    transform: translateY(calc(100vh + 80px)) rotate(180deg);
+    transform: translateY(calc(100vh + 120px)) rotate(var(--r, 0deg));
   }
 }
 @keyframes intro-in {
@@ -224,7 +235,8 @@ kbd {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .intro .intro-fall {
+  .intro .intro-fall,
+  .tetro-bg {
     display: none;
   }
   .intro-steps li {

@@ -1,6 +1,6 @@
 # Plan — Tetris ML
 
-Last updated: 23 October 2026 (v0.20).
+Last updated: 23 October 2026 (v0.21).
 
 **Goal:** a neural network that plays Tetris well and learns by itself.
 
@@ -95,6 +95,11 @@ Worker so your piece never stutters). Network unchanged.
   Start button, the intro screen with falling blocks.
 - Play page always opens on "Ready to play?" (you play); ML only when switched on.
 - Play vs Bot: the opponent's board gets its own intro screen; calmer colours.
+
+## Done on 23 October (v0.21)
+
+- Falling tetrominoes (all 7 kinds) as a faint background on every page, and
+  on the intro screens (`tetro-bg.js`). Off for reduced-motion users.
 
 ## ▶ NEXT: options
 

@@ -360,7 +360,10 @@ piece and can hold.
 
 All pages load `theme.css` after their own CSS: one dark palette, one page
 background, the main button (`.btn-go`), `<kbd>` keys, and the intro screen
-with falling blocks (`.intro`, `.intro-fall`, `.intro-steps`, `.intro-chips`).
+(`.intro`, `.intro-steps`, `.intro-chips`). `tetro-bg.js` adds the slowly
+falling tetrominoes (all 7 kinds): very faint behind every page, a little
+brighter inside `.intro-fall` on the intro screens. It is pure decoration and
+turns itself off when the system asks for reduced motion.
 
 ## Presentation page
 
