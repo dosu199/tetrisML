@@ -345,8 +345,10 @@ piece and can hold.
   tops out first loses.
 - **Race:** first to 40 lines wins; topping out loses.
 - **Opponent:** network + deep lookahead (strongest), network + lookahead,
-  network, or search bot, at a speed you choose (from 1 piece every 2 seconds
-  up to 5 per second). The opponent thinks in a background thread
+  network, or search bot, at a speed you choose (from **Super easy**, 1 piece
+  every 4 seconds with about 30% of its pieces dropped in a random spot, up to
+  5 per second). Opponent and speed can be changed at any time, also during a
+  match; a new mode starts when you press Restart. The opponent thinks in a background thread
   (`versus-ai-worker.js`), so its slower searches never make your own piece
   stutter. On a slow computer the deep lookahead may not keep up with the
   fastest setting.
@@ -388,51 +390,23 @@ repeatable, so `snapshots/game-2800.json` is exactly `dqn-model.json`. It only
 reads `src/` and `dqn-model.json`, and has its own `presentation.css`. The
 game page (`index.html`, `style.css`) is not touched.
 
-## Watching it play in the browser
+## Play page (you, or the network)
 
-In `index.html`, replace your current game `<script type="module">` with:
+`index.html` is the game itself. Since v0.19 you can play it yourself:
 
-```html
-<select id="agent">
-  <option value="dqn2">Neural network + lookahead</option>
-  <option value="dqn">Neural network (DQN)</option>
-  <option value="bot">Bot (search)</option>
-</select>
-<div id="agentStats"></div>
+- **Turn on ML** switch: off = you play, on = the player chosen under
+  **Who plays** (network + deep lookahead, network + lookahead, network, or
+  the search bot) plays and you watch. Picking a player turns ML on. The page
+  remembers your choice.
+- **Keys:** ← → move, ↑ or X rotate, Z rotate back, ↓ soft drop, Space hard
+  drop, C or Shift hold, P or Esc pause, Enter (or Space) after game over to
+  play again. On phones and tablets, touch buttons appear at the bottom.
+- Gravity speeds up every 10 lines, as in the Play vs Bot page.
 
-<script type="module">
-  import { startVisualGame } from './src/tetris-visual.js';
-  import { chooseMove } from './src/tetris-ai.js';
-  import { loadDqn, chooseDqnMove } from './src/tetris-dqn.js';
-
-  const json = (f) => fetch(f).then((r) => r.json());
-  const weights = (await json('./weights.json')).weights;
-  const net = loadDqn(await json('./dqn-model.json'));
-
-  const choosers = {
-    dqn2: (board, cur, next) => chooseDqnMove(board, cur, net, next, { lookahead: true }),
-    dqn: (board, cur) => chooseDqnMove(board, cur, net),
-    bot: (board, cur, next) => chooseMove(board, cur, next, weights, { lookahead: true }),
-  };
-
-  const statsEl = document.getElementById('agentStats');
-  const game = startVisualGame({
-    chooser: choosers.dqn2,
-    msPerRow: 45,
-    imagePath: 'images/',
-    onStats: (s) => {
-      statsEl.textContent = `game ${s.games} · lines ${s.lines} · pieces ${s.pieces} · best ${s.bestLines} lines`;
-    },
-  });
-
-  document.getElementById('agent').addEventListener('change', (e) => {
-    game.setChooser(choosers[e.target.value]);
-  });
-</script>
-```
-
-`type="module"` scripts do not load over `file://`. In a Codespace, run
-`npx serve .` and open the forwarded port.
+Under the hood this is `startVisualGame({ human: true, onState })` in
+`src/tetris-visual.js`, with `setHuman(on)`, `press(action)`, `softDrop(on)`
+and `pause(on)` for the page. `type="module"` scripts do not load over
+`file://`; in a Codespace, run `npx serve .` and open the forwarded port.
 
 ## History
 
@@ -447,5 +421,6 @@ Version 0.7 adds the 2-ply lookahead and `train_many.js`. Version 0.8
 tests three ways to stabilise training (none helped) and ships seed 8.
 Version 0.14 adds the hold box. Version 0.15 makes tests faster and harder,
 and tests 5-step learning and training with hold (neither helped). Version
-0.17 adds Play vs Bot, and 0.18 the deep (3-ply) lookahead.
+0.17 adds Play vs Bot, 0.18 the deep (3-ply) lookahead, and 0.19 lets you
+play the Play page yourself.
 Version 0.9 adds training with garbage rows. The old code is in git history if you ever want it.

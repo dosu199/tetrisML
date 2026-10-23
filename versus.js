@@ -26,6 +26,7 @@ import {
   idx,
   FRAME,
   mulberry32,
+  placements,
 } from './src/tetris-core.js';
 import { loadDqn, chooseDqnAction } from './src/tetris-dqn.js';
 import { chooseMoveAction, PUBLISHED_WEIGHTS } from './src/tetris-ai.js';
@@ -220,6 +221,7 @@ let mode = 'battle';
 let state = 'loading'; // loading | idle | countdown | playing | paused | over
 let chooser = null;
 let aiPps = 1;
+let aiMistakes = 0; // chance that the opponent drops a piece somewhere random (Super easy)
 let aiAnim = null; // { r, row, col, target, start, dur }
 let aiNextAt = 0;
 let elapsed = 0;
@@ -394,7 +396,8 @@ function aiStep(t) {
   if (aiThinking || t < aiNextAt) return;
   aiThinking = true;
   const match = matchId;
-  aiDecideAsync(ai, match).then((m) => {
+  aiDecideAsync(ai, match).then((move) => {
+    let m = move;
     if (match !== matchId) return; // a new match started meanwhile
     aiThinking = false;
     if (state === 'over') return;
@@ -402,6 +405,11 @@ function aiStep(t) {
       ai.dead = true;
       checkEnd();
       return;
+    }
+    if (aiMistakes && Math.random() < aiMistakes) {
+      // Super easy: now and then it drops the piece in a random spot
+      const all = placements(ai.board, ai.cur);
+      if (all.length) m = all[Math.floor(Math.random() * all.length)];
     }
     const interval = 1000 / aiPps;
     aiAnim = { r: m.rotation, col: m.col, target: m.row, start: performance.now(), dur: Math.min(220, interval * 0.6) };
@@ -412,22 +420,41 @@ function aiStep(t) {
 /* ------------------------------------------------------------ the match */
 
 function setOverlay(title, html) {
+  $('overlay').classList.remove('intro');
   $('overlayTitle').innerHTML = title;
   $('overlayText').innerHTML = html;
   $('overlay').hidden = false;
 }
 
+/* Opponent and speed can change at any time, even mid-match: the next piece
+   it places uses the new settings. The mode only changes on (Re)start. */
+function applyOpponent() {
+  aiPps = Number($('speed').value);
+  aiMistakes = Number($('speed').selectedOptions[0].dataset.mistakes || 0);
+  aiKind = $('opponent').value;
+  chooser = makeChooser(aiKind);
+  aiNextAt = Math.min(aiNextAt, performance.now() + 1000 / aiPps); // a faster speed kicks in at once
+  const full = $('opponent').selectedOptions[0].textContent.replace(/ \(.*\)$/, '');
+  const short = { dqn3: 'Network++', dqn2: 'Network+', dqn: 'Network', bot: 'Bot' }[aiKind];
+  $('aiName').innerHTML = `<span class="long">${full}</span><span class="short">${short}</span>`;
+  updateIntroPick();
+}
+
+function updateIntroPick() {
+  if (!$('introPick')) return; // the intro is replaced by the first countdown
+  const txt = (id) => $(id).selectedOptions[0].textContent.replace(/ \(.*\)$/, '').replace(/:.*$/, '');
+  $('introPick').innerHTML = `<span>${txt('mode')}</span><span>${txt('opponent')}</span><span>${txt('speed')}</span>`;
+}
+
+const matchRunning = () => state === 'countdown' || state === 'playing' || state === 'paused';
+
 function start() {
   if (state === 'loading') return;
   mode = $('mode').value;
-  aiPps = Number($('speed').value);
-  aiKind = $('opponent').value;
-  chooser = makeChooser(aiKind);
+  applyOpponent();
   matchId++;
   aiThinking = false;
-  const full = $('opponent').selectedOptions[0].textContent.replace(/ \(.*\)$/, '');
-  const short = { dqn3: 'Network++', dqn2: 'Network+', dqn: 'Network', bot: 'Bot' }[$('opponent').value];
-  $('aiName').innerHTML = `<span class="long">${full}</span><span class="short">${short}</span>`;
+  $('setupNote').hidden = true;
   $('goal').textContent = mode === 'race' ? `Race to ${RACE_LINES} lines` : 'Battle';
   const seed = (Math.random() * 2 ** 31) >>> 0;
   you = newPlayer(seed);
@@ -445,7 +472,6 @@ function start() {
     $(id).className = 'vs-badge';
   }
   $('aiOverlay').hidden = true;
-  for (const id of ['mode', 'opponent', 'speed']) $(id).disabled = true;
   $('startBtn').textContent = 'Restart';
   $('pauseBtn').disabled = false;
   $('pauseBtn').textContent = 'Pause';
@@ -485,7 +511,7 @@ function fmtTime(ms) {
 
 function endMatch(winner) {
   state = 'over';
-  const title = winner === 'you' ? 'You win! 🎉' : winner === 'ai' ? 'The network wins' : 'Draw';
+  const title = winner === 'you' ? 'You win! 🎉' : winner === 'ai' ? (aiKind === 'bot' ? 'The bot wins' : 'The network wins') : 'Draw';
   const why =
     mode === 'race'
       ? winner === 'you'
@@ -515,7 +541,6 @@ function endMatch(winner) {
     $('aiOverlayTitle').textContent = 'Topped out';
     $('aiOverlay').hidden = false;
   }
-  for (const id of ['mode', 'opponent', 'speed']) $(id).disabled = false;
   $('pauseBtn').disabled = true;
 }
 
@@ -677,6 +702,25 @@ for (const btn of document.querySelectorAll('#touch button')) {
   for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) btn.addEventListener(ev, stop);
 }
 
+for (const id of ['opponent', 'speed']) {
+  $(id).addEventListener('change', (e) => {
+    applyOpponent();
+    e.target.blur(); // arrow keys go back to your piece, not the dropdown
+  });
+}
+$('mode').addEventListener('change', (e) => {
+  updateIntroPick();
+  e.target.blur();
+  if (matchRunning() && $('mode').value !== mode) {
+    $('setupNote').textContent = 'The new mode starts when you press Restart.';
+    $('setupNote').hidden = false;
+  } else $('setupNote').hidden = true;
+});
+$('introStart').addEventListener('click', (e) => {
+  e.currentTarget.blur();
+  start();
+});
+
 $('startBtn').addEventListener('click', (e) => {
   e.currentTarget.blur(); // so Space drops a piece instead of pressing the button again
   start();
@@ -694,6 +738,7 @@ document.addEventListener('visibilitychange', () => {
 async function init() {
   you = newPlayer(1);
   ai = newPlayer(1);
+  applyOpponent();
   requestAnimationFrame(frame);
   try {
     const [model, w] = await Promise.all([

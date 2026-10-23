@@ -16,12 +16,16 @@
  *    long way to travel could land somewhere the AI never evaluated. For a
  *    learning agent that is fatal: the move it is scored on has to be the move
  *    it actually made.
+ *
+ * Human mode (v0.19): with { human: true } (or setHuman(true)) you play it
+ * yourself with the keyboard or the touch buttons; the agent is switched off.
  */
 
 import {
   WIDTH,
   HEIGHT,
   PLAY_LEFT,
+  PLAY_COLS,
   PLAY_BOTTOM,
   idx,
   createBoard,
@@ -124,6 +128,26 @@ export class Renderer {
 
 /* ------------------------------------------------------------------- game */
 
+// Human play: same timings as the Play vs Bot page
+const LOCK_DELAY = 500; // ms a landed piece can still slide or turn
+const MAX_LOCK_RESETS = 15;
+const DAS = 160; // ms before a held left/right starts repeating
+const ARR = 45; // ms between repeats
+const SOFT_DROP = 35; // ms per row while holding down
+const KICKS = [[0, 0], [0, -1], [0, 1], [0, -2], [0, 2], [-1, 0], [-1, -1], [-1, 1]];
+const KEYMAP = {
+  ArrowLeft: 'left',
+  ArrowRight: 'right',
+  ArrowDown: 'down',
+  ArrowUp: 'cw',
+  KeyX: 'cw',
+  KeyZ: 'ccw',
+  Space: 'drop',
+  KeyC: 'hold',
+  ShiftLeft: 'hold',
+  ShiftRight: 'hold',
+};
+
 export function startVisualGame(options = {}) {
   let weights = options.weights || PUBLISHED_WEIGHTS;
   let msPerRow = options.msPerRow ?? 40;
@@ -174,10 +198,25 @@ export function startVisualGame(options = {}) {
   let chooser =
     options.chooser || ((b, c, n) => chooseMove(b, c, n, weights, { lookahead }));
 
-  let active = null; // { rotation, row, col }
+  // human mode state
+  let human = !!options.human;
+  let phase = 'playing'; // ready | playing | paused | over (human mode only)
+  let canHold = true;
+  let gravityAcc = 0;
+  let lockStart = null;
+  let lockResets = 0;
+  let overAt = 0;
+  const keys = { left: null, right: null, down: false };
+
+  let active = null; // { rotation, row, col, target } (agent) or { r, rotation, row, col } (human)
   let accumulator = 0;
   let lastTime = 0;
   let running = true;
+
+  const setPhase = (p, info = {}) => {
+    phase = p;
+    options.onState?.(p, { lines, score, pieces, ...info });
+  };
 
   function showNext() {
     if (nextBoard) nextBoard.style.backgroundImage = `url(${imagePath}${NEXT_IMAGES[next]}.png)`;
@@ -198,7 +237,21 @@ export function startVisualGame(options = {}) {
       bestLines,
       avgLines: totalLines / Math.max(games - 1, 1),
       finishedGames: games - 1,
+      human,
     });
+  }
+
+  function swapHold() {
+    holds++;
+    if (held == null) {
+      held = current;
+      current = next;
+      next = bag.next();
+    } else {
+      [held, current] = [current, held];
+    }
+    showHold();
+    showNext();
   }
 
   function spawn() {
@@ -208,16 +261,7 @@ export function startVisualGame(options = {}) {
     if (hold && move && move.hold) {
       // put the current piece in the hold box and take the held one (or the
       // next one, if the box was empty); then the piece we got must be placed
-      holds++;
-      if (held == null) {
-        held = current;
-        current = next;
-        next = bag.next();
-      } else {
-        [held, current] = [current, held];
-      }
-      showHold();
-      showNext();
+      swapHold();
       move = chooser(board, current, next, { held, canHold: false });
     }
     if (move === null || move.hold || move.score === -Infinity) return false;
@@ -230,14 +274,37 @@ export function startVisualGame(options = {}) {
     return true;
   }
 
-  function reset(hard = false) {
+  /** Human mode: the new piece appears at the top in the middle. */
+  function spawnHuman() {
+    const rotation = PIECES[current].rotations[0];
+    const col = PLAY_LEFT + Math.floor((PLAY_COLS - rotation.width) / 2);
+    active = { r: 0, rotation, row: 0, col };
+    gravityAcc = 0;
+    lockStart = null;
+    lockResets = 0;
+    showNext();
+    if (collides(board, rotation, 0, col)) {
+      active = null;
+      totalLines += lines;
+      if (lines > bestLines) bestLines = lines;
+      overAt = performance.now();
+      setPhase('over');
+      return false;
+    }
+    return true;
+  }
+
+  function reset(hard = false, ready = false) {
     if (hard) {
       games = 1;
       bestLines = 0;
       totalLines = 0;
     } else {
-      totalLines += lines;
-      if (lines > bestLines) bestLines = lines;
+      if (!human) {
+        // (in human mode these were already counted when the game ended)
+        totalLines += lines;
+        if (lines > bestLines) bestLines = lines;
+      }
       games++;
     }
     board = createBoard();
@@ -249,9 +316,33 @@ export function startVisualGame(options = {}) {
     pieces = 0;
     held = null;
     holds = 0;
+    canHold = true;
     active = null;
+    keys.left = keys.right = null;
+    keys.down = false;
     showHold();
     showScore();
+    if (human) {
+      spawnHuman();
+      setPhase(ready ? 'ready' : 'playing'); // 'ready' waits for a key before gravity starts
+    }
+  }
+
+  /** Puts the active piece into the board, clears lines and scores. */
+  function lockActive() {
+    placePiece(board, active.rotation, active.row, active.col);
+    pieces++;
+    const cleared = clearLines(board);
+    if (cleared > 0) {
+      lines += cleared;
+      // classic scoring: a quadruple is worth far more than four singles
+      score += [0, 40, 100, 300, 1200][cleared];
+    }
+    showScore();
+    active = null;
+    current = next;
+    next = bag.next();
+    canHold = true;
   }
 
   function tick() {
@@ -269,30 +360,191 @@ export function startVisualGame(options = {}) {
       return;
     }
 
-    // landed
-    placePiece(board, active.rotation, active.row, active.col);
-    pieces++;
-    const cleared = clearLines(board);
-    if (cleared > 0) {
-      lines += cleared;
-      // classic scoring: a quadruple is worth far more than four singles
-      score += [0, 40, 100, 300, 1200][cleared];
+    lockActive(); // landed
+  }
+
+  /* ---- human controls ---- */
+
+  const fits = (rotation, row, col) => !collides(board, rotation, row, col);
+
+  function afterMoveOnGround() {
+    // sliding or turning a landed piece gives it a little more time
+    if (lockStart != null && lockResets < MAX_LOCK_RESETS) {
+      lockStart = performance.now();
+      lockResets++;
     }
-    showScore();
-    active = null;
-    current = next;
-    next = bag.next();
+  }
+
+  function move(dc, dr) {
+    if (!active || !fits(active.rotation, active.row + dr, active.col + dc)) return false;
+    active.row += dr;
+    active.col += dc;
+    if (dc) afterMoveOnGround();
+    return true;
+  }
+
+  function rotate(dir) {
+    if (!active) return;
+    const rots = PIECES[current].rotations;
+    if (rots.length === 1) return;
+    const r = (active.r + dir + rots.length) % rots.length;
+    for (const [dr, dc] of KICKS) {
+      if (fits(rots[r], active.row + dr, active.col + dc)) {
+        active.r = r;
+        active.rotation = rots[r];
+        active.row += dr;
+        active.col += dc;
+        afterMoveOnGround();
+        return;
+      }
+    }
+  }
+
+  function lockHuman() {
+    lockActive();
+    spawnHuman();
+  }
+
+  function hardDrop() {
+    if (!active) return;
+    while (fits(active.rotation, active.row + 1, active.col)) active.row++;
+    lockHuman();
+  }
+
+  function holdHuman() {
+    if (!hold || !canHold || !active) return;
+    swapHold();
+    canHold = false;
+    spawnHuman();
+  }
+
+  const ACTIONS = {
+    left: () => move(-1, 0),
+    right: () => move(1, 0),
+    down: () => move(0, 1),
+    cw: () => rotate(1),
+    ccw: () => rotate(-1),
+    drop: hardDrop,
+    hold: holdHuman,
+  };
+
+  function go() {
+    lastTime = 0;
+    setPhase('playing');
+  }
+
+  function setPaused(on) {
+    if (!human) return;
+    if (on && phase === 'playing') setPhase('paused');
+    else if (!on && phase === 'paused') {
+      lastTime = 0;
+      setPhase('playing');
+    }
+  }
+
+  /** One input from the keyboard or a touch button. */
+  function press(action) {
+    if (!human || !running) return;
+    if (phase === 'ready') {
+      if (action !== 'pause') go();
+      return;
+    }
+    if (action === 'pause') return setPaused(phase === 'playing');
+    if (phase === 'over') {
+      // Space restarts too, but not in the first second, so a hard drop
+      // that was already on its way does not skip the result
+      if (action === 'restart' || (action === 'drop' && performance.now() - overAt > 1000)) reset();
+      return;
+    }
+    if (phase !== 'playing') return;
+    ACTIONS[action]?.();
+  }
+
+  function onKeyDown(e) {
+    if (!human || !running) return;
+    if (e.target.closest?.('select, input, textarea, button')) return;
+    if (e.code === 'KeyP' || e.code === 'Escape') {
+      setPaused(phase === 'playing');
+      return;
+    }
+    if (e.code === 'Enter' && phase === 'over') {
+      reset();
+      return;
+    }
+    if (phase === 'ready' && (KEYMAP[e.code] || e.code === 'Enter')) {
+      e.preventDefault();
+      go();
+      return;
+    }
+    const action = KEYMAP[e.code];
+    if (!action) return;
+    e.preventDefault(); // no page scrolling while playing
+    if (e.repeat) return; // we do our own repeat for left/right/down
+    if (phase !== 'playing') {
+      press(action);
+      return;
+    }
+    if (action === 'left' || action === 'right') {
+      ACTIONS[action]();
+      const t = performance.now();
+      keys[action] = { since: t, last: t };
+      keys[action === 'left' ? 'right' : 'left'] = null;
+    } else if (action === 'down') {
+      keys.down = true;
+    } else {
+      ACTIONS[action]();
+    }
+  }
+
+  function onKeyUp(e) {
+    const action = KEYMAP[e.code];
+    if (action === 'left' || action === 'right') keys[action] = null;
+    if (action === 'down') keys.down = false;
+  }
+
+  window.addEventListener('keydown', onKeyDown);
+  window.addEventListener('keyup', onKeyUp);
+
+  function humanStep(t, dt) {
+    if (phase !== 'playing') return;
+    for (const dir of ['left', 'right']) {
+      const k = keys[dir];
+      if (k && t - k.since >= DAS && t - k.last >= ARR) {
+        ACTIONS[dir]();
+        k.last = t;
+      }
+    }
+    if (!active) return;
+    gravityAcc += dt;
+    const level = Math.floor(lines / 10);
+    const g = keys.down ? SOFT_DROP : Math.max(70, 800 * 0.85 ** level);
+    while (gravityAcc >= g) {
+      gravityAcc -= g;
+      if (!move(0, 1)) {
+        gravityAcc = 0;
+        break;
+      }
+      if (keys.down) score += 1; // a point per row of soft drop
+    }
+    const grounded = !fits(active.rotation, active.row + 1, active.col);
+    if (!grounded) lockStart = null;
+    else if (lockStart == null) lockStart = t;
+    else if (t - lockStart >= LOCK_DELAY) lockHuman();
   }
 
   function frame(timestamp) {
     if (!running) return;
-    if (lastTime === 0) lastTime = timestamp;
-    accumulator += timestamp - lastTime;
+    const dt = lastTime === 0 ? 0 : Math.min(100, timestamp - lastTime);
     lastTime = timestamp;
 
-    while (accumulator >= msPerRow) {
-      accumulator -= msPerRow;
-      tick();
+    if (human) {
+      humanStep(timestamp, dt);
+    } else {
+      accumulator += dt;
+      while (accumulator >= msPerRow) {
+        accumulator -= msPerRow;
+        tick();
+      }
     }
 
     renderer.draw(board, active);
@@ -302,11 +554,14 @@ export function startVisualGame(options = {}) {
   showScore();
   showNext();
   showHold();
+  if (human) reset(true, true);
   window.requestAnimationFrame(frame);
 
   return {
     stop() {
       running = false;
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
     },
     setWeights(w) {
       weights = w;
@@ -318,8 +573,24 @@ export function startVisualGame(options = {}) {
      */
     setChooser(fn) {
       chooser = fn;
-      reset(true);
+      if (!human) reset(true);
     },
+    /** Switch between you playing (true) and the agent playing (false). New game. */
+    setHuman(on) {
+      human = !!on;
+      phase = 'playing';
+      accumulator = 0;
+      reset(true, true);
+      if (!human) options.onState?.('agent', {});
+    },
+    isHuman: () => human,
+    /** For touch buttons: 'left' 'right' 'down' 'cw' 'ccw' 'drop' 'hold' 'pause' 'restart' 'start'. */
+    press,
+    /** Touch soft drop: true while the button is held down. */
+    softDrop(on) {
+      keys.down = !!on && human;
+    },
+    pause: setPaused,
     setSpeed(ms) {
       msPerRow = ms;
     },

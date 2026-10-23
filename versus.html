@@ -41,6 +41,7 @@
         <label class="vs-field">
           <span>Opponent speed</span>
           <select id="speed">
+            <option value="0.25" data-mistakes="0.3">Super easy: 1 piece every 4 s, makes mistakes</option>
             <option value="0.5">Easy: 1 piece every 2 s</option>
             <option value="1" selected>Normal: 1 piece per second</option>
             <option value="1.5">Hard: 1.5 pieces per second</option>
@@ -50,6 +51,7 @@
         </label>
         <button id="startBtn" class="primary" type="button">Start</button>
         <button id="pauseBtn" type="button" disabled>Pause</button>
+        <p class="vs-setup-note" id="setupNote" hidden></p>
       </div>
 
       <div class="vs-arena">
@@ -73,10 +75,20 @@
               <div class="vs-garbage" title="Garbage coming your way"><i id="youGarbage"></i></div>
               <div class="vs-board">
                 <canvas id="youBoard" aria-label="Your Tetris board"></canvas>
-                <div class="vs-overlay" id="overlay">
-                  <div>
-                    <p class="vs-overlay-title" id="overlayTitle">You vs the network</p>
-                    <p id="overlayText">Same pieces for both of you. Pick a mode and press <b>Start</b>.</p>
+                <div class="vs-overlay intro" id="overlay">
+                  <div class="vs-fall" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+                  <div class="vs-overlay-box">
+                    <p class="vs-overlay-title" id="overlayTitle">Ready to battle?</p>
+                    <div id="overlayText">
+                      <p class="vs-intro-sub">Human vs machine, same pieces, one winner.</p>
+                      <ol class="vs-intro-steps">
+                        <li><span><b>Mode:</b> Battle or Race</span></li>
+                        <li><span><b>Opponent</b> and its speed</span></li>
+                        <li><span><b>Start</b> and stack fast</span></li>
+                      </ol>
+                      <p class="vs-intro-pick" id="introPick"></p>
+                      <button type="button" class="vs-intro-go" id="introStart">Start</button>
+                    </div>
                   </div>
                 </div>
               </div>
