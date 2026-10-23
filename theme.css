@@ -93,7 +93,7 @@ kbd {
 
 /* ------------------------------------------------- intro screen on a board */
 
-.intro {
+.intro-screen {
   overflow: hidden;
   background:
     radial-gradient(110% 50% at 50% 0%, rgba(139, 133, 255, 0.16), transparent 70%),
@@ -105,7 +105,7 @@ kbd {
   max-width: 260px;
   margin: 0 auto;
 }
-.intro .intro-title {
+.intro-screen .intro-title {
   margin: 0 0 6px;
   font-size: 1.9rem;
   font-weight: 800;
@@ -202,10 +202,10 @@ kbd {
 
 /* short boards on phones: keep the title, the choices and the button */
 @media (max-width: 720px) {
-  .intro .intro-title {
+  .intro-screen .intro-title {
     font-size: 1.4rem;
   }
-  .intro .intro-steps {
+  .intro-screen .intro-steps {
     display: none;
   }
   .intro-sub {

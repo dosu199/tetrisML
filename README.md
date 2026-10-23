@@ -405,8 +405,9 @@ game page (`index.html`, `style.css`) is not touched.
 
 - The page opens on a **Ready to play?** screen: you play.
 - **Turn on ML** switch: off = you play, on = the player chosen under
-  **Who plays** (network + deep lookahead, network + lookahead, network, or
-  the search bot) plays and you watch. Picking a player turns ML on. The page
+  **Who plays** (network looking 3 / 2 / 1 pieces ahead, or the search bot)
+  plays and you watch. A badge shows who is playing right now, and four small
+  cards show lines, pieces, game number and best lines. Picking a player turns ML on. The page
   remembers which player you picked, but always starts with ML off.
 - Switching hands over **the same game**: board, score, lines and hold carry
   over. Turning ML off mid-fall gives you the falling piece where it is;

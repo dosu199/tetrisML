@@ -420,7 +420,7 @@ function aiStep(t) {
 /* ------------------------------------------------------------ the match */
 
 function setOverlay(title, html) {
-  $('overlay').classList.remove('intro');
+  $('overlay').classList.remove('intro-screen');
   $('overlayTitle').innerHTML = title;
   $('overlayText').innerHTML = html;
   $('overlay').hidden = false;

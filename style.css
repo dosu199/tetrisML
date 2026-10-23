@@ -336,18 +336,55 @@ select:focus {
   color: var(--muted);
 }
 
-.keys-hint {
-  list-style: none;
-  margin: 4px 0 0;
-  padding: 10px 0 0;
-  border-top: 1px solid var(--panel-line);
+.who-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.ml-badge {
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--panel-line);
+}
+.ml-badge.on {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: transparent;
+}
+
+/* the four numbers under the agent picker */
+.play-stats {
   display: grid;
-  gap: 5px;
-  font-size: 0.8rem;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 6px 0 0;
+}
+.play-stats div {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--page);
+  border: 1px solid var(--panel-line);
+}
+.play-stats dt {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
   color: var(--muted);
 }
-body:not(.human) .keys-hint {
-  display: none;
+.play-stats dd {
+  margin: 2px 0 0;
+  font-size: 1.25rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
 }
 
 /* touch buttons: only on touch screens, only while you play */
@@ -396,9 +433,6 @@ body:not(.human) .keys-hint {
   .touch-pad button:active {
     background: var(--accent);
     color: #0b0e1d;
-  }
-  body.human .keys-hint {
-    display: none;
   }
 }
 

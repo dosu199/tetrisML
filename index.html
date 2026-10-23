@@ -4,9 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="theme.css?v=25">
-    <link rel="stylesheet" href="nav.css">
+    <link rel="stylesheet" href="style.css?v=26">
+    <link rel="stylesheet" href="theme.css?v=26">
+    <link rel="stylesheet" href="nav.css?v=26">
     <title>Tetris</title>
 </head>
 
@@ -24,7 +24,7 @@
     <div id="wrapper">
         <div class="board-wrap">
             <div id="gameContainer"></div>
-            <div class="play-overlay intro" id="playOverlay" hidden>
+            <div class="play-overlay intro-screen" id="playOverlay" hidden>
                 <div class="intro-box">
                     <p class="play-overlay-title intro-title" id="playTitle">Ready to play?</p>
                     <div id="playText"></div>
@@ -46,21 +46,23 @@
     <span class="ml-track" aria-hidden="true"><span class="ml-thumb"></span></span>
     <span class="ml-text">Turn on ML</span>
   </label>
-  <p class="ml-hint" id="mlHint">Off: you play. On: the network plays.</p>
-  <label for="agent">Who plays</label>
+  <p class="ml-hint" id="mlHint">Turn on to let the network continue your game.</p>
+  <div class="who-row">
+    <label for="agent">Who plays</label>
+    <span class="ml-badge" id="mlBadge" title="Who is playing right now">You</span>
+  </div>
   <select id="agent">
-    <option value="dqn3">Neural network + deep lookahead</option>
-    <option value="dqn2">Neural network + lookahead</option>
-    <option value="dqn">Neural network (DQN)</option>
-    <option value="bot">Bot (search)</option>
+    <option value="dqn3">Network, 3 ahead</option>
+    <option value="dqn2">Network, 2 ahead</option>
+    <option value="dqn">Network, 1 piece</option>
+    <option value="bot">Search bot</option>
   </select>
-  <div id="agentStats"></div>
-  <ul class="keys-hint" id="keysHint">
-    <li><kbd>←</kbd><kbd>→</kbd> move</li>
-    <li><kbd>↑</kbd>/<kbd>X</kbd> rotate, <kbd>Z</kbd> back</li>
-    <li><kbd>↓</kbd> soft drop, <kbd>Space</kbd> hard drop</li>
-    <li><kbd>C</kbd>/<kbd>Shift</kbd> hold, <kbd>P</kbd> pause</li>
-  </ul>
+  <dl class="play-stats" aria-live="polite">
+    <div><dt>Lines</dt><dd id="stLines">0</dd></div>
+    <div><dt>Pieces</dt><dd id="stPieces">0</dd></div>
+    <div><dt>Game</dt><dd id="stGame">1</dd></div>
+    <div><dt>Best</dt><dd id="stBest">0</dd></div>
+  </dl>
 </div>
         </div>
     </div>
@@ -78,7 +80,7 @@
     </div>
 
 <script type="module">
-  import { startVisualGame } from './src/tetris-visual.js';
+  import { startVisualGame } from './src/tetris-visual.js?v=26';
   import { chooseMoveAction } from './src/tetris-ai.js';
   import { loadDqn, chooseDqnAction } from './src/tetris-dqn.js';
 
@@ -137,14 +139,13 @@
             : null;
     $('playOverlay').hidden = !o;
     if (!o) return;
-    $('playOverlay').classList.toggle('intro', state === 'ready'); // falling blocks only on the start screen
+    $('playOverlay').classList.toggle('intro-screen', state === 'ready'); // falling blocks only on the start screen
     $('playTitle').textContent = o[0];
     $('playText').innerHTML = o[1];
     $('playGo').textContent = o[2];
     $('playOverlay').dataset.state = state;
   }
 
-  const statsEl = $('agentStats');
   const game = startVisualGame({
     chooser: choosers[$('agent').value],
     hold: true,
@@ -153,21 +154,27 @@
     imagePath: 'images/',
     onState: showOverlay,
     onStats: (s) => {
-      statsEl.textContent = s.human
-        ? `you · game ${s.games} · lines ${s.lines} · pieces ${s.pieces} · best ${s.bestLines} lines`
-        : `game ${s.games} · lines ${s.lines} · pieces ${s.pieces} · holds ${s.holds} · best ${s.bestLines} lines`;
+      $('stLines').textContent = s.lines;
+      $('stPieces').textContent = s.pieces;
+      $('stGame').textContent = s.games;
+      $('stBest').textContent = Math.max(s.bestLines, s.lines);
     },
   });
 
   function applyMode() {
     const ml = $('mlToggle').checked;
     document.body.classList.toggle('human', !ml);
-    $('mlHint').innerHTML = ml ? 'The network is playing. Turn off to play yourself.' : 'You are playing. Turn on to let the network play.';
+    setHint(ml);
     if (game.isHuman() === ml) game.setHuman(!ml); // the same game carries on
     save();
   }
+  function setHint(ml) {
+    $('mlHint').textContent = ml ? 'Turn off to take over the same game.' : 'Turn on to let the network continue your game.';
+    $('mlBadge').textContent = ml ? 'Network' : 'You';
+    $('mlBadge').classList.toggle('on', ml);
+  }
   document.body.classList.toggle('human', !$('mlToggle').checked);
-  $('mlHint').innerHTML = $('mlToggle').checked ? 'The network is playing. Turn off to play yourself.' : 'You are playing. Turn on to let the network play.';
+  setHint($('mlToggle').checked);
 
   $('mlToggle').addEventListener('change', (e) => {
     e.target.blur(); // so Space and the arrows go to the game, not the switch
@@ -222,7 +229,7 @@
     for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) btn.addEventListener(ev, stop);
   }
 </script>
-<script src="tetro-bg.js?v=25" defer></script>
+<script src="tetro-bg.js?v=26" defer></script>
 </body>
 
 </html>
