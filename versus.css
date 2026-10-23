@@ -202,6 +202,150 @@ body {
   font-size: 1.5rem;
   font-weight: 800;
 }
+.vs-setup-note {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--accent);
+}
+.vs-setup-note[hidden] {
+  display: none;
+}
+
+/* the intro screen on your board before the first match */
+.vs-overlay-box {
+  position: relative;
+  z-index: 1;
+}
+.vs-overlay.intro {
+  overflow: hidden;
+  background:
+    radial-gradient(120% 70% at 50% 0%, rgba(139, 133, 255, 0.35), transparent 60%),
+    radial-gradient(90% 60% at 50% 110%, rgba(78, 195, 224, 0.28), transparent 60%),
+    rgba(8, 11, 24, 0.88);
+}
+.vs-overlay.intro .vs-overlay-title {
+  font-size: 2rem;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  background: linear-gradient(90deg, #ff7ad9, #8b85ff 45%, #4ec3e0);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  margin-bottom: 4px;
+}
+.vs-intro-sub {
+  color: #c9cdf2;
+}
+.vs-intro-steps {
+  list-style: none;
+  counter-reset: step;
+  margin: 14px auto;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+  max-width: 220px;
+  text-align: left;
+}
+.vs-intro-steps li {
+  counter-increment: step;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  animation: vs-in 0.5s both;
+}
+.vs-intro-steps li:nth-child(2) { animation-delay: 0.12s; }
+.vs-intro-steps li:nth-child(3) { animation-delay: 0.24s; }
+.vs-intro-steps li::before {
+  content: counter(step);
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-weight: 800;
+  font-size: 0.78rem;
+  background: linear-gradient(135deg, #8b85ff, #4ec3e0);
+  color: #0b0e1d;
+}
+.vs-intro-steps b {
+  color: #fff;
+}
+.vs-intro-pick {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin: 0 0 14px !important;
+}
+.vs-intro-pick span {
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  background: rgba(139, 133, 255, 0.22);
+  color: #dcdcff;
+}
+.vs-intro-go {
+  font: inherit;
+  font-weight: 800;
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+  padding: 10px 28px;
+  border: 0;
+  border-radius: 999px;
+  color: #0b0e1d;
+  background: linear-gradient(90deg, #ff7ad9, #8b85ff 50%, #4ec3e0);
+  box-shadow: 0 6px 24px rgba(139, 133, 255, 0.45);
+  cursor: pointer;
+  animation: vs-pulse 2s ease-in-out infinite;
+}
+.vs-intro-go:hover {
+  filter: brightness(1.1);
+}
+.vs-fall {
+  display: none;
+}
+.vs-overlay.intro .vs-fall {
+  display: block;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.vs-fall i {
+  position: absolute;
+  top: -40px;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  opacity: 0.55;
+  animation: vs-drop 6s linear infinite;
+}
+.vs-fall i:nth-child(1) { left: 8%;  background: #ff5a6e; animation-delay: 0s; }
+.vs-fall i:nth-child(2) { left: 22%; background: #4ec3e0; animation-delay: 2.1s; animation-duration: 7s; }
+.vs-fall i:nth-child(3) { left: 38%; background: #ffd23f; animation-delay: 4s; }
+.vs-fall i:nth-child(4) { left: 55%; background: #5ad17a; animation-delay: 1.2s; animation-duration: 5.5s; }
+.vs-fall i:nth-child(5) { left: 70%; background: #ff9f43; animation-delay: 3.3s; }
+.vs-fall i:nth-child(6) { left: 84%; background: #5b7cfa; animation-delay: 0.6s; animation-duration: 6.5s; }
+.vs-fall i:nth-child(7) { left: 92%; background: #b06cff; animation-delay: 4.8s; }
+@keyframes vs-drop {
+  to { transform: translateY(calc(100vh + 80px)) rotate(180deg); }
+}
+@keyframes vs-in {
+  from { opacity: 0; transform: translateY(8px); }
+}
+@keyframes vs-pulse {
+  50% { box-shadow: 0 6px 34px rgba(139, 133, 255, 0.8); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vs-fall { display: none !important; }
+  .vs-intro-go, .vs-intro-steps li { animation: none; }
+}
+
 .vs-overlay .big {
   font-size: 4rem;
   font-weight: 800;
@@ -354,5 +498,15 @@ kbd {
   }
   .vs-overlay-title {
     font-size: 1.1rem;
+  }
+  .vs-overlay.intro .vs-overlay-title {
+    font-size: 1.4rem;
+  }
+  /* the board is short on phones: keep the title, the choices and Start */
+  .vs-intro-steps {
+    display: none;
+  }
+  .vs-intro-sub {
+    font-size: 0.78rem;
   }
 }

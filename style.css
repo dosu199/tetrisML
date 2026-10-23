@@ -249,6 +249,195 @@ select:focus {
   display: none;
 }
 
+/* ------------------------------------------- playing it yourself (v0.19) */
+
+.board-wrap {
+  position: relative;
+}
+
+.play-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  text-align: center;
+  border-radius: var(--radius);
+  background:
+    radial-gradient(120% 60% at 50% 0%, rgba(139, 133, 255, 0.3), transparent 60%),
+    rgba(8, 11, 24, 0.8);
+  color: var(--text);
+  line-height: 1.5;
+}
+.play-overlay[hidden] {
+  display: none;
+}
+.play-overlay p {
+  margin: 0 0 12px;
+}
+.play-overlay-title {
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  background: linear-gradient(90deg, #ff7ad9, var(--accent) 50%, var(--accent-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.play-go {
+  font: inherit;
+  font-weight: 800;
+  padding: 10px 28px;
+  border: 0;
+  border-radius: 999px;
+  color: #0b0e1d;
+  background: linear-gradient(90deg, #ff7ad9, var(--accent) 50%, var(--accent-2));
+  box-shadow: 0 6px 24px rgba(139, 133, 255, 0.45);
+  cursor: pointer;
+}
+.play-go:hover {
+  filter: brightness(1.1);
+}
+
+kbd {
+  display: inline-block;
+  min-width: 1.4em;
+  padding: 0 5px;
+  margin: 0 1px;
+  border-radius: 5px;
+  border: 1px solid var(--panel-line);
+  border-bottom-width: 2px;
+  background: #12182c;
+  font: inherit;
+  font-size: 0.8em;
+  text-align: center;
+  color: var(--text);
+}
+
+/* the "Turn on ML" switch */
+.agent-panel .ml-switch {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  font-size: 1rem;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text);
+}
+.ml-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+.ml-track {
+  position: relative;
+  flex: none;
+  width: 50px;
+  height: 28px;
+  border-radius: 999px;
+  background: #2a3150;
+  border: 1px solid var(--panel-line);
+  transition: background 0.2s;
+}
+.ml-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  transition: transform 0.2s;
+}
+.ml-switch input:checked + .ml-track {
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+}
+.ml-switch input:checked + .ml-track .ml-thumb {
+  transform: translateX(22px);
+}
+.ml-switch input:focus-visible + .ml-track {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.ml-text {
+  font-weight: 700;
+}
+.ml-hint {
+  margin: -2px 0 6px;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.keys-hint {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 10px 0 0;
+  border-top: 1px solid var(--panel-line);
+  display: grid;
+  gap: 5px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+body:not(.human) .keys-hint {
+  display: none;
+}
+
+/* touch buttons: only on touch screens, only while you play */
+.touch-pad {
+  display: none;
+}
+@media (pointer: coarse) {
+  body.human {
+    /* leave room for the buttons under the board */
+    --cell: clamp(12px, min(calc((100vh - 330px - var(--topnav-h, 0px)) / 24), calc((100vw - 48px) / 10)), 30px);
+    padding-top: calc(var(--topnav-h, 0px) + 10px);
+    padding-bottom: 160px;
+    justify-content: flex-start;
+  }
+  body.human #gameContainer {
+    scroll-margin-bottom: 150px;
+  }
+  body.human .touch-pad {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 5;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+    background: rgba(11, 15, 29, 0.92);
+    border-top: 1px solid var(--panel-line);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+  }
+  .touch-pad button {
+    font: inherit;
+    font-size: 1.15rem;
+    font-weight: 700;
+    height: 52px;
+    border-radius: 12px;
+    border: 1px solid var(--panel-line);
+    background: var(--panel);
+    color: var(--text);
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .touch-pad button:active {
+    background: var(--accent);
+    color: #0b0e1d;
+  }
+  body.human .keys-hint {
+    display: none;
+  }
+}
+
 /* ------------------------------------------------ small screens: stack */
 
 @media (max-width: 720px) {
@@ -286,6 +475,53 @@ select:focus {
   }
 
   .agent-panel {
+    grid-column: 1 / -1;
+  }
+}
+
+/* small screens while you play: hold, next and score in one row above the
+   board, the ML switch below it, so the board and buttons fit one screen */
+@media (max-width: 720px) {
+  body.human #wrapper {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    width: 100%;
+    max-width: 380px;
+  }
+  body.human #gameStuff {
+    display: contents;
+  }
+  body.human #gameStuff::before {
+    display: none;
+  }
+  body.human #holdTetromino,
+  body.human #holdTetromino + #nextTetromino,
+  body.human #score {
+    order: 1;
+    width: auto;
+    height: 70px;
+    padding: 24px 10px 6px;
+  }
+  body.human #holdTetromino::before,
+  body.human #nextTetromino::before {
+    top: 7px;
+    left: 10px;
+  }
+  body.human #wrapper #gameStuff > #score {
+    grid-column: auto;
+    padding: 7px 10px;
+  }
+  body.human #scoreBoard {
+    font-size: 1.6rem;
+  }
+  body.human .board-wrap {
+    order: 2;
+    grid-column: 1 / -1;
+    justify-self: center;
+  }
+  body.human .agent-panel {
+    order: 3;
     grid-column: 1 / -1;
   }
 }

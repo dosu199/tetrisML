@@ -21,7 +21,16 @@
     </nav>
 
     <div id="wrapper">
-        <div id="gameContainer"></div>
+        <div class="board-wrap">
+            <div id="gameContainer"></div>
+            <div class="play-overlay" id="playOverlay" hidden>
+                <div>
+                    <p class="play-overlay-title" id="playTitle">Your turn</p>
+                    <p id="playText">Press <kbd>Space</kbd> or an arrow key to start.</p>
+                    <button type="button" class="play-go" id="playGo">Start</button>
+                </div>
+            </div>
+        </div>
         <div id="gameStuff">
             <div id="holdTetromino"></div>
             <div id="nextTetromino">
@@ -31,7 +40,13 @@
                 <div id="scoreBoard">0</div>
             </div>
             <div class="agent-panel">
-  <label for="agent">Ko igra</label>
+  <label class="ml-switch">
+    <input type="checkbox" id="mlToggle" role="switch">
+    <span class="ml-track" aria-hidden="true"><span class="ml-thumb"></span></span>
+    <span class="ml-text">Turn on ML</span>
+  </label>
+  <p class="ml-hint" id="mlHint">Off: you play. On: the network plays.</p>
+  <label for="agent">Who plays</label>
   <select id="agent">
     <option value="dqn3">Neural network + deep lookahead</option>
     <option value="dqn2">Neural network + lookahead</option>
@@ -39,8 +54,26 @@
     <option value="bot">Bot (search)</option>
   </select>
   <div id="agentStats"></div>
+  <ul class="keys-hint" id="keysHint">
+    <li><kbd>←</kbd><kbd>→</kbd> move</li>
+    <li><kbd>↑</kbd>/<kbd>X</kbd> rotate, <kbd>Z</kbd> back</li>
+    <li><kbd>↓</kbd> soft drop, <kbd>Space</kbd> hard drop</li>
+    <li><kbd>C</kbd>/<kbd>Shift</kbd> hold, <kbd>P</kbd> pause</li>
+  </ul>
 </div>
         </div>
+    </div>
+
+    <!-- touch controls (phones and tablets, only while you play) -->
+    <div class="touch-pad" id="touchPad" aria-label="Touch controls">
+        <button type="button" data-key="hold">Hold</button>
+        <button type="button" data-key="ccw" aria-label="Rotate left">⟲</button>
+        <button type="button" data-key="cw" aria-label="Rotate right">⟳</button>
+        <button type="button" data-key="pause" aria-label="Pause">❚❚</button>
+        <button type="button" data-key="left" aria-label="Move left">◀</button>
+        <button type="button" data-key="down" aria-label="Move down">▼</button>
+        <button type="button" data-key="right" aria-label="Move right">▶</button>
+        <button type="button" data-key="drop" aria-label="Drop">Drop</button>
     </div>
 
 <script type="module">
@@ -48,6 +81,7 @@
   import { chooseMoveAction } from './src/tetris-ai.js';
   import { loadDqn, chooseDqnAction } from './src/tetris-dqn.js';
 
+  const $ = (id) => document.getElementById(id);
   const json = (f) => fetch(f).then((r) => r.json());
   const weights = (await json('./weights.json')).weights;
   const net = loadDqn(await json('./dqn-model.json'));
@@ -60,20 +94,117 @@
     bot: (board, cur, next, hold) => chooseMoveAction(board, cur, next, weights, hold, { lookahead: true }),
   };
 
-  const statsEl = document.getElementById('agentStats');
+  // remember the switch and the agent between visits (optional nicety)
+  const saved = (() => {
+    try {
+      return JSON.parse(localStorage.getItem('tetris-play') || '{}');
+    } catch {
+      return {};
+    }
+  })();
+  const save = () => {
+    try {
+      localStorage.setItem('tetris-play', JSON.stringify({ ml: $('mlToggle').checked, agent: $('agent').value }));
+    } catch {}
+  };
+  if (saved.agent && choosers[saved.agent]) $('agent').value = saved.agent;
+  $('mlToggle').checked = !!saved.ml;
+
+  const coarse = window.matchMedia('(pointer: coarse)').matches;
+  const OVERLAY = {
+    ready: ['Your turn', coarse ? 'Tap <b>Start</b>, then use the buttons below.' : 'Press <kbd>Space</kbd> or an arrow key to start.', 'Start'],
+    paused: ['Paused', coarse ? 'Tap <b>Resume</b> to continue.' : 'Press <kbd>P</kbd> to continue.', 'Resume'],
+  };
+
+  function showOverlay(state, info) {
+    const o = state === 'over'
+      ? ['Game over', `${info.lines} lines · score ${info.score.toLocaleString('en-US')}<br>${coarse ? '' : 'Press <kbd>Enter</kbd> or <kbd>Space</kbd> to play again.'}`, 'Play again']
+      : OVERLAY[state];
+    $('playOverlay').hidden = !o;
+    if (!o) return;
+    $('playTitle').textContent = o[0];
+    $('playText').innerHTML = o[1];
+    $('playGo').textContent = o[2];
+    $('playOverlay').dataset.state = state;
+  }
+
+  const statsEl = $('agentStats');
   const game = startVisualGame({
-    chooser: choosers.dqn3,
+    chooser: choosers[$('agent').value],
     hold: true,
+    human: !$('mlToggle').checked,
     msPerRow: 45,
     imagePath: 'images/',
+    onState: showOverlay,
     onStats: (s) => {
-      statsEl.textContent = `game ${s.games} · lines ${s.lines} · pieces ${s.pieces} · holds ${s.holds} · best ${s.bestLines} lines`;
+      statsEl.textContent = s.human
+        ? `you · game ${s.games} · lines ${s.lines} · pieces ${s.pieces} · best ${s.bestLines} lines`
+        : `game ${s.games} · lines ${s.lines} · pieces ${s.pieces} · holds ${s.holds} · best ${s.bestLines} lines`;
     },
   });
 
-  document.getElementById('agent').addEventListener('change', (e) => {
-    game.setChooser(choosers[e.target.value]);
+  function applyMode() {
+    const ml = $('mlToggle').checked;
+    document.body.classList.toggle('human', !ml);
+    $('mlHint').innerHTML = ml ? 'The network is playing. Turn off to play yourself.' : 'You are playing. Turn on to let the network play.';
+    if (game.isHuman() === ml) game.setHuman(!ml);
+    save();
+  }
+  document.body.classList.toggle('human', !$('mlToggle').checked);
+  $('mlHint').innerHTML = $('mlToggle').checked ? 'The network is playing. Turn off to play yourself.' : 'You are playing. Turn on to let the network play.';
+
+  $('mlToggle').addEventListener('change', (e) => {
+    e.target.blur(); // so Space and the arrows go to the game, not the switch
+    applyMode();
   });
+
+  $('agent').addEventListener('change', (e) => {
+    e.target.blur();
+    game.setChooser(choosers[e.target.value]);
+    if (!$('mlToggle').checked) {
+      // picking a player means you want to watch it: turn ML on
+      $('mlToggle').checked = true;
+      applyMode();
+    }
+    save();
+  });
+
+  $('playGo').addEventListener('click', (e) => {
+    e.currentTarget.blur();
+    const state = $('playOverlay').dataset.state;
+    game.press(state === 'paused' ? 'pause' : state === 'over' ? 'restart' : 'start');
+    if (coarse) $('gameContainer').scrollIntoView({ block: 'end', behavior: 'smooth' });
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) game.pause(true);
+  });
+
+  // touch buttons: tap to act; hold left/right to repeat, hold down to soft drop
+  for (const btn of document.querySelectorAll('#touchPad button')) {
+    const action = btn.dataset.key;
+    let timer = null;
+    const stop = () => {
+      clearInterval(timer);
+      timer = null;
+      if (action === 'down') game.softDrop(false);
+    };
+    btn.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      if (action === 'down') {
+        game.softDrop(true);
+        return;
+      }
+      game.press(action);
+      if (action === 'left' || action === 'right') {
+        const t0 = performance.now();
+        timer = setInterval(() => {
+          if (performance.now() - t0 >= 160) game.press(action);
+        }, 45);
+      }
+    });
+    for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) btn.addEventListener(ev, stop);
+  }
 </script>
 </body>
 
