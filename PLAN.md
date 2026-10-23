@@ -1,6 +1,6 @@
 # Plan — Tetris ML
 
-Last updated: 23 October 2026 (v0.19).
+Last updated: 23 October 2026 (v0.18).
 
 **Goal:** a neural network that plays Tetris well and learns by itself.
 
@@ -80,14 +80,6 @@ the top 6 first moves (4 follow-ups each) get the deep look. 50 games, hold:
 - garbage every 4 (cap 2,000): deep 2,000 (0 lost) vs 2-ply 992 vs bot 1,000
 Default on the game page; strongest Play vs Bot opponent (runs in a Web
 Worker so your piece never stutters). Network unchanged.
-
-## Done on 23 October (v0.19): pages
-
-- Play page: you can play it yourself (keyboard and touch); a "Turn on ML"
-  switch hands the game to the player chosen under "Who plays".
-- Play vs Bot: Super easy speed (1 piece every 4 s, ~30% random drops), new
-  intro screen, opponent and speed can be changed at any time.
-- Network unchanged.
 
 ## ▶ NEXT: options
 
