@@ -186,48 +186,8 @@ kbd {
   border: 1px solid var(--ui-line);
 }
 
-/* falling tetrominoes (tetro-bg.js): a faint layer behind every page, and a
-   brighter one on the intro screens */
-.tetro-bg {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  overflow: hidden;
-  pointer-events: none;
-}
-.tetro {
-  position: absolute;
-  top: 0;
-  line-height: 0;
-  will-change: transform;
-  animation-name: tetro-drop;
-  animation-timing-function: linear;
-  animation-iteration-count: infinite;
-}
-.tetro-bg .tetro {
-  opacity: 0.08;
-}
-.intro-fall {
-  display: none;
-}
-.intro .intro-fall {
-  display: block;
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-.intro-fall .tetro {
-  opacity: 0.18;
-}
-@keyframes tetro-drop {
-  from {
-    transform: translateY(-120px) rotate(var(--r, 0deg));
-  }
-  to {
-    transform: translateY(calc(100vh + 120px)) rotate(var(--r, 0deg));
-  }
-}
+/* the falling tetrominoes bring their own styles: see tetro-bg.js */
+
 @keyframes intro-in {
   from {
     opacity: 0;
@@ -235,10 +195,6 @@ kbd {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .intro .intro-fall,
-  .tetro-bg {
-    display: none;
-  }
   .intro-steps li {
     animation: none;
   }

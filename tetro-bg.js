@@ -5,7 +5,8 @@
  *  - the same pieces, a little brighter, on the intro screens (.intro-fall)
  *
  * Pure decoration: nothing reads it, nothing depends on it. Turned off for
- * people who ask their system for reduced motion.
+ * people who ask their system for reduced motion. Opacity: 0.08 behind the
+ * page, 0.18 on the intro screens (in CSS below).
  */
 (() => {
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -53,7 +54,29 @@
     }
   }
 
+  // The styles live here, not in a CSS file, so the pieces can never show up
+  // unstyled (for example when the browser still has an older CSS cached).
+  const CSS = `
+    .tetro-bg { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+    .intro-fall { display: none; }
+    .intro .intro-fall { display: block; position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+    .tetro {
+      position: absolute; top: 0; line-height: 0; will-change: transform;
+      animation-name: tetro-drop; animation-timing-function: linear; animation-iteration-count: infinite;
+    }
+    .tetro svg { display: block; }
+    .tetro-bg .tetro { opacity: 0.08; }
+    .intro-fall .tetro { opacity: 0.18; }
+    @keyframes tetro-drop {
+      from { transform: translateY(-120px) rotate(var(--r, 0deg)); }
+      to { transform: translateY(calc(100vh + 120px)) rotate(var(--r, 0deg)); }
+    }`;
+
   function start() {
+    const style = document.createElement('style');
+    style.textContent = CSS;
+    document.head.appendChild(style);
+
     const page = document.createElement('div');
     page.className = 'tetro-bg';
     page.setAttribute('aria-hidden', 'true');
