@@ -68,6 +68,29 @@ pieces survived; higher is better.)
   random pieces (2 vs 0 lost) and beats it clearly in the hardest mode, 319
   vs 254 pieces with rising garbage. It never trained on garbage at all.
 
+### Deep lookahead (v0.18)
+
+The network can now look **two pieces ahead** when it plays (`{ deep: true }`
+in `chooseDqnAction`, `--deep` in `hardmode.js`). For each spot for the
+current piece, it tries the spots for the next piece and then averages over
+all 7 possible pieces after that (the "expectimax" idea). Checking every
+combination would be about 200× slower, so it uses **beam search**: every
+option is first scored the quick 2-ply way, and only the best 6 first moves
+(and 4 follow-ups each) get the deeper look. With hold, it plays about 9
+pieces per second on one core; the 2-ply version plays about 66.
+
+50 games each, seeds 90000+, all with hold:
+
+| test | bot | network + lookahead (2-ply) | network + deep lookahead (3-ply) |
+|---|---|---|---|
+| garbage every 3 pieces, pieces survived | 202 | 210 | **403** |
+| garbage every 4 pieces (cap 2,000), pieces survived | 1,000 (47 lost) | 992 (47 lost) | **2,000 (0 lost)** |
+
+Looking one piece further almost doubles survival in the hardest test, and
+the network now beats the bot clearly in every garbage test. The network
+itself is unchanged; only the search around it is deeper. Deep lookahead is
+the default on the game page and the strongest opponent in Play vs Bot.
+
 ### Faster tests, harder tests, and two experiments that did not help (v0.15)
 
 - **Faster.** `predict` and the 2-ply search no longer allocate memory on every
@@ -276,6 +299,7 @@ train_many.js            trains several seeds, keeps the best on a validation se
 hardmode.js              bot vs network, 5 rule modes (--lookahead adds 2-ply)
 test_dqn.js              gradient check + smoke tests for the network
 versus.html/.css/.js     play against the network, side by side
+versus-ai-worker.js      the opponent's thinking, in a background thread
 presentation.html/.css/.js   visual explanation page, network playing live
 learning.html/.css/.js   six training snapshots playing side by side
 snapshots/               the network saved at 6 moments of training
@@ -320,8 +344,12 @@ piece and can hold.
   the other board, and your own clears cancel garbage coming at you. Whoever
   tops out first loses.
 - **Race:** first to 40 lines wins; topping out loses.
-- **Opponent:** network + lookahead (strongest), network, or search bot, at a
-  speed you choose (from 1 piece every 2 seconds up to 5 per second).
+- **Opponent:** network + deep lookahead (strongest), network + lookahead,
+  network, or search bot, at a speed you choose (from 1 piece every 2 seconds
+  up to 5 per second). The opponent thinks in a background thread
+  (`versus-ai-worker.js`), so its slower searches never make your own piece
+  stutter. On a slow computer the deep lookahead may not keep up with the
+  fastest setting.
 - **Keys:** ← → move, ↑ or X rotate, Z rotate the other way, ↓ soft drop,
   Space hard drop, C or Shift hold, P or Esc pause. On phones and tablets,
   touch buttons appear under the boards.
@@ -418,5 +446,6 @@ best of several training seeds. Version 0.6 trains on random pieces.
 Version 0.7 adds the 2-ply lookahead and `train_many.js`. Version 0.8
 tests three ways to stabilise training (none helped) and ships seed 8.
 Version 0.14 adds the hold box. Version 0.15 makes tests faster and harder,
-and tests 5-step learning and training with hold (neither helped).
+and tests 5-step learning and training with hold (neither helped). Version
+0.17 adds Play vs Bot, and 0.18 the deep (3-ply) lookahead.
 Version 0.9 adds training with garbage rows. The old code is in git history if you ever want it.

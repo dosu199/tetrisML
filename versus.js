@@ -239,7 +239,54 @@ const aiCtx = setupCanvas($('aiBoard'), PLAY_COLS * CELL, PLAY_ROWS * CELL);
 function makeChooser(kind) {
   if (kind === 'bot') return (b, c, n, h) => chooseMoveAction(b, c, n, weights, h, { lookahead: true });
   if (kind === 'dqn') return (b, c, n, h) => chooseDqnAction(b, c, net, n, h);
-  return (b, c, n, h) => chooseDqnAction(b, c, net, n, h, { lookahead: true });
+  if (kind === 'dqn2') return (b, c, n, h) => chooseDqnAction(b, c, net, n, h, { lookahead: true });
+  return (b, c, n, h) => chooseDqnAction(b, c, net, n, h, { deep: true });
+}
+
+/* The opponent thinks in a background worker (versus-ai-worker.js), so even
+   the slow 3-ply search never makes your own piece stutter. If workers are
+   not available, it falls back to thinking here. */
+let aiWorker = null;
+try {
+  aiWorker = new Worker(new URL('./versus-ai-worker.js', import.meta.url), { type: 'module' });
+  aiWorker.onerror = () => {
+    aiWorker = null;
+  };
+} catch {
+  aiWorker = null;
+}
+let aiKind = 'dqn3';
+let aiThinking = false;
+let matchId = 0;
+let aiReqId = 0;
+const aiWaiting = new Map();
+if (aiWorker) {
+  aiWorker.onmessage = (e) => {
+    const done = aiWaiting.get(e.data.id);
+    aiWaiting.delete(e.data.id);
+    done?.(e.data);
+  };
+}
+
+function askWorker(p, canHold) {
+  return new Promise((resolve) => {
+    const id = ++aiReqId;
+    aiWaiting.set(id, resolve);
+    aiWorker.postMessage({ id, kind: aiKind, board: p.board, cur: p.cur, next: p.next, held: p.held, canHold });
+  });
+}
+
+/** The opponent's decision: a placement, or null when it has no legal move. */
+async function aiDecideAsync(p, match) {
+  if (!aiWorker) return aiDecide();
+  let r = await askWorker(p, true);
+  if (match !== matchId) return null;
+  if (r.hold) {
+    swapHold(p);
+    r = await askWorker(p, false);
+    if (r.hold) return null;
+  }
+  return r.move;
 }
 
 /* ------------------------------------------------------------- your moves */
@@ -344,16 +391,22 @@ function aiStep(t) {
     }
     return;
   }
-  if (t < aiNextAt) return;
-  const m = aiDecide();
-  if (!m) {
-    ai.dead = true;
-    checkEnd();
-    return;
-  }
-  const interval = 1000 / aiPps;
-  aiAnim = { r: m.rotation, col: m.col, target: m.row, start: t, dur: Math.min(220, interval * 0.6) };
-  aiNextAt = t + interval;
+  if (aiThinking || t < aiNextAt) return;
+  aiThinking = true;
+  const match = matchId;
+  aiDecideAsync(ai, match).then((m) => {
+    if (match !== matchId) return; // a new match started meanwhile
+    aiThinking = false;
+    if (state === 'over') return;
+    if (!m) {
+      ai.dead = true;
+      checkEnd();
+      return;
+    }
+    const interval = 1000 / aiPps;
+    aiAnim = { r: m.rotation, col: m.col, target: m.row, start: performance.now(), dur: Math.min(220, interval * 0.6) };
+    aiNextAt = t + interval; // thinking time counts towards its turn
+  });
 }
 
 /* ------------------------------------------------------------ the match */
@@ -368,9 +421,12 @@ function start() {
   if (state === 'loading') return;
   mode = $('mode').value;
   aiPps = Number($('speed').value);
-  chooser = makeChooser($('opponent').value);
+  aiKind = $('opponent').value;
+  chooser = makeChooser(aiKind);
+  matchId++;
+  aiThinking = false;
   const full = $('opponent').selectedOptions[0].textContent.replace(/ \(.*\)$/, '');
-  const short = { dqn2: 'Network+', dqn: 'Network', bot: 'Bot' }[$('opponent').value];
+  const short = { dqn3: 'Network++', dqn2: 'Network+', dqn: 'Network', bot: 'Bot' }[$('opponent').value];
   $('aiName').innerHTML = `<span class="long">${full}</span><span class="short">${short}</span>`;
   $('goal').textContent = mode === 'race' ? `Race to ${RACE_LINES} lines` : 'Battle';
   const seed = (Math.random() * 2 ** 31) >>> 0;

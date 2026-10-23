@@ -33,6 +33,7 @@
             <div class="agent-panel">
   <label for="agent">Ko igra</label>
   <select id="agent">
+    <option value="dqn3">Neural network + deep lookahead</option>
     <option value="dqn2">Neural network + lookahead</option>
     <option value="dqn">Neural network (DQN)</option>
     <option value="bot">Bot (search)</option>
@@ -53,6 +54,7 @@
 
   // every player may use the hold box: `hold` is { held, canHold }
   const choosers = {
+    dqn3: (board, cur, next, hold) => chooseDqnAction(board, cur, net, next, hold, { deep: true }),
     dqn2: (board, cur, next, hold) => chooseDqnAction(board, cur, net, next, hold, { lookahead: true }),
     dqn: (board, cur, next, hold) => chooseDqnAction(board, cur, net, next, hold),
     bot: (board, cur, next, hold) => chooseMoveAction(board, cur, next, weights, hold, { lookahead: true }),
@@ -60,7 +62,7 @@
 
   const statsEl = document.getElementById('agentStats');
   const game = startVisualGame({
-    chooser: choosers.dqn2,
+    chooser: choosers.dqn3,
     hold: true,
     msPerRow: 45,
     imagePath: 'images/',

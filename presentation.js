@@ -717,6 +717,28 @@ const SCORES = [
     ],
     max: 2000,
   },
+  {
+    title: 'With Hold: garbage every 3 pieces',
+    sub: 'next piece visible · everyone loses · average pieces survived',
+    unit: '',
+    rows: [
+      ['Search bot', 202],
+      ['Network + lookahead', 210, 'net'],
+      ['Network + deep lookahead', 403, 'net'],
+    ],
+    max: 420,
+  },
+  {
+    title: 'With Hold: garbage every 4 pieces',
+    sub: 'next piece visible · average pieces survived, games stop at 2,000',
+    unit: '',
+    rows: [
+      ['Search bot', 1000],
+      ['Network + lookahead', 992, 'net'],
+      ['Network + deep lookahead', 2000, 'net'],
+    ],
+    max: 2000,
+  },
 ];
 
 function drawScoreboard() {

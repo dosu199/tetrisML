@@ -21,6 +21,7 @@
  * add --lookahead, which also runs it with 2-ply search.
  *
  *   --lookahead   also play each network with 2-ply search (sees the next piece)
+ *   --deep        also play each network with 3-ply search (beam search)
  *   --no-bot      leave the search bot out
  *   --hold        everyone may use the hold box
  *   --workers N   games run in parallel on N CPU cores (default: all cores).
@@ -88,6 +89,11 @@ function makePlayers() {
     // --lookahead: also run each network with 2-ply search (uses the preview)
     if (argv.includes('--lookahead')) {
       players[`${name}+2ply`] = (b, c, n, h) => chooseDqnAction(b, c, net, n, h, { lookahead: true });
+    }
+    // --deep: also run each network with 3-ply search (next piece known,
+    // the one after it averaged over all 7)
+    if (argv.includes('--deep')) {
+      players[`${name}+3ply`] = (b, c, n, h) => chooseDqnAction(b, c, net, n, h, { deep: true });
     }
   }
   return players;

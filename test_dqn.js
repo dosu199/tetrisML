@@ -5,7 +5,7 @@
  *    numerical derivative (nudge each weight a tiny bit, see how the loss
  *    moves). If backprop had a bug, training would quietly learn nonsense.
  * 2. Smoke test: dqn-model.json loads and plays a legal game, with and
- *    without the 2-ply lookahead, and with the hold box.
+ *    without the 2-ply and 3-ply lookahead, and with the hold box.
  * 3. A network that sees the hold box (11 inputs) saves, loads and plays.
  */
 
@@ -76,6 +76,8 @@ if (model) {
   const r5 = playEpisode((b, c, n, h) => chooseDqnAction(b, c, model, n, h), 3, { cap: 300 });
   const r6 = playEpisode((b, c) => chooseDqnMove(b, c, model), 3, { cap: 300 });
   check('without hold, the new chooser plays exactly like before', r5.lines === r6.lines && r5.pieces === r6.pieces, `${r5.lines} = ${r6.lines} lines`);
+  const r8 = playEpisode((b, c, n, h) => chooseDqnAction(b, c, model, n, h, { deep: true }), 5, { cap: 25, hold: true, garbageEvery: 4 });
+  check('deep (3-ply) lookahead plays a game', r8.pieces > 0, `${r8.pieces} pieces, ${r8.lines} lines`);
 }
 
 // 3. a network that sees the hold box (11 inputs) saves, loads and plays

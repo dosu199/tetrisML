@@ -389,7 +389,8 @@
             The network against a classic search bot with hand-tuned weights. Each line is 50 games
             the network never saw in training, and every player gets exactly the same pieces.
             <b>Network + lookahead</b> is the same network, also trying every placement of the next piece.
-            The first four cards use the classic rules; the last two show what the <b>Hold box</b> changes.
+            The first four cards use the classic rules; the others show what the <b>Hold box</b> changes.
+            <b>Deep lookahead</b> also looks at the piece after next, averaged over all 7 possibilities.
             The network was never trained with hold: it simply also scores the options holding gives it.
           </p>
           <div id="scoreboard" class="scoreboard"></div>

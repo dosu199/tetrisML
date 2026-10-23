@@ -1,6 +1,6 @@
 # Plan — Tetris ML
 
-Last updated: 22 October 2026 (v0.17).
+Last updated: 23 October 2026 (v0.18).
 
 **Goal:** a neural network that plays Tetris well and learns by itself.
 
@@ -72,9 +72,20 @@ stage B (retrain with the held piece as an input) and proposal 1 (5-step).
 and Race (40 lines) modes, adjustable opponent speed, keyboard and touch
 controls, hold and next for both. New top-bar item on every page.
 
+## Done on 23 October (v0.18): deep (3-ply) lookahead
+
+Beam search: next piece known, the piece after it averaged over all 7; only
+the top 6 first moves (4 follow-ups each) get the deep look. 50 games, hold:
+- garbage every 3: deep 403 vs 2-ply 210 vs bot 202
+- garbage every 4 (cap 2,000): deep 2,000 (0 lost) vs 2-ply 992 vs bot 1,000
+Default on the game page; strongest Play vs Bot opponent (runs in a Web
+Worker so your piece never stutters). Network unchanged.
+
 ## ▶ NEXT: options
 
-1. Deeper lookahead with hold (piece after next, averaged over 7).
+1. ~~Deeper lookahead with hold~~ done in v0.18. Possible follow-ups: a wider
+   beam, or 4-ply, but each costs speed; harder tests are needed first
+   (garbage every 4 is now never lost).
 2. ~~Presentation polish~~ done in v0.16: network diagram, hold in the demo,
    classic vs hold scoreboard, "Score" label on the game page.
 3. The CNN (raw board), as a separate learning project.

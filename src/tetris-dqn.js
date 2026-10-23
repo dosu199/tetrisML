@@ -353,7 +353,8 @@ export function chooseDqnMove(board, pieceIdx, net, next = null, { lookahead = f
  *   lookahead:      score = reward + 0.99 x (the best the follower can do), or
  *                   reward + 0.99 x V(board after) when the follower is unknown
  */
-export function dqnBest(net, board, { lookahead = false, gamma = GAMMA_DEFAULT } = {}) {
+export function dqnBest(net, board, { lookahead = false, deep = false, gamma = GAMMA_DEFAULT } = {}) {
+  if (deep) return dqnBestDeep(net, board, gamma);
   return (piece, follower) => {
     let best = null;
     for (const s of nextStates(board, piece, net.input)) {
@@ -372,17 +373,103 @@ export function dqnBest(net, board, { lookahead = false, gamma = GAMMA_DEFAULT }
   };
 }
 
+/* ------------------------------------------------- 3-ply: deeper lookahead */
+
+// How many candidates get the expensive deeper look at each level.
+export const DEEP_BEAM = { first: 6, second: 4 };
+
+/**
+ * Expected value of the board after the next piece is placed, when the piece
+ * after that is unknown: for each of the 7 pieces, the best it could do,
+ * averaged. A piece with nowhere to go counts as a lost game.
+ */
+function expectedFollow(board, net, gamma) {
+  let sum = 0;
+  for (let p = 0; p < PIECES.length; p++) {
+    const f = bestFollow(board, p, net, gamma);
+    sum += f === -Infinity ? -1e9 : f;
+  }
+  return sum / PIECES.length;
+}
+
+/**
+ * The best the `piece` can do on `board` when we also look one piece further:
+ *   max over its placements of  reward + 0.99 x (average over the 7 possible
+ *   pieces after it of their best  reward + 0.99 x V(board) ).
+ * Only the `beam` most promising placements (by reward + 0.99 x V) get that
+ * deeper look; that is what keeps it fast enough to play.
+ */
+function bestFollowDeep(board, piece, net, gamma, beam) {
+  const rotations = PIECES[piece].rotations;
+  const cands = [];
+  for (const m of placements(board, piece)) {
+    const after = board.slice();
+    placePiece(after, rotations[m.rotation], m.row, m.col);
+    const lines = clearLines(after);
+    const quick = moveReward(lines) + gamma * net.predict(boardState(after, lines, net.input, followState));
+    cands.push({ after, lines, quick });
+  }
+  if (cands.length === 0) return -Infinity;
+  cands.sort((a, b) => b.quick - a.quick);
+  let best = -Infinity;
+  for (const c of cands.slice(0, beam)) {
+    const v = moveReward(c.lines) + gamma * expectedFollow(c.after, net, gamma);
+    if (v > best) best = v;
+  }
+  return best;
+}
+
+/**
+ * 3-ply version of dqnBest: (piece, follower) -> { move, score }.
+ * For each placement of `piece`, the follower (the visible next piece) is
+ * placed, and then the unknown piece after it is averaged over all 7:
+ *   score = reward + 0.99 x max over follower placements of
+ *             [ reward + 0.99 x average over 7 pieces of their best
+ *                 ( reward + 0.99 x V(board) ) ]
+ * Beam search: every placement is first scored the 2-ply way, and only the
+ * best DEEP_BEAM.first of them (and DEEP_BEAM.second follower placements
+ * each) get the deeper look. Without a known follower it falls back to an
+ * average over the 7 possible followers, 2-ply style.
+ */
+function dqnBestDeep(net, board, gamma) {
+  return (piece, follower) => {
+    const states = nextStates(board, piece, net.input);
+    if (states.length === 0) return null;
+    for (const s of states) {
+      if (follower == null) {
+        s.shallow = moveReward(s.lines) + gamma * expectedFollow(s.board, net, gamma);
+      } else {
+        const f = bestFollow(s.board, follower, net, gamma);
+        s.shallow = f === -Infinity ? -1e9 : moveReward(s.lines) + gamma * f;
+      }
+    }
+    if (follower == null) {
+      let best = states[0];
+      for (const s of states) if (s.shallow > best.shallow) best = s;
+      return { move: best.move, score: best.shallow };
+    }
+    states.sort((a, b) => b.shallow - a.shallow);
+    let best = null;
+    for (const s of states.slice(0, DEEP_BEAM.first)) {
+      const f = bestFollowDeep(s.board, follower, net, gamma, DEEP_BEAM.second);
+      const v = f === -Infinity ? -1e9 : moveReward(s.lines) + gamma * f;
+      if (!best || v > best.score) best = { move: s.move, score: v };
+    }
+    return best;
+  };
+}
+
 /**
  * Like chooseDqnMove, but understands hold: pass the 4th chooser argument
  * ({ held, canHold }) as `holdCtx`. Returns a placement or HOLD.
  * Without holdCtx it plays exactly like chooseDqnMove.
  */
-export function chooseDqnAction(board, pieceIdx, net, next = null, holdCtx = null, { lookahead = false } = {}) {
+export function chooseDqnAction(board, pieceIdx, net, next = null, holdCtx = null, { lookahead = false, deep = false } = {}) {
   // a network trained with hold sees the hold box: decide with that knowledge
   if (holdCtx && net.input.held.length > 0) return chooseWithHoldInputs(board, pieceIdx, net, next, holdCtx);
-  const best = dqnBest(net, board, { lookahead });
+  const best = dqnBest(net, board, { lookahead: lookahead || deep, deep });
   if (!holdCtx) return best(pieceIdx, next)?.move ?? null;
-  return decideWithHold(best, pieceIdx, next, holdCtx.held, holdCtx.canHold, lookahead);
+  return decideWithHold(best, pieceIdx, next, holdCtx.held, holdCtx.canHold, lookahead || deep);
 }
 
 /**
