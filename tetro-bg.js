@@ -1,12 +1,12 @@
 /*
  * tetro-bg.js - slowly falling tetrominoes, all 7 kinds, as decoration.
  *
- *  - a faint layer behind every page (fixed, behind all content)
- *  - the same pieces, a little brighter, on the intro screens (.intro-fall)
+ *  - a subtle layer behind every page (fixed, behind all content; boards
+ *    and cards cover it, so none fall over the game itself)
  *
  * Pure decoration: nothing reads it, nothing depends on it. Turned off for
- * people who ask their system for reduced motion. Opacity: 0.08 behind the
- * page, 0.18 on the intro screens (in CSS below).
+ * people who ask their system for reduced motion. To tune it: OPACITY and the
+ * piece counts in start() below.
  */
 (() => {
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -56,17 +56,15 @@
 
   // The styles live here, not in a CSS file, so the pieces can never show up
   // unstyled (for example when the browser still has an older CSS cached).
+  const OPACITY = 0.16; // how visible the pieces are (0 = invisible, 1 = full colour)
   const CSS = `
     .tetro-bg { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
-    .intro-fall { display: none; }
-    .intro .intro-fall { display: block; position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
     .tetro {
       position: absolute; top: 0; line-height: 0; will-change: transform;
       animation-name: tetro-drop; animation-timing-function: linear; animation-iteration-count: infinite;
     }
     .tetro svg { display: block; }
-    .tetro-bg .tetro { opacity: 0.08; }
-    .intro-fall .tetro { opacity: 0.18; }
+    .tetro-bg .tetro { opacity: ${OPACITY}; }
     @keyframes tetro-drop {
       from { transform: translateY(-120px) rotate(var(--r, 0deg)); }
       to { transform: translateY(calc(100vh + 120px)) rotate(var(--r, 0deg)); }
@@ -81,10 +79,9 @@
     page.className = 'tetro-bg';
     page.setAttribute('aria-hidden', 'true');
     document.body.prepend(page);
-    const narrow = window.innerWidth < 720;
-    fill(page, narrow ? 9 : 16, { size: [12, 22], speed: [18, 34] });
-
-    for (const layer of document.querySelectorAll('.intro-fall')) fill(layer, 7, { size: [9, 14], speed: [7, 11] });
+    // about one piece per 45px of screen width: 42 on a laptop, 9 on a phone
+    const count = Math.max(9, Math.min(60, Math.round(window.innerWidth / 45)));
+    fill(page, count, { size: [12, 22], speed: [16, 32] });
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);

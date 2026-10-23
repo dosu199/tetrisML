@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="theme.css?v=22">
+    <link rel="stylesheet" href="theme.css?v=23">
     <link rel="stylesheet" href="nav.css">
     <title>Tetris</title>
 </head>
@@ -25,7 +25,6 @@
         <div class="board-wrap">
             <div id="gameContainer"></div>
             <div class="play-overlay intro" id="playOverlay" hidden>
-                <div class="intro-fall" aria-hidden="true"></div>
                 <div class="intro-box">
                     <p class="play-overlay-title intro-title" id="playTitle">Ready to play?</p>
                     <div id="playText"></div>
@@ -223,7 +222,7 @@
     for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) btn.addEventListener(ev, stop);
   }
 </script>
-<script src="tetro-bg.js?v=22" defer></script>
+<script src="tetro-bg.js?v=23" defer></script>
 </body>
 
 </html>

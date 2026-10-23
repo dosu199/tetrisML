@@ -7,7 +7,7 @@
     <meta name="description" content="Play Tetris against the neural network: same pieces, side by side, with garbage battles or a race to 40 lines." />
     <link rel="stylesheet" href="presentation.css" />
     <link rel="stylesheet" href="versus.css" />
-    <link rel="stylesheet" href="theme.css?v=22" />
+    <link rel="stylesheet" href="theme.css?v=23" />
     <link rel="stylesheet" href="nav.css" />
   </head>
   <body>
@@ -77,7 +77,6 @@
               <div class="vs-board">
                 <canvas id="youBoard" aria-label="Your Tetris board"></canvas>
                 <div class="vs-overlay intro" id="overlay">
-                  <div class="intro-fall" aria-hidden="true"></div>
                   <div class="intro-box">
                     <p class="vs-overlay-title intro-title" id="overlayTitle">Ready to battle?</p>
                     <div id="overlayText">
@@ -117,7 +116,6 @@
                 <canvas id="aiBoard" aria-label="The network's Tetris board"></canvas>
                 <div class="vs-overlay" id="aiOverlay" hidden><div><p class="vs-overlay-title" id="aiOverlayTitle"></p></div></div>
                 <div class="vs-overlay intro" id="aiIntro">
-                  <div class="intro-fall" aria-hidden="true"></div>
                   <div class="intro-box">
                     <p class="intro-kicker">Your opponent</p>
                     <p class="intro-title" id="aiIntroName">Neural network + deep lookahead</p>
@@ -172,6 +170,6 @@
     </main>
 
     <script type="module" src="versus.js"></script>
-      <script src="tetro-bg.js?v=22" defer></script>
+      <script src="tetro-bg.js?v=23" defer></script>
   </body>
 </html>

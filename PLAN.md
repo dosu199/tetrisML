@@ -1,6 +1,6 @@
 # Plan — Tetris ML
 
-Last updated: 23 October 2026 (v0.22).
+Last updated: 23 October 2026 (v0.23).
 
 **Goal:** a neural network that plays Tetris well and learns by itself.
 
@@ -103,6 +103,8 @@ Worker so your piece never stutters). Network unchanged.
 - v0.22 fix: the script now carries its own styles (a cached old
   `theme.css` showed the pieces as an unstyled row), and the shared files
   are linked as `theme.css?v=22` / `tetro-bg.js?v=22` so browsers reload them.
+- v0.23: pieces only in the page background (none on the intro screens),
+  more visible (opacity 0.16) and denser (about one per 45px of width).
 
 ## ▶ NEXT: options
 
