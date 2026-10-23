@@ -98,6 +98,29 @@ body {
 .vs-player:not(.vs-ai) .vs-body {
   justify-content: flex-end;
 }
+/* wide screens: "You" sits right above your board, like the opponent's name */
+@media (min-width: 861px) {
+  .vs-player:not(.vs-ai) {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    column-gap: 10px;
+  }
+  .vs-player:not(.vs-ai) .vs-body {
+    display: contents;
+  }
+  .vs-player:not(.vs-ai) .vs-head {
+    grid-column: 3;
+    grid-row: 1;
+  }
+  .vs-player:not(.vs-ai) .vs-side {
+    grid-column: 2;
+    grid-row: 2;
+    align-self: start;
+  }
+  .vs-player:not(.vs-ai) .vs-boardwrap {
+    grid-column: 3;
+    grid-row: 2;
+  }
+}
 .vs-boardwrap {
   display: flex;
   gap: 4px;
