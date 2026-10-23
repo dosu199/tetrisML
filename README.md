@@ -356,6 +356,12 @@ piece and can hold.
   Space hard drop, C or Shift hold, P or Esc pause. On phones and tablets,
   touch buttons appear under the boards.
 
+## Shared look
+
+All pages load `theme.css` after their own CSS: one dark palette, one page
+background, the main button (`.btn-go`), `<kbd>` keys, and the intro screen
+with falling blocks (`.intro`, `.intro-fall`, `.intro-steps`, `.intro-chips`).
+
 ## Presentation page
 
 `presentation.html` is a visual explanation of the project, with the real
@@ -394,10 +400,11 @@ game page (`index.html`, `style.css`) is not touched.
 
 `index.html` is the game itself. Since v0.19 you can play it yourself:
 
+- The page opens on a **Ready to play?** screen: you play.
 - **Turn on ML** switch: off = you play, on = the player chosen under
   **Who plays** (network + deep lookahead, network + lookahead, network, or
   the search bot) plays and you watch. Picking a player turns ML on. The page
-  remembers your choice.
+  remembers which player you picked, but always starts with ML off.
 - **Keys:** ← → move, ↑ or X rotate, Z rotate back, ↓ soft drop, Space hard
   drop, C or Shift hold, P or Esc pause, Enter (or Space) after game over to
   play again. On phones and tablets, touch buttons appear at the bottom.
@@ -421,6 +428,6 @@ Version 0.7 adds the 2-ply lookahead and `train_many.js`. Version 0.8
 tests three ways to stabilise training (none helped) and ships seed 8.
 Version 0.14 adds the hold box. Version 0.15 makes tests faster and harder,
 and tests 5-step learning and training with hold (neither helped). Version
-0.17 adds Play vs Bot, 0.18 the deep (3-ply) lookahead, and 0.19 lets you
-play the Play page yourself.
+0.17 adds Play vs Bot, 0.18 the deep (3-ply) lookahead, 0.19 lets you
+play the Play page yourself, and 0.20 gives all pages one look (`theme.css`).
 Version 0.9 adds training with garbage rows. The old code is in git history if you ever want it.

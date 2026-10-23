@@ -440,9 +440,22 @@ function applyOpponent() {
   updateIntroPick();
 }
 
+const AI_ABOUT = {
+  dqn3: 'Looks three pieces ahead: this one, the next, and every piece that could come after.',
+  dqn2: 'Looks two pieces ahead: this one and the next.',
+  dqn: 'Looks at the current piece only. Quick, but it misses more.',
+  bot: 'No network: a hand-tuned search with 8 weights.',
+};
+
 function updateIntroPick() {
-  if (!$('introPick')) return; // the intro is replaced by the first countdown
   const txt = (id) => $(id).selectedOptions[0].textContent.replace(/ \(.*\)$/, '').replace(/:.*$/, '');
+  // the opponent's intro screen, until the first match starts
+  const full = $('opponent').selectedOptions[0].textContent.replace(/ \(.*\)$/, '');
+  const short = { dqn3: 'Network++', dqn2: 'Network+', dqn: 'Network', bot: 'Bot' }[$('opponent').value];
+  $('aiIntroName').innerHTML = `<span class="long">${full}</span><span class="short">${short}</span>`;
+  $('aiIntroText').textContent = AI_ABOUT[$('opponent').value];
+  $('aiIntroChips').innerHTML = `<span>${txt('speed')} speed</span>`;
+  if (!$('introPick')) return; // your intro is replaced by the first countdown
   $('introPick').innerHTML = `<span>${txt('mode')}</span><span>${txt('opponent')}</span><span>${txt('speed')}</span>`;
 }
 
@@ -472,6 +485,7 @@ function start() {
     $(id).className = 'vs-badge';
   }
   $('aiOverlay').hidden = true;
+  $('aiIntro').hidden = true;
   $('startBtn').textContent = 'Restart';
   $('pauseBtn').disabled = false;
   $('pauseBtn').textContent = 'Pause';

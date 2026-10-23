@@ -7,6 +7,7 @@
     <meta name="description" content="Play Tetris against the neural network: same pieces, side by side, with garbage battles or a race to 40 lines." />
     <link rel="stylesheet" href="presentation.css" />
     <link rel="stylesheet" href="versus.css" />
+    <link rel="stylesheet" href="theme.css" />
     <link rel="stylesheet" href="nav.css" />
   </head>
   <body>
@@ -76,18 +77,18 @@
               <div class="vs-board">
                 <canvas id="youBoard" aria-label="Your Tetris board"></canvas>
                 <div class="vs-overlay intro" id="overlay">
-                  <div class="vs-fall" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-                  <div class="vs-overlay-box">
-                    <p class="vs-overlay-title" id="overlayTitle">Ready to battle?</p>
+                  <div class="intro-fall" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+                  <div class="intro-box">
+                    <p class="vs-overlay-title intro-title" id="overlayTitle">Ready to battle?</p>
                     <div id="overlayText">
-                      <p class="vs-intro-sub">Human vs machine, same pieces, one winner.</p>
-                      <ol class="vs-intro-steps">
+                      <p class="intro-sub">Human vs machine, same pieces, one winner.</p>
+                      <ol class="intro-steps">
                         <li><span><b>Mode:</b> Battle or Race</span></li>
                         <li><span><b>Opponent</b> and its speed</span></li>
                         <li><span><b>Start</b> and stack fast</span></li>
                       </ol>
-                      <p class="vs-intro-pick" id="introPick"></p>
-                      <button type="button" class="vs-intro-go" id="introStart">Start</button>
+                      <p class="intro-chips" id="introPick"></p>
+                      <button type="button" class="btn-go" id="introStart">Start</button>
                     </div>
                   </div>
                 </div>
@@ -115,6 +116,15 @@
               <div class="vs-board">
                 <canvas id="aiBoard" aria-label="The network's Tetris board"></canvas>
                 <div class="vs-overlay" id="aiOverlay" hidden><div><p class="vs-overlay-title" id="aiOverlayTitle"></p></div></div>
+                <div class="vs-overlay intro" id="aiIntro">
+                  <div class="intro-fall" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+                  <div class="intro-box">
+                    <p class="intro-kicker">Your opponent</p>
+                    <p class="intro-title" id="aiIntroName">Neural network + deep lookahead</p>
+                    <p class="intro-sub" id="aiIntroText"></p>
+                    <p class="intro-chips" id="aiIntroChips"></p>
+                  </div>
+                </div>
               </div>
             </div>
             <div class="vs-side">

@@ -114,10 +114,7 @@ body {
   letter-spacing: 0.32em;
   line-height: 1;
   padding: 4px 0 6px;
-  background: linear-gradient(90deg, var(--accent), var(--accent-2));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: var(--text);
 }
 
 #holdTetromino,
@@ -225,7 +222,7 @@ select {
   font: inherit;
   font-size: 0.92rem;
   color: var(--text);
-  background-color: #12182c;
+  background-color: var(--page);
   border: 1px solid var(--panel-line);
   border-radius: 10px;
   padding: 9px 10px;
@@ -264,9 +261,7 @@ select:focus {
   padding: 20px;
   text-align: center;
   border-radius: var(--radius);
-  background:
-    radial-gradient(120% 60% at 50% 0%, rgba(139, 133, 255, 0.3), transparent 60%),
-    rgba(8, 11, 24, 0.8);
+  background: rgba(10, 13, 26, 0.84);
   color: var(--text);
   line-height: 1.5;
 }
@@ -277,42 +272,10 @@ select:focus {
   margin: 0 0 12px;
 }
 .play-overlay-title {
-  font-size: 2rem;
+  font-size: 1.9rem;
   font-weight: 800;
-  letter-spacing: -0.01em;
-  background: linear-gradient(90deg, #ff7ad9, var(--accent) 50%, var(--accent-2));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-.play-go {
-  font: inherit;
-  font-weight: 800;
-  padding: 10px 28px;
-  border: 0;
-  border-radius: 999px;
-  color: #0b0e1d;
-  background: linear-gradient(90deg, #ff7ad9, var(--accent) 50%, var(--accent-2));
-  box-shadow: 0 6px 24px rgba(139, 133, 255, 0.45);
-  cursor: pointer;
-}
-.play-go:hover {
-  filter: brightness(1.1);
-}
-
-kbd {
-  display: inline-block;
-  min-width: 1.4em;
-  padding: 0 5px;
-  margin: 0 1px;
-  border-radius: 5px;
-  border: 1px solid var(--panel-line);
-  border-bottom-width: 2px;
-  background: #12182c;
-  font: inherit;
-  font-size: 0.8em;
-  text-align: center;
-  color: var(--text);
+  letter-spacing: -0.02em;
+  color: #fff;
 }
 
 /* the "Turn on ML" switch */
@@ -354,7 +317,8 @@ kbd {
   transition: transform 0.2s;
 }
 .ml-switch input:checked + .ml-track {
-  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  background: var(--accent);
+  border-color: var(--accent);
 }
 .ml-switch input:checked + .ml-track .ml-thumb {
   transform: translateX(22px);

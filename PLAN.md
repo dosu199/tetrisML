@@ -1,6 +1,6 @@
 # Plan — Tetris ML
 
-Last updated: 23 October 2026 (v0.19).
+Last updated: 23 October 2026 (v0.20).
 
 **Goal:** a neural network that plays Tetris well and learns by itself.
 
@@ -88,6 +88,13 @@ Worker so your piece never stutters). Network unchanged.
 - Play vs Bot: Super easy speed (1 piece every 4 s, ~30% random drops), new
   intro screen, opponent and speed can be changed at any time.
 - Network unchanged.
+
+## Done on 23 October (v0.20): one look for all pages
+
+- `theme.css`, loaded by every page: one dark palette, one background, one
+  Start button, the intro screen with falling blocks.
+- Play page always opens on "Ready to play?" (you play); ML only when switched on.
+- Play vs Bot: the opponent's board gets its own intro screen; calmer colours.
 
 ## ▶ NEXT: options
 

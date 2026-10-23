@@ -1,10 +1,11 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="theme.css">
     <link rel="stylesheet" href="nav.css">
     <title>Tetris</title>
 </head>
@@ -23,11 +24,12 @@
     <div id="wrapper">
         <div class="board-wrap">
             <div id="gameContainer"></div>
-            <div class="play-overlay" id="playOverlay" hidden>
-                <div>
-                    <p class="play-overlay-title" id="playTitle">Your turn</p>
-                    <p id="playText">Press <kbd>Space</kbd> or an arrow key to start.</p>
-                    <button type="button" class="play-go" id="playGo">Start</button>
+            <div class="play-overlay intro" id="playOverlay" hidden>
+                <div class="intro-fall" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+                <div class="intro-box">
+                    <p class="play-overlay-title intro-title" id="playTitle">Ready to play?</p>
+                    <div id="playText"></div>
+                    <button type="button" class="btn-go" id="playGo">Start</button>
                 </div>
             </div>
         </div>
@@ -94,7 +96,7 @@
     bot: (board, cur, next, hold) => chooseMoveAction(board, cur, next, weights, hold, { lookahead: true }),
   };
 
-  // remember the switch and the agent between visits (optional nicety)
+  // remember which agent you picked last time (optional nicety)
   const saved = (() => {
     try {
       return JSON.parse(localStorage.getItem('tetris-play') || '{}');
@@ -104,24 +106,39 @@
   })();
   const save = () => {
     try {
-      localStorage.setItem('tetris-play', JSON.stringify({ ml: $('mlToggle').checked, agent: $('agent').value }));
+      localStorage.setItem('tetris-play', JSON.stringify({ agent: $('agent').value }));
     } catch {}
   };
   if (saved.agent && choosers[saved.agent]) $('agent').value = saved.agent;
-  $('mlToggle').checked = !!saved.ml;
+  $('mlToggle').checked = false; // you always start playing yourself
 
   const coarse = window.matchMedia('(pointer: coarse)').matches;
-  const OVERLAY = {
-    ready: ['Your turn', coarse ? 'Tap <b>Start</b>, then use the buttons below.' : 'Press <kbd>Space</kbd> or an arrow key to start.', 'Start'],
-    paused: ['Paused', coarse ? 'Tap <b>Resume</b> to continue.' : 'Press <kbd>P</kbd> to continue.', 'Resume'],
-  };
+  const READY_TEXT = coarse
+    ? '<p class="intro-sub">You play. Turn on ML below to let the network play instead.</p>'
+    : `<p class="intro-sub">You play. Turn on ML to let the network play instead.</p>
+       <ol class="intro-steps">
+         <li><span><kbd>←</kbd><kbd>→</kbd> move, <kbd>↑</kbd> rotate</span></li>
+         <li><span><kbd>↓</kbd> soft drop, <kbd>Space</kbd> drop</span></li>
+         <li><span><kbd>C</kbd> hold, <kbd>P</kbd> pause</span></li>
+       </ol>`;
 
   function showOverlay(state, info) {
-    const o = state === 'over'
-      ? ['Game over', `${info.lines} lines · score ${info.score.toLocaleString('en-US')}<br>${coarse ? '' : 'Press <kbd>Enter</kbd> or <kbd>Space</kbd> to play again.'}`, 'Play again']
-      : OVERLAY[state];
+    const o =
+      state === 'ready'
+        ? ['Ready to play?', READY_TEXT, 'Start']
+        : state === 'paused'
+          ? ['Paused', `<p class="intro-sub">${coarse ? 'Tap <b>Resume</b> to continue.' : 'Press <kbd>P</kbd> to continue.'}</p>`, 'Resume']
+          : state === 'over'
+            ? [
+                'Game over',
+                `<p class="intro-sub">${info.lines} lines · score ${info.score.toLocaleString('en-US')}</p>` +
+                  (coarse ? '' : '<p class="intro-sub">Press <kbd>Enter</kbd> or <kbd>Space</kbd> to play again.</p>'),
+                'Play again',
+              ]
+            : null;
     $('playOverlay').hidden = !o;
     if (!o) return;
+    $('playOverlay').classList.toggle('intro', state === 'ready'); // falling blocks only on the start screen
     $('playTitle').textContent = o[0];
     $('playText').innerHTML = o[1];
     $('playGo').textContent = o[2];
