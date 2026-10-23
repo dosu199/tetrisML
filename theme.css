@@ -212,3 +212,12 @@ kbd {
     font-size: 0.8rem;
   }
 }
+
+/* How it works / Watch it learn: the hero and the shaded sections had solid
+   backgrounds that hid the falling pieces; keep only a see-through tint */
+.hero {
+  background: radial-gradient(1200px 300px at 20% -10%, rgba(139, 133, 255, 0.12), transparent 70%) !important;
+}
+.section.alt {
+  background: rgba(255, 255, 255, 0.025) !important;
+}

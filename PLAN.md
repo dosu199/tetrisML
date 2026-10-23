@@ -1,6 +1,6 @@
 # Plan — Tetris ML
 
-Last updated: 23 October 2026 (v0.24).
+Last updated: 23 October 2026 (v0.25).
 
 **Goal:** a neural network that plays Tetris well and learns by itself.
 
@@ -106,6 +106,8 @@ Worker so your piece never stutters). Network unchanged.
 - v0.23: pieces only in the page background (none on the intro screens),
   more visible (opacity 0.16) and denser (about one per 45px of width).
 - v0.24: the ML switch hands over the same game (no reset) both ways.
+- v0.25: How it works / Watch it learn: the hero and shaded sections are
+  see-through, so the pieces fall from the top there too.
 
 ## ▶ NEXT: options
 
