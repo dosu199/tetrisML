@@ -1,6 +1,6 @@
 # Plan — Tetris ML
 
-Last updated: 27 October 2026 (v0.29).
+Last updated: 27 October 2026 (v0.31).
 
 **Goal:** a neural network that plays Tetris well and learns by itself.
 
@@ -126,6 +126,12 @@ Removed: `test.js` (old copy of hardmode), `tetris-ml-dqn.zip`, `runs/`
 v0.29 (showcase polish): README top with live link and preview image, tab
 icon (`assets/meta/favicon.svg` + PNGs), link preview card on every page
 (`assets/meta/preview.png`, 1200x630), "Made by Suad" footer on every page.
+
+v0.30: removed mentions of the original repo. v0.31: Play page hint (H),
+Rematch button / Enter on Play vs Bot, Lighthouse fixes: accessibility 100 on
+every page (button contrast, heading order, logo link name), no layout shift
+on load (board sizes reserved in CSS). Left as is: compression and caching
+(GitHub Pages handles them), minifying (needs a build step).
 
 ## ▶ NEXT: options
 

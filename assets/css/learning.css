@@ -4,6 +4,12 @@
   max-width: 780px;
   margin-top: 4px;
 }
+.howto-title {
+  margin: 0 0 6px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0;
+}
 .howto ul {
   margin: 4px 0 0;
   padding-left: 18px;

@@ -107,9 +107,18 @@ export class Renderer {
     el.style.opacity = opacity;
   }
 
-  /** Draws the settled board plus the falling piece and its ghost. */
-  draw(board, piece) {
+  /**
+   * Draws the settled board plus the falling piece and its ghost, and the
+   * hint outline (a list of cell indexes) when there is one.
+   */
+  draw(board, piece, hint = null) {
     for (let i = 0; i < board.length; i++) this.paint(this.blocks[i], board[i]);
+
+    if (this.hinted !== hint) {
+      for (const i of this.hinted || []) this.blocks[i].classList.remove('hint');
+      for (const i of hint || []) this.blocks[i].classList.add('hint');
+      this.hinted = hint;
+    }
 
     if (!piece) return;
     const { rotation, row, col } = piece;
@@ -120,6 +129,8 @@ export class Renderer {
     for (const [dr, dc] of rotation.cells) {
       this.paint(this.blocks[idx(ghostRow + dr, col + dc)], rotation.value, '0.3');
     }
+    // the hint outline wins over the ghost, so it is never faded out
+    for (const i of hint || []) this.paint(this.blocks[i], 0);
     for (const [dr, dc] of rotation.cells) {
       this.paint(this.blocks[idx(row + dr, col + dc)], rotation.value, '1');
     }
@@ -200,6 +211,10 @@ export function startVisualGame(options = {}) {
 
   // human mode state
   let human = !!options.human;
+  // hint: where the chosen agent would put your current piece
+  let hintOn = !!options.hint;
+  let hintCells = null; // cell indexes to outline, or null
+  let pieceSeq = 0; // bumps on every new piece, so a late hint is dropped
   let phase = 'playing'; // ready | playing | paused | over (human mode only)
   let canHold = true;
   let gravityAcc = 0;
@@ -284,15 +299,46 @@ export function startVisualGame(options = {}) {
     lockStart = null;
     lockResets = 0;
     showNext();
+    pieceSeq++;
     if (collides(board, rotation, 0, col)) {
       active = null;
+      updateHint();
       totalLines += lines;
       if (lines > bestLines) bestLines = lines;
       overAt = performance.now();
       setPhase('over');
       return false;
     }
+    updateHint();
     return true;
+  }
+
+  /**
+   * Asks the agent picked under "Who plays" where it would put your current
+   * piece. Runs just after the new piece appears (the deep search takes about
+   * 0.1 s), and only when the hint is on and you are playing.
+   */
+  function updateHint() {
+    hintCells = null;
+    if (!human || !hintOn || !active) {
+      options.onHint?.(null);
+      return;
+    }
+    const seq = pieceSeq;
+    setTimeout(() => {
+      if (seq !== pieceSeq || !human || !hintOn || !active) return;
+      const m = chooser(board, current, next, hold ? { held, canHold } : undefined);
+      if (seq !== pieceSeq) return;
+      if (m && m.hold) {
+        options.onHint?.({ hold: true });
+      } else if (m && m.score !== -Infinity) {
+        const rot = PIECES[current].rotations[m.rotation];
+        hintCells = rot.cells.map(([dr, dc]) => idx(m.row + dr, m.col + dc));
+        options.onHint?.({ hold: false });
+      } else {
+        options.onHint?.(null);
+      }
+    }, 30);
   }
 
   function reset(hard = false, ready = false) {
@@ -548,7 +594,7 @@ export function startVisualGame(options = {}) {
       }
     }
 
-    renderer.draw(board, active);
+    renderer.draw(board, active, human && hintOn ? hintCells : null);
     window.requestAnimationFrame(frame);
   }
 
@@ -573,6 +619,16 @@ export function startVisualGame(options = {}) {
      */
     setChooser(fn) {
       chooser = fn;
+      if (human) {
+        pieceSeq++;
+        updateHint();
+      }
+    },
+    /** Show (true) or hide (false) where the agent would put your piece. */
+    setHint(on) {
+      hintOn = !!on;
+      pieceSeq++;
+      updateHint();
     },
     /**
      * Hand the same game over between you (true) and the agent (false):
@@ -594,6 +650,8 @@ export function startVisualGame(options = {}) {
           gravityAcc = 0;
           lockStart = null;
           lockResets = 0;
+          pieceSeq++;
+          updateHint();
           setPhase('playing');
         } else if (spawnHuman()) {
           setPhase('playing');
@@ -606,6 +664,8 @@ export function startVisualGame(options = {}) {
           active = null; // the agent places the current piece again, from the top
         }
         phase = 'playing';
+        hintCells = null;
+        options.onHint?.(null);
         options.onState?.('agent', {});
       }
       showScore();

@@ -4,9 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="assets/css/style.css?v=29">
-    <link rel="stylesheet" href="assets/css/theme.css?v=29">
-    <link rel="stylesheet" href="assets/css/nav.css?v=29">
+    <link rel="stylesheet" href="assets/css/style.css?v=31">
+    <link rel="stylesheet" href="assets/css/theme.css?v=31">
+    <link rel="stylesheet" href="assets/css/nav.css?v=31">
     <title>Tetris ML · Play</title>
     <meta name="description" content="Play Tetris yourself, then flip one switch and let a neural network that taught itself Tetris take over your game." />
     <meta name="theme-color" content="#0d1120" />
@@ -26,9 +26,9 @@
     <meta name="twitter:card" content="summary_large_image" />
 </head>
 
-<body>
+<body class="human"><!-- you play first; the ML switch changes this -->
     <nav class="topnav" aria-label="Main">
-      <a class="topnav-brand" href="index.html"><span class="topnav-logo" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span>Tetris ML</span></a>
+      <a class="topnav-brand" href="index.html" aria-label="Tetris ML home"><span class="topnav-logo" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span>Tetris ML</span></a>
       <ul class="topnav-links">
         <li><a href="index.html" aria-current="page">Play</a></li>
         <li><a href="versus.html">Play vs Bot</a></li>
@@ -63,6 +63,15 @@
     <span class="ml-text">Turn on ML</span>
   </label>
   <p class="ml-hint" id="mlHint">Turn on to let the network continue your game.</p>
+  <div class="hint-row">
+    <label class="ml-switch small">
+      <input type="checkbox" id="hintToggle" role="switch">
+      <span class="ml-track" aria-hidden="true"><span class="ml-thumb"></span></span>
+      <span class="ml-text">Show hint</span>
+    </label>
+    <kbd title="Keyboard shortcut">H</kbd>
+  </div>
+  <p class="hint-note" id="hintNote" hidden></p>
   <div class="who-row">
     <label for="agent">Who plays</label>
     <span class="ml-badge" id="mlBadge" title="Who is playing right now">You</span>
@@ -100,7 +109,7 @@
     </footer>
 
 <script type="module">
-  import { startVisualGame } from './src/tetris-visual.js?v=29';
+  import { startVisualGame } from './src/tetris-visual.js?v=31';
   import { chooseMoveAction } from './src/tetris-ai.js';
   import { loadDqn, chooseDqnAction } from './src/tetris-dqn.js';
 
@@ -173,6 +182,14 @@
     msPerRow: 45,
     imagePath: 'assets/images/',
     onState: showOverlay,
+    onHint: (h) => {
+      // the outline is drawn on the board; this line says what to do with hold
+      $('hintNote').hidden = !h;
+      $('holdTetromino').classList.toggle('hint-hold', !!h?.hold);
+      if (h) $('hintNote').textContent = h.hold
+        ? 'Hint: hold this piece (C). The network would rather keep it for later.'
+        : 'Hint: the outlined spot is where the network would put it.';
+    },
     onStats: (s) => {
       $('stLines').textContent = s.lines;
       $('stPieces').textContent = s.pieces;
@@ -199,6 +216,21 @@
   $('mlToggle').addEventListener('change', (e) => {
     e.target.blur(); // so Space and the arrows go to the game, not the switch
     applyMode();
+  });
+
+  // hint: where the selected player would put your piece (only while you play)
+  function setHintOn(on) {
+    $('hintToggle').checked = on;
+    game.setHint(on);
+  }
+  $('hintToggle').addEventListener('change', (e) => {
+    e.target.blur();
+    setHintOn(e.target.checked);
+  });
+  window.addEventListener('keydown', (e) => {
+    if (e.code !== 'KeyH' || e.repeat || $('mlToggle').checked) return;
+    if (e.target.closest?.('select, input, textarea')) return;
+    setHintOn(!$('hintToggle').checked);
   });
 
   $('agent').addEventListener('change', (e) => {
@@ -249,7 +281,7 @@
     for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) btn.addEventListener(ev, stop);
   }
 </script>
-<script src="assets/js/tetro-bg.js?v=29" defer></script>
+<script src="assets/js/tetro-bg.js?v=31" defer></script>
 </body>
 
 </html>

@@ -542,7 +542,8 @@ function endMatch(winner) {
     `${why} ${winner === 'you' && ai.dead ? 'Its stack reached the top.' : winner === 'ai' && you.dead ? 'Your stack reached the top.' : ''}<br />` +
       `Time ${fmtTime(elapsed)} · you ${you.lines} lines, ${pps(you)} pieces/s` +
       (mode === 'battle' ? `, ${you.sent} garbage sent` : '') +
-      `<br />Press <b>Restart</b> to play again.`
+      `<br /><button type="button" class="btn-go vs-rematch" id="rematchBtn">Rematch</button>` +
+      `<span class="vs-rematch-hint">or press <kbd>Enter</kbd></span>`
   );
   if (winner !== 'draw') {
     $(winner === 'you' ? 'youBadge' : 'aiBadge').textContent = 'Winner';
@@ -662,6 +663,11 @@ const KEYMAP = {
 
 window.addEventListener('keydown', (e) => {
   if (e.target.closest?.('select')) return;
+  if (e.code === 'Enter' && state === 'over' && !e.target.closest?.('button')) {
+    e.preventDefault();
+    start(); // rematch with the current settings
+    return;
+  }
   if (e.code === 'KeyP' || e.code === 'Escape') {
     if (state === 'playing') setPaused(true);
     else if (state === 'paused') setPaused(false);
@@ -729,6 +735,12 @@ $('mode').addEventListener('change', (e) => {
     $('setupNote').textContent = 'The new mode starts when you press Restart.';
     $('setupNote').hidden = false;
   } else $('setupNote').hidden = true;
+});
+// the Rematch button lives inside the result screen, which is rebuilt each match
+$('overlay').addEventListener('click', (e) => {
+  if (!e.target.closest?.('#rematchBtn')) return;
+  e.target.blur();
+  start();
 });
 $('introStart').addEventListener('click', (e) => {
   e.currentTarget.blur();

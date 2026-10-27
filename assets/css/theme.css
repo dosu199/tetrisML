@@ -56,7 +56,7 @@ body {
   padding: 10px 30px;
   border: 1px solid transparent;
   border-radius: 999px;
-  color: #fff;
+  color: #0b0e1d; /* dark text on the purple: readable (contrast 6.3:1) */
   background: var(--ui-accent);
   box-shadow: 0 4px 18px rgba(139, 133, 255, 0.28);
   cursor: pointer;
@@ -241,4 +241,9 @@ kbd {
 .footer + .site-footer {
   padding-top: 0;
   margin-top: -24px; /* sit right under a page's own footer */
+}
+
+/* the other purple buttons (Start, Pause/Play, Race): dark text as well */
+button.primary {
+  color: #0b0e1d !important;
 }

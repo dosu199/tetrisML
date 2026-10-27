@@ -442,6 +442,8 @@ game page (`index.html`, `style.css`) is not touched.
   drop, C or Shift hold, P or Esc pause, Enter (or Space) after game over to
   play again. On phones and tablets, touch buttons appear at the bottom.
 - Gravity speeds up every 10 lines, as in the Play vs Bot page.
+- **Show hint** (or press H): outlines where the player chosen under Who plays
+  would put your current piece, or lights up the Hold box when it would hold.
 
 Under the hood this is `startVisualGame({ human: true, onState })` in
 `src/tetris-visual.js`, with `setHuman(on)`, `press(action)`, `softDrop(on)`

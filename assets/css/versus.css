@@ -134,6 +134,7 @@ body {
   line-height: 0;
 }
 .vs-board canvas {
+  aspect-ratio: 10 / 24; /* known before the script sizes it: no jump on load */
   display: block;
   height: min(calc(100vh - 230px), 600px);
   width: auto;
@@ -240,6 +241,16 @@ body {
 }
 #aiIntroName .short {
   display: none;
+}
+
+.vs-rematch {
+  margin-top: 14px;
+}
+.vs-rematch-hint {
+  display: block;
+  margin-top: 10px;
+  font-size: 0.78rem;
+  color: var(--muted);
 }
 
 .vs-overlay .big {
