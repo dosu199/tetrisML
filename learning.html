@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Watch It Learn</title>
     <meta name="description" content="The same Tetris neural network saved at six moments of its training, all playing the same pieces side by side." />
-    <link rel="stylesheet" href="presentation.css?v=26" />
-    <link rel="stylesheet" href="learning.css?v=26" />
-    <link rel="stylesheet" href="theme.css?v=26" />
-    <link rel="stylesheet" href="nav.css?v=26" />
+    <link rel="stylesheet" href="assets/css/base.css?v=28" />
+    <link rel="stylesheet" href="assets/css/learning.css?v=28" />
+    <link rel="stylesheet" href="assets/css/theme.css?v=28" />
+    <link rel="stylesheet" href="assets/css/nav.css?v=28" />
   </head>
   <body>
     <nav class="topnav" aria-label="Main">
@@ -16,7 +16,7 @@
       <ul class="topnav-links">
         <li><a href="index.html">Play</a></li>
         <li><a href="versus.html">Play vs Bot</a></li>
-        <li><a href="presentation.html">How it works</a></li>
+        <li><a href="how-it-works.html">How it works</a></li>
         <li><a href="learning.html" aria-current="page">Watch it learn</a></li>
       </ul>
     </nav>
@@ -101,14 +101,14 @@
     <footer class="footer">
       <div class="wrap">
         <p>
-          The six copies are in <code>snapshots/</code>, made by
-          <code>node train_dqn.js --snapshots 0,1000,1700,2200,2800,2900</code>. Training is repeatable, so the copy
-          from game 2,800 is exactly the network in <code>dqn-model.json</code>.
+          The six copies are in <code>models/snapshots/</code>, made by
+          <code>node scripts/train-dqn.js --snapshots 0,1000,1700,2200,2800,2900</code>. Training is repeatable, so the copy
+          from game 2,800 is exactly the network in <code>models/dqn-model.json</code>.
         </p>
       </div>
     </footer>
 
-    <script type="module" src="learning.js?v=26"></script>
-      <script src="tetro-bg.js?v=26" defer></script>
+    <script type="module" src="assets/js/learning.js?v=28"></script>
+      <script src="assets/js/tetro-bg.js?v=28" defer></script>
   </body>
 </html>

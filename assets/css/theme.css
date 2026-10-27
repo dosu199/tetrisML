@@ -2,7 +2,7 @@
  * theme.css - the shared look of every page (Play, Play vs Bot, How it works,
  * Watch it learn). Loaded after each page's own CSS, so these values win.
  *
- *  - one dark palette: the names used by presentation.css (--bg, --surface,
+ *  - one dark palette: the names used by base.css (--bg, --surface,
  *    --line, --accent, ...) and by style.css (--page, --panel, ...) all point
  *    at the same colours
  *  - one page background, one primary button, one <kbd>
@@ -20,7 +20,7 @@
   --ui-accent-soft: rgba(139, 133, 255, 0.16);
   --ui-radius: 14px;
 
-  /* presentation.css / versus.css / learning.css names */
+  /* base.css / versus.css / learning.css names */
   --bg: var(--ui-bg);
   --bg-alt: #111628;
   --surface: var(--ui-surface);

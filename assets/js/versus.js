@@ -27,9 +27,9 @@ import {
   FRAME,
   mulberry32,
   placements,
-} from './src/tetris-core.js';
-import { loadDqn, chooseDqnAction } from './src/tetris-dqn.js';
-import { chooseMoveAction, PUBLISHED_WEIGHTS } from './src/tetris-ai.js';
+} from '../../src/tetris-core.js';
+import { loadDqn, chooseDqnAction } from '../../src/tetris-dqn.js';
+import { chooseMoveAction, PUBLISHED_WEIGHTS } from '../../src/tetris-ai.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -52,7 +52,7 @@ const COLORS = { 1: '#e6483d', 2: '#4ec3e0', 3: '#f2c94c', 4: '#5fc27e', 5: '#f2
 const sprites = {};
 for (const [v, name] of Object.entries(IMAGES)) {
   const img = new Image();
-  img.src = `images/${name}.png`;
+  img.src = `assets/images/${name}.png`;
   sprites[v] = img;
 }
 const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -756,11 +756,11 @@ async function init() {
   requestAnimationFrame(frame);
   try {
     const [model, w] = await Promise.all([
-      fetch('./dqn-model.json').then((r) => {
+      fetch('./models/dqn-model.json').then((r) => {
         if (!r.ok) throw new Error(`dqn-model.json: HTTP ${r.status}`);
         return r.json();
       }),
-      fetch('./weights.json')
+      fetch('./models/weights.json')
         .then((r) => (r.ok ? r.json() : null))
         .catch(() => null),
     ]);

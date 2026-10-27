@@ -9,16 +9,16 @@
  *              { id, move: null }                    -> no legal move (topped out)
  */
 
-import { loadDqn, chooseDqnAction } from './src/tetris-dqn.js';
-import { chooseMoveAction, PUBLISHED_WEIGHTS } from './src/tetris-ai.js';
+import { loadDqn, chooseDqnAction } from '../../src/tetris-dqn.js';
+import { chooseMoveAction, PUBLISHED_WEIGHTS } from '../../src/tetris-ai.js';
 
 let net = null;
 let weights = PUBLISHED_WEIGHTS;
 
 const ready = (async () => {
-  net = loadDqn(await fetch(new URL('./dqn-model.json', import.meta.url)).then((r) => r.json()));
+  net = loadDqn(await fetch(new URL('../../models/dqn-model.json', import.meta.url)).then((r) => r.json()));
   try {
-    const w = await fetch(new URL('./weights.json', import.meta.url)).then((r) => (r.ok ? r.json() : null));
+    const w = await fetch(new URL('../../models/weights.json', import.meta.url)).then((r) => (r.ok ? r.json() : null));
     if (w?.weights) weights = w.weights;
   } catch {}
 })();

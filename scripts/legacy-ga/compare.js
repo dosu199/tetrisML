@@ -1,9 +1,9 @@
 /**
  * compare.js - learned weights against the published ones, head to head.
  *
- *   node compare.js                      # 30 held-out games each
- *   node compare.js --games 50 --cap 2000
- *   node compare.js --weights quick.json
+ *   node scripts/legacy-ga/compare.js                      # 30 held-out games each
+ *   node scripts/legacy-ga/compare.js --games 50 --cap 2000
+ *   node scripts/legacy-ga/compare.js --weights quick.json
  *
  * The seeds here start at 10,000 and were never used during training. This is
  * the same idea as the train/test split in your course: a model scored on the
@@ -12,8 +12,8 @@
  */
 
 import { readFileSync } from 'node:fs';
-import { playGame } from './src/tetris-headless.js';
-import { PUBLISHED_WEIGHTS, FEATURE_NAMES } from './src/tetris-ai.js';
+import { playGame } from '../../src/tetris-headless.js';
+import { PUBLISHED_WEIGHTS, FEATURE_NAMES } from '../../src/tetris-ai.js';
 
 const argv = process.argv.slice(2);
 const flag = (name, fallback) => {
@@ -24,13 +24,13 @@ const flag = (name, fallback) => {
 const games = Number(flag('games', 30));
 const cap = Number(flag('cap', 2000));
 const lookahead = argv.includes('--lookahead');
-const weightsFile = flag('weights', 'weights.json');
+const weightsFile = flag('weights', 'models/weights.json');
 
 let learned;
 try {
   learned = JSON.parse(readFileSync(weightsFile, 'utf8')).weights;
 } catch {
-  console.error(`\nCould not read ${weightsFile}. Run "node train.js" first.\n`);
+  console.error(`\nCould not read ${weightsFile}. Run "node scripts/legacy-ga/train.js" first.\n`);
   process.exit(1);
 }
 

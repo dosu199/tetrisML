@@ -1,8 +1,8 @@
 /**
  * bench.js - sanity tests and a speed benchmark. Run with:
  *
- *   node bench.js --test     # correctness only
- *   node bench.js            # tests, then benchmark
+ *   node tests/bench.js --test     # correctness only
+ *   node tests/bench.js            # tests, then benchmark
  *
  * The benchmark number is the thing to care about: it tells you how many games
  * per second you can run, which decides whether Phase 1 takes ten minutes or
@@ -27,9 +27,9 @@ import {
   PIECES,
   PIECE_INDEX,
   Bag,
-} from './src/tetris-core.js';
-import { extractFeatures, chooseMove, PUBLISHED_WEIGHTS, FEATURE_NAMES } from './src/tetris-ai.js';
-import { playGame } from './src/tetris-headless.js';
+} from '../src/tetris-core.js';
+import { extractFeatures, chooseMove, PUBLISHED_WEIGHTS, FEATURE_NAMES } from '../src/tetris-ai.js';
+import { playGame } from '../src/tetris-headless.js';
 
 let passed = 0;
 let failed = 0;

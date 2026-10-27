@@ -1,9 +1,9 @@
 /**
- * train_many.js - train several networks with different seeds, keep the best.
+ * train-many.js - train several networks with different seeds, keep the best.
  *
- *   node train_many.js                          # seeds 1-4, 2 at a time
- *   node train_many.js --seeds 1,2,3,4,5,6 --parallel 3
- *   node train_many.js --seeds 1,2 --pieces mix  # extra flags go to train_dqn.js
+ *   node scripts/train-many.js                          # seeds 1-4, 2 at a time
+ *   node scripts/train-many.js --seeds 1,2,3,4,5,6 --parallel 3
+ *   node scripts/train-many.js --seeds 1,2 --pieces mix  # extra flags go to train-dqn.js
  *
  * WHY
  * ---
@@ -30,9 +30,10 @@
  */
 
 import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
-import { playEpisode } from './src/tetris-core.js';
-import { loadDqn, chooseDqnMove, chooseDqnAction } from './src/tetris-dqn.js';
+import { playEpisode } from '../src/tetris-core.js';
+import { loadDqn, chooseDqnMove, chooseDqnAction } from '../src/tetris-dqn.js';
 
 const argv = process.argv.slice(2);
 const own = new Set(['seeds', 'parallel', 'out', 'select-games', 'select-cap']);
@@ -40,7 +41,7 @@ const flag = (n, d) => {
   const i = argv.indexOf(`--${n}`);
   return i === -1 ? d : argv[i + 1];
 };
-// everything that is not ours is passed through to train_dqn.js
+// everything that is not ours is passed through to train-dqn.js
 const passThrough = [];
 for (let i = 0; i < argv.length; i++) {
   const name = argv[i].replace(/^--/, '');
@@ -50,7 +51,7 @@ for (let i = 0; i < argv.length; i++) {
 
 const SEEDS = flag('seeds', '1,2,3,4').split(',').map(Number);
 const PARALLEL = Number(flag('parallel', 2));
-const OUT = flag('out', 'dqn-model.json');
+const OUT = flag('out', 'models/dqn-model.json');
 const SELECT_GAMES = Number(flag('select-games', 50));
 const SELECT_CAP = Number(flag('select-cap', 2000));
 const PIECES = flag('pieces', 'random');
@@ -61,7 +62,7 @@ mkdirSync('runs', { recursive: true });
 function train(seed) {
   return new Promise((resolve, reject) => {
     const file = `runs/seed-${seed}.json`;
-    const args = ['train_dqn.js', '--seed', String(seed), '--out', file, ...passThrough];
+    const args = [fileURLToPath(new URL('./train-dqn.js', import.meta.url)), '--seed', String(seed), '--out', file, ...passThrough];
     const child = spawn(process.execPath, args, { stdio: ['ignore', 'pipe', 'inherit'] });
     let last = '';
     child.stdout.on('data', (d) => {
@@ -104,7 +105,7 @@ function select(file) {
 
 const t0 = Date.now();
 console.log(`\ntraining ${SEEDS.length} networks (seeds ${SEEDS.join(', ')}), ${PARALLEL} at a time`);
-console.log(`train_dqn.js flags: ${passThrough.join(' ') || '(defaults)'}\n`);
+console.log(`train-dqn.js flags: ${passThrough.join(' ') || '(defaults)'}\n`);
 
 // a tiny worker pool: PARALLEL trainings at once
 const queue = [...SEEDS];
@@ -131,4 +132,4 @@ if (results[0].file === OUT) {
   copyFileSync(results[0].file, OUT);
   console.log(`\n${results[0].file} -> ${OUT}   (${minutes} min)`);
 }
-console.log(`final check: node hardmode.js --model ${OUT} --games 50 --seed 90000 --mode memoryless-no-preview\n`);
+console.log(`final check: node scripts/hardmode.js --model ${OUT} --games 50 --seed 90000 --mode memoryless-no-preview\n`);

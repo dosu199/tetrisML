@@ -1,0 +1,420 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tetris Neural Network</title>
+    <meta name="description" content="A small neural network that taught itself to play Tetris, playing live in your browser, with an explanation of how it decides and how it learned." />
+    <link rel="stylesheet" href="assets/css/base.css?v=28" />
+    <link rel="stylesheet" href="assets/css/theme.css?v=28" />
+    <link rel="stylesheet" href="assets/css/nav.css?v=28" />
+  </head>
+  <body>
+    <nav class="topnav" aria-label="Main">
+      <a class="topnav-brand" href="index.html"><span class="topnav-logo" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span>Tetris ML</span></a>
+      <ul class="topnav-links">
+        <li><a href="index.html">Play</a></li>
+        <li><a href="versus.html">Play vs Bot</a></li>
+        <li><a href="how-it-works.html" aria-current="page">How it works</a></li>
+        <li><a href="learning.html">Watch it learn</a></li>
+      </ul>
+    </nav>
+
+    <header class="hero">
+      <div class="wrap">
+        <p class="eyebrow">Tetris ML · deep Q-learning in plain JavaScript</p>
+        <h1>A neural network that taught itself Tetris</h1>
+        <p class="lede">
+          Nobody showed it a single good move. It played a few thousand games and was only told its
+          score. What came out is about 4,500 numbers that now play better than a hand-tuned bot.
+          Below, the real network is playing live in your browser.
+        </p>
+        <div class="stats">
+          <div class="stat"><span class="stat-num">4</span><span class="stat-label">numbers it looks at per move</span></div>
+          <div class="stat"><span class="stat-num">~4 min</span><span class="stat-label">of training, from nothing</span></div>
+          <div class="stat"><span class="stat-num">0 / 50</span><span class="stat-label">games lost on normal pieces (bot: 8)</span></div>
+        </div>
+        <nav class="toc" aria-label="Sections">
+          <a href="#watch">1 · Watch it think</a>
+          <a href="#learn">2 · How it learned</a>
+          <a href="#score">3 · How good is it</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <!-- ------------------------------------------------------------ 1 -->
+      <section id="watch" class="section">
+        <div class="wrap">
+          <h2><span class="num">1</span> Watch it think</h2>
+          <p class="intro">
+            For every piece the network tries <b>every rotation in every column</b>. Each faint outline
+            on the board is one option, coloured by how much the network likes it: <span class="swatch bad"></span>
+            red is bad, <span class="swatch good"></span> green is good. The solid outline is the move it picks.
+            With the <b>Hold box</b> on, it also tries every spot for the piece it would get by holding; those
+            options have <b>dashed</b> outlines. Pause and use <b>Next move</b> to go through it one decision at a time.
+          </p>
+
+          <div class="demo">
+            <div class="board-col">
+              <div class="board-frame">
+                <canvas id="board" aria-label="Tetris board with the network's candidate moves"></canvas>
+                <div id="gameOver" class="overlay">Loading the network… If this message stays, open the page through a local server (<code>npx serve .</code>), not by double-clicking the file.</div>
+              </div>
+              <div class="controls">
+                <button id="playBtn" class="primary" type="button">Pause</button>
+                <button id="stepBtn" type="button">Next move</button>
+                <button id="resetBtn" type="button">New game</button>
+              </div>
+              <label class="slider">
+                <span>Speed</span>
+                <input id="speed" type="range" min="0" max="5" step="1" value="2" />
+                <output id="speedOut">2 moves/s</output>
+              </label>
+              <p id="demoStatus" class="hint demo-status" aria-live="polite"></p>
+              <div class="toggles">
+                <label><input id="holdBox" type="checkbox" checked /> Hold box (as in the game)</label>
+                <label><input id="randomPieces" type="checkbox" /> Fully random pieces</label>
+                <label><input id="lookahead" type="checkbox" /> Look one piece ahead</label>
+              </div>
+            </div>
+
+            <div class="panel-col">
+              <div class="card pieces-card">
+                <div id="holdCol">
+                  <h3>Hold</h3>
+                  <canvas id="holdPiece" class="mini-piece"></canvas>
+                </div>
+                <div>
+                  <h3>Now</h3>
+                  <canvas id="curPiece" class="mini-piece"></canvas>
+                </div>
+                <div>
+                  <h3>Next</h3>
+                  <canvas id="nextPiece" class="mini-piece"></canvas>
+                </div>
+                <dl class="counters">
+                  <div><dt>Lines</dt><dd id="lines">0</dd></div>
+                  <div><dt>Pieces</dt><dd id="pieces">0</dd></div>
+                  <div><dt>Game</dt><dd id="games">1</dd></div>
+                  <div><dt>Best</dt><dd id="best">0</dd></div>
+                  <div><dt>Holds</dt><dd id="holds">0</dd></div>
+                </dl>
+              </div>
+
+              <div class="card">
+                <h3>What it sees for <span id="seeWhich">its pick</span></h3>
+                <p class="hint">After placing the piece, the board is boiled down to these 4 numbers. That's all the network gets.</p>
+                <div id="features" class="features"></div>
+                <div class="verdict">
+                  <span>Network's score for this board</span>
+                  <strong id="verdict">–</strong>
+                </div>
+              </div>
+
+              <div class="card">
+                <h3>Its top choices <span class="muted" id="optCount"></span></h3>
+                <p class="hint">Hover a row to see that option on the board.</p>
+                <ol id="options" class="options"></ol>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ------------------------------------------------------------ 2 -->
+      <section id="learn" class="section alt">
+        <div class="wrap">
+          <h2><span class="num">2</span> How it learned</h2>
+          <p class="intro">
+            The method is deep Q-learning, following the open-source project
+            <a href="https://github.com/vietnh1009/Tetris-deep-Q-learning-pytorch" target="_blank" rel="noopener">Tetris-deep-Q-learning-pytorch</a>,
+            rewritten in plain JavaScript. Five ideas carry the whole thing.
+          </p>
+
+          <ol class="steps">
+            <!-- a -->
+            <li class="step">
+              <div class="step-text">
+                <h3>It sees 4 numbers, not the picture</h3>
+                <p>
+                  For each possible move, the board that move would leave is reduced to four numbers:
+                </p>
+                <ul class="defs">
+                  <li><b>Lines</b>: rows cleared by this move.</li>
+                  <li><b>Holes</b>: empty cells with a block somewhere above them. <span class="mark-hole">●</span></li>
+                  <li><b>Bumpiness</b>: how jagged the surface is. It adds up the height jumps between neighbouring columns.</li>
+                  <li><b>Height</b>: all column heights added together.</li>
+                </ul>
+                <p>
+                  The network (4 → 64 → 64 → 1 neurons) turns those 4 numbers into one score.
+                  It never learned what a hole <i>is</i>. It only learned that boards with a high
+                  "holes" number tend to end badly.
+                </p>
+              </div>
+              <div class="step-visual">
+                <canvas id="exampleBoard" aria-label="Example board with holes and column heights marked"></canvas>
+                <div id="exampleFeatures" class="example-features"></div>
+              </div>
+            </li>
+
+            <!-- a2 -->
+            <li class="step wide">
+              <div class="step-text">
+                <h3>Inside the network: 4 → 64 → 64 → 1</h3>
+                <p>
+                  It's a <b>feedforward neural network</b> (also called a multi-layer perceptron): numbers flow
+                  one way, from left to right. Every arrow is one <b>weight</b>. Each neuron multiplies what
+                  comes in by its weights, adds them up plus a <b>bias</b>, and turns a negative result into 0
+                  (<b>ReLU</b>). The last neuron gives the score. Only 4 of each 64 hidden neurons are drawn;
+                  together the network has 4,545 numbers (4,416 weights and 129 biases), and training adjusted
+                  every one of them. They're stored in <code>models/dqn-model.json</code>.
+                </p>
+              </div>
+              <div class="step-visual netdiag-wrap">
+<svg class="netdiag" viewBox="0 0 1000 520" role="img" aria-label="The network: 4 inputs, two hidden layers of 64 neurons, 1 output">
+<defs><marker id="nd-ar" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="nd-arrow"/></marker></defs>
+<text class="nd-title" x="150" y="44" text-anchor="middle">Input layer</text>
+<text class="nd-title" x="410" y="44" text-anchor="middle">Hidden layer 1</text>
+<text class="nd-title" x="670" y="44" text-anchor="middle">Hidden layer 2</text>
+<text class="nd-title" x="900" y="44" text-anchor="middle">Output layer</text>
+<line class="nd-edge" x1="172.0" y1="90.0" x2="386.0" y2="90.0" marker-end="url(#nd-ar)"/>
+<line class="nd-edge" x1="171.1" y1="96.3" x2="387.0" y2="160.6" marker-end="url(#nd-ar)"/>
+<line class="nd-edge" x1="168.9" y1="101.3" x2="389.4" y2="232.7" marker-end="url(#nd-ar)"/>
+<line class="nd-edge" x1="164.1" y1="106.9" x2="394.6" y2="381.6" marker-end="url(#nd-ar)"/>
+<line class="nd-edge" x1="170.4" y1="185.2" x2="387.7" y2="98.9" marker-end="url(#nd-ar)"/>
+<line class="nd-edge" x1="171.9" y1="191.2" x2="386.1" y2="169.9" marker-end="url(#nd-ar)"/>
+<line class="nd-edge" x1="171.6" y1="197.6" x2="386.5" y2="240.3" marker-end="url(#nd-ar)"/>
+<line class="nd-edge" x1="167.2" y1="207.0" x2="391.2" y2="385.1" marker-end="url(#nd-ar)"/>
+<line class="nd-edge" x1="167.2" y1="283.0" x2="391.2" y2="104.9" marker-end="url(#nd-ar)"/>
+<line class="nd-edge" x1="169.7" y1="286.9" x2="388.5" y2="178.2" marker-end="url(#nd-ar)"/>
+<line class="nd-edge" x1="171.6" y1="292.4" x2="386.5" y2="249.7" marker-end="url(#nd-ar)"/>
+<line class="nd-edge" x1="170.4" y1="304.8" x2="387.7" y2="391.1" marker-end="url(#nd-ar)"/>
+<line class="nd-edge" x1="164.1" y1="383.1" x2="394.6" y2="108.4" marker-end="url(#nd-ar)"/>
+<line class="nd-edge" x1="166.4" y1="385.3" x2="392.1" y2="183.5" marker-end="url(#nd-ar)"/>
+<line class="nd-edge" x1="168.9" y1="388.7" x2="389.4" y2="257.3" marker-end="url(#nd-ar)"/>
+<line class="nd-edge" x1="172.0" y1="400.0" x2="386.0" y2="400.0" marker-end="url(#nd-ar)"/>
+<line class="nd-edge" x1="432.0" y1="90.0" x2="646.0" y2="90.0" marker-end="url(#nd-ar)"/>
+<line class="nd-edge" x1="431.1" y1="96.3" x2="647.0" y2="160.6" marker-end="url(#nd-ar)"/>
+<line class="nd-edge" x1="428.9" y1="101.3" x2="649.4" y2="232.7" marker-end="url(#nd-ar)"/>
+<line class="nd-edge" x1="424.1" y1="106.9" x2="654.6" y2="381.6" marker-end="url(#nd-ar)"/>
+<line class="nd-edge" x1="431.1" y1="161.2" x2="647.0" y2="96.9" marker-end="url(#nd-ar)"/>
+<line class="nd-edge" x1="432.0" y1="167.5" x2="646.0" y2="167.5" marker-end="url(#nd-ar)"/>
+<line class="nd-edge" x1="431.1" y1="173.8" x2="647.0" y2="238.1" marker-end="url(#nd-ar)"/>
+<line class="nd-edge" x1="426.4" y1="182.2" x2="652.1" y2="384.0" marker-end="url(#nd-ar)"/>
+<line class="nd-edge" x1="428.9" y1="233.7" x2="649.4" y2="102.3" marker-end="url(#nd-ar)"/>
+<line class="nd-edge" x1="431.1" y1="238.7" x2="647.0" y2="174.4" marker-end="url(#nd-ar)"/>
+<line class="nd-edge" x1="432.0" y1="245.0" x2="646.0" y2="245.0" marker-end="url(#nd-ar)"/>
+<line class="nd-edge" x1="428.9" y1="256.3" x2="649.4" y2="387.7" marker-end="url(#nd-ar)"/>
+<line class="nd-edge" x1="424.1" y1="383.1" x2="654.6" y2="108.4" marker-end="url(#nd-ar)"/>
+<line class="nd-edge" x1="426.4" y1="385.3" x2="652.1" y2="183.5" marker-end="url(#nd-ar)"/>
+<line class="nd-edge" x1="428.9" y1="388.7" x2="649.4" y2="257.3" marker-end="url(#nd-ar)"/>
+<line class="nd-edge" x1="432.0" y1="400.0" x2="646.0" y2="400.0" marker-end="url(#nd-ar)"/>
+<line class="nd-edge" x1="688.2" y1="102.3" x2="880.1" y2="231.6" marker-end="url(#nd-ar)"/>
+<line class="nd-edge" x1="690.8" y1="174.5" x2="877.3" y2="237.3" marker-end="url(#nd-ar)"/>
+<line class="nd-edge" x1="692.0" y1="245.0" x2="876.0" y2="245.0" marker-end="url(#nd-ar)"/>
+<line class="nd-edge" x1="688.2" y1="387.7" x2="880.1" y2="258.4" marker-end="url(#nd-ar)"/>
+<rect class="nd-wbg" x="253.0" y="80.0" width="54" height="19" rx="4"/>
+<text class="nd-w" x="280.0" y="95.0" text-anchor="middle">W1,1</text>
+<rect class="nd-wbg" x="253.0" y="390.0" width="54" height="19" rx="4"/>
+<text class="nd-w" x="280.0" y="405.0" text-anchor="middle">W4,64</text>
+<rect class="nd-wbg" x="513.0" y="80.0" width="54" height="19" rx="4"/>
+<text class="nd-w" x="540.0" y="95.0" text-anchor="middle">U1,1</text>
+<rect class="nd-wbg" x="513.0" y="390.0" width="54" height="19" rx="4"/>
+<text class="nd-w" x="540.0" y="405.0" text-anchor="middle">U64,64</text>
+<rect class="nd-wbg" x="746.5" y="149.8" width="54" height="19" rx="4"/>
+<text class="nd-w" x="773.5" y="164.8" text-anchor="middle">V1</text>
+<rect class="nd-wbg" x="746.5" y="320.2" width="54" height="19" rx="4"/>
+<text class="nd-w" x="773.5" y="335.2" text-anchor="middle">V64</text>
+<circle class="nd-node nd-in" cx="150" cy="90.0" r="22"/>
+<text class="nd-label" x="150" y="95.0" text-anchor="middle">X1</text>
+<text class="nd-side" x="118" y="95.0" text-anchor="end">Lines</text>
+<circle class="nd-node nd-in" cx="150" cy="193.3" r="22"/>
+<text class="nd-label" x="150" y="198.3" text-anchor="middle">X2</text>
+<text class="nd-side" x="118" y="198.3" text-anchor="end">Holes</text>
+<circle class="nd-node nd-in" cx="150" cy="296.7" r="22"/>
+<text class="nd-label" x="150" y="301.7" text-anchor="middle">X3</text>
+<text class="nd-side" x="118" y="301.7" text-anchor="end">Bumpiness</text>
+<circle class="nd-node nd-in" cx="150" cy="400.0" r="22"/>
+<text class="nd-label" x="150" y="405.0" text-anchor="middle">X4</text>
+<text class="nd-side" x="118" y="405.0" text-anchor="end">Height</text>
+<circle class="nd-node" cx="410" cy="90.0" r="22"/>
+<text class="nd-label" x="410" y="95.0" text-anchor="middle">A1</text>
+<circle class="nd-node" cx="410" cy="167.5" r="22"/>
+<text class="nd-label" x="410" y="172.5" text-anchor="middle">A2</text>
+<circle class="nd-node" cx="410" cy="245.0" r="22"/>
+<text class="nd-label" x="410" y="250.0" text-anchor="middle">A3</text>
+<circle class="nd-dot" cx="410" cy="310.5" r="2.8"/>
+<circle class="nd-dot" cx="410" cy="322.5" r="2.8"/>
+<circle class="nd-dot" cx="410" cy="334.5" r="2.8"/>
+<circle class="nd-node" cx="410" cy="400.0" r="22"/>
+<text class="nd-label" x="410" y="405.0" text-anchor="middle">A64</text>
+<circle class="nd-node" cx="670" cy="90.0" r="22"/>
+<text class="nd-label" x="670" y="95.0" text-anchor="middle">B1</text>
+<circle class="nd-node" cx="670" cy="167.5" r="22"/>
+<text class="nd-label" x="670" y="172.5" text-anchor="middle">B2</text>
+<circle class="nd-node" cx="670" cy="245.0" r="22"/>
+<text class="nd-label" x="670" y="250.0" text-anchor="middle">B3</text>
+<circle class="nd-dot" cx="670" cy="310.5" r="2.8"/>
+<circle class="nd-dot" cx="670" cy="322.5" r="2.8"/>
+<circle class="nd-dot" cx="670" cy="334.5" r="2.8"/>
+<circle class="nd-node" cx="670" cy="400.0" r="22"/>
+<text class="nd-label" x="670" y="405.0" text-anchor="middle">B64</text>
+<circle class="nd-node nd-out" cx="900" cy="245.0" r="22"/>
+<text class="nd-label" x="900" y="250.0" text-anchor="middle">Z</text>
+<text class="nd-side" x="900" y="289.0" text-anchor="middle">score</text>
+<text class="nd-cap" x="150" y="448" text-anchor="middle">4 numbers</text>
+<text class="nd-sub" x="150" y="466" text-anchor="middle">about the board</text>
+<text class="nd-cap" x="410" y="448" text-anchor="middle">64 neurons</text>
+<text class="nd-sub" x="410" y="466" text-anchor="middle">ReLU</text>
+<text class="nd-cap" x="670" y="448" text-anchor="middle">64 neurons</text>
+<text class="nd-sub" x="670" y="466" text-anchor="middle">ReLU</text>
+<text class="nd-cap" x="900" y="448" text-anchor="middle">1 number</text>
+<text class="nd-sub" x="900" y="466" text-anchor="middle">how good the board is</text>
+<text class="nd-sub" x="280.0" y="496" text-anchor="middle">W: 4 × 64 = 256 weights</text>
+<text class="nd-sub" x="540.0" y="496" text-anchor="middle">U: 64 × 64 = 4,096 weights</text>
+<text class="nd-sub" x="785.0" y="496" text-anchor="middle">V: 64 × 1 = 64 weights</text>
+</svg>
+              </div>
+            </li>
+
+            <!-- b -->
+            <li class="step">
+              <div class="step-text">
+                <h3>Its only teacher is the score</h3>
+                <p>
+                  Every piece placed earns a reward: <code>1 + 10 × lines²</code>. Just staying alive earns 1, and
+                  clearing lines earns much more. Clearing four at once (a "tetris") is worth 16 times a single.
+                  Losing simply means no more rewards. That's the entire instruction it gets.
+                </p>
+              </div>
+              <div class="step-visual">
+                <div class="reward-chart" id="rewardChart"></div>
+              </div>
+            </li>
+
+            <!-- c -->
+            <li class="step">
+              <div class="step-text">
+                <h3>One rule: a board is worth what it pays now plus what comes next</h3>
+                <p>
+                  The network guesses how many points a board will still earn. After each move, the guess is
+                  checked against what actually happened: the reward it just got, plus its own guess for the
+                  new board (slightly discounted, × 0.99). The gap between the two is the error it trains on.
+                  Repeat that over thousands of training steps and real rewards flow backwards to the moves
+                  that earned them. This is the <b>Bellman equation</b>.
+                </p>
+                <p class="hint">Live from the game above: after training, both sides should nearly agree.</p>
+              </div>
+              <div class="step-visual">
+                <div class="bellman card">
+                  <div class="b-row">
+                    <span class="b-label">Its guess for the board before this move</span>
+                    <span class="b-val" id="bBefore">–</span>
+                  </div>
+                  <div class="b-eq">≈</div>
+                  <div class="b-row">
+                    <span class="b-label">Reward from the move</span>
+                    <span class="b-val" id="bReward">–</span>
+                  </div>
+                  <div class="b-row">
+                    <span class="b-label">+ 0.99 × its guess for the new board</span>
+                    <span class="b-val" id="bAfter">–</span>
+                  </div>
+                  <div class="b-row total">
+                    <span class="b-label">= what actually followed</span>
+                    <span class="b-val" id="bTarget">–</span>
+                  </div>
+                  <div class="b-gap">
+                    <span>Gap on this move: <b id="bGap">–</b></span>
+                    <span>Average gap: <b id="bAvg">–</b></span>
+                  </div>
+                </div>
+              </div>
+            </li>
+
+            <!-- d -->
+            <li class="step">
+              <div class="step-text">
+                <h3>First it plays randomly, then it trusts itself</h3>
+                <p>
+                  At the start the network knows nothing, so it plays random moves to find out what happens.
+                  This is called <b>exploration</b>. Over 2,000 games the share of random moves falls from 100% to
+                  0.1%, and it relies more and more on what it learned. Drag the slider to make the trained network
+                  explore again, and watch how quickly random moves ruin a game.
+                </p>
+              </div>
+              <div class="step-visual explore">
+                <canvas id="exploreBoard" aria-label="Small board played with a chosen amount of random moves"></canvas>
+                <div class="explore-side">
+                  <label class="slider vertical-ish">
+                    <span>Random moves</span>
+                    <input id="epsilon" type="range" min="0" max="4" step="1" value="2" />
+                    <output id="epsOut">10%</output>
+                  </label>
+                  <dl class="counters small">
+                    <div><dt>This game</dt><dd id="exPieces">0</dd></div>
+                    <div><dt>Games</dt><dd id="exGames">0</dd></div>
+                    <div><dt>Avg pieces / game</dt><dd id="exAvg">–</dd></div>
+                  </dl>
+                  <p class="hint">Pieces survived per game, at this setting.</p>
+                </div>
+              </div>
+            </li>
+
+            <!-- e -->
+            <li class="step wide">
+              <div class="step-text">
+                <h3>Training is bumpy, so keep the best version</h3>
+                <p>
+                  This is the real training run of the network you're watching (3,000 games, about 4 minutes).
+                  It learned slowly while exploring, then took off. But it didn't improve steadily: a
+                  network that survived 1,000 pieces could fall to 83 one hundred games later. So every
+                  100 games it plays a short test with no random moves, and only a new best result is saved
+                  (<span class="dot-best"></span>). The saved network is from game 2,800.
+                </p>
+              </div>
+              <div class="step-visual">
+                <div id="trainChart" class="train-chart"></div>
+              </div>
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <!-- ------------------------------------------------------------ 3 -->
+      <section id="score" class="section">
+        <div class="wrap">
+          <h2><span class="num">3</span> How good is it?</h2>
+          <p class="intro">
+            The network against a classic search bot with hand-tuned weights. Each line is 50 games
+            the network never saw in training, and every player gets exactly the same pieces.
+            <b>Network + lookahead</b> is the same network, also trying every placement of the next piece.
+            The first four cards use the classic rules; the others show what the <b>Hold box</b> changes.
+            <b>Deep lookahead</b> also looks at the piece after next, averaged over all 7 possibilities.
+            The network was never trained with hold: it simply also scores the options holding gives it.
+          </p>
+          <div id="scoreboard" class="scoreboard"></div>
+          <p class="footnote">
+            Classic rules: with fully random pieces and no preview, the bot loses 9 games and the network 12.
+            With hold, both almost never lose ordinary games, so the hardest tests use garbage: there the
+            network with lookahead never lost in 2,000 pieces, and the bot lost 4 of 50.
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="wrap">
+        <p>
+          Tetris ML · the network is <code>models/dqn-model.json</code> from this repo, running on
+          <code>src/tetris-dqn.js</code>. Method after
+          <a href="https://github.com/vietnh1009/Tetris-deep-Q-learning-pytorch" target="_blank" rel="noopener">vietnh1009/Tetris-deep-Q-learning-pytorch</a>.
+        </p>
+      </div>
+    </footer>
+
+    <script type="module" src="assets/js/how-it-works.js?v=28"></script>
+      <script src="assets/js/tetro-bg.js?v=28" defer></script>
+  </body>
+</html>

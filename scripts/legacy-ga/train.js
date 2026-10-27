@@ -1,9 +1,9 @@
 /**
  * train.js - run the genetic algorithm and save the weights it finds.
  *
- *   node train.js                            # defaults: 50 x 40 generations
- *   node train.js --generations 60 --workers 4
- *   node train.js --population 30 --generations 15 --out quick.json
+ *   node scripts/legacy-ga/train.js                            # defaults: 50 x 40 generations
+ *   node scripts/legacy-ga/train.js --generations 60 --workers 4
+ *   node scripts/legacy-ga/train.js --population 30 --generations 15 --out quick.json
  *
  * Writes weights.json (the learned weights) and training-log.csv (one row per
  * generation, so you can plot the learning curve - which is a nice first use
@@ -12,9 +12,9 @@
 
 import { writeFileSync } from 'node:fs';
 import os from 'node:os';
-import { runGA, DEFAULTS } from './src/ga.js';
-import { FEATURE_NAMES, PUBLISHED_WEIGHTS } from './src/tetris-ai.js';
-import { fitnessOf } from './src/ga.js';
+import { runGA, DEFAULTS } from './ga.js';
+import { FEATURE_NAMES, PUBLISHED_WEIGHTS } from '../../src/tetris-ai.js';
+import { fitnessOf } from './ga.js';
 
 /* ------------------------------------------------------------------- flags */
 
@@ -32,7 +32,7 @@ const config = {
   randomSeed: Number(flag('seed', DEFAULTS.randomSeed)),
   workers: Number(flag('workers', Math.max(1, os.cpus().length - 1))),
 };
-const outFile = flag('out', 'weights.json');
+const outFile = flag('out', 'models/weights.json');
 
 // Seeds 1..8 train; the high seeds in compare.js are never seen during
 // training. Same discipline as a train/test split - weights that only work on
@@ -92,7 +92,7 @@ const theirs = fitnessOf(PUBLISHED_WEIGHTS, TRAIN_SEEDS, cap);
 console.log(`\non the training seeds at a ${cap}-piece cap:`);
 console.log(`  learned    ${mine.fitness.toFixed(1)} lines`);
 console.log(`  published  ${theirs.fitness.toFixed(1)} lines`);
-console.log('\nrun `node compare.js` for the honest number, on seeds never trained on.');
+console.log('\nrun `node scripts/legacy-ga/compare.js` for the honest number, on seeds never trained on.');
 
 writeFileSync(
   outFile,

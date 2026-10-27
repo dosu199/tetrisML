@@ -40,7 +40,7 @@ which is still fast enough to watch.
 - **Replay memory**: the last 30,000 moves. After every game it takes one
   training step on a random batch of 512 of them.
 - **Best checkpoint**: DQN does not improve steadily. It climbs, then often
-  collapses. Every 100 games, `train_dqn.js` plays 5 test games with no
+  collapses. Every 100 games, `scripts/train-dqn.js` plays 5 test games with no
   exploration and saves the network only when it beats the best so far. In our
   run the final network survived 144 pieces on average while the saved best
   survived about 1,900. So always use the saved best network, never the final
@@ -108,13 +108,13 @@ the default on the game page and the strongest opponent in Play vs Bot.
 
 - **5-step learning: no.** Over 16 training runs, 5-step lost 35.5 of 50 games
   on average and normal 1-step lost 33.6. Its lead after 8 runs was luck.
-- **Training with hold (stage B): no, so far.** `train_dqn.js --hold` gives
+- **Training with hold (stage B): no, so far.** `scripts/train-dqn.js --hold` gives
   the network 7 extra inputs (which piece is in the hold box) and lets it hold
   during training. Of 8 runs, the best was worse than the current network
   using hold without training: 6 vs 3 games lost on random pieces, 97 vs 114
   pieces with garbage every 3. The hold-trained networks hold less and make
   almost no tetrises (0.04 vs 1.9 per 100 pieces); some barely hold at all.
-  The option stays in `train_dqn.js` for future experiments.
+  The option stays in `scripts/train-dqn.js` for future experiments.
 - **Training with hold + garbage: closer, still no.** The suspicion was that
   with hold, training games almost never end, so the network rarely sees a
   loss. `--hold --garbage 3` puts a garbage row every 3 pieces into half of
@@ -158,13 +158,13 @@ first, then with hold:
 Hold removes almost all losses on random pieces: 92% fewer for the network,
 100% fewer for the bot. With rising garbage, the network with lookahead now
 never loses in 2,000 pieces; it used to survive about 320. Both players hold
-about one piece in four. Turn it on in a test with `node hardmode.js --hold`.
+about one piece in four. Turn it on in a test with `node scripts/hardmode.js --hold`.
 The game page has hold switched on (`startVisualGame({ hold: true })`).
 
 ### Making training stable (v0.8)
 
 Our network came from a lucky run, so we tried to make every run good. Each
-setting was trained on 8 seeds with `train_many.js` and scored on the same 50
+setting was trained on 8 seeds with `scripts/train-many.js` and scored on the same 50
 selection games (random pieces, no preview, seeds 70000+). The numbers are
 games lost out of 50; lower is better.
 
@@ -190,13 +190,13 @@ None of them made a typical run better.
 So for this setup, the honest answer to "how do we make every run good?" is
 that we can't yet. The spread between seeds (14 to 48 lost) is part of how DQN
 behaves here. What works is to **train many seeds and keep the best on a
-separate test**, which is what `train_many.js` does. Seed 8 came out of these
+separate test**, which is what `scripts/train-many.js` does. Seed 8 came out of these
 runs. On the final test it beats the old network without preview (12 vs 16
 lost on random pieces, 0 vs 1 on normal pieces up to 10,000). With lookahead
 it is level (2 vs 0 lost on random pieces, 319 vs 321 pieces with garbage).
 Those differences are within luck, so overall it is a modest step forward.
 
-All three options stay in `train_dqn.js` (off by default), so you can
+All three options stay in `scripts/train-dqn.js` (off by default), so you can
 experiment with them.
 
 ### Training with garbage rows (v0.9)
@@ -233,7 +233,7 @@ Digging out of garbage needs planning that 4 board numbers cannot describe.
 
 ### Picking the best of several runs (v0.7)
 
-`train_many.js` trains several seeds and picks the winner on a separate set of
+`scripts/train-many.js` trains several seeds and picks the winner on a separate set of
 games (70000+), so the final test (90000+) stays fair. It is the train /
 validation / test split.
 
@@ -288,51 +288,62 @@ how we pick the checkpoint, not what we train on.
 ## Files
 
 ```
+index.html  versus.html  how-it-works.html  learning.html     the four pages (GitHub Pages serves the root)
+how-it-works.html        forwards old links to how-it-works.html
+
+assets/css/              style (Play), theme (shared look), nav (top bar),
+                         base (How it works + base for the others), versus, learning
+assets/js/               versus, versus-ai-worker (opponent in a background thread),
+                         how-it-works, learning, tetro-bg (falling pieces)
+assets/images/           block and background images
+
 src/tetris-core.js       board, pieces, 7-bag, collision, line clears, playEpisode()
-src/tetris-dqn.js        the network: features, MLP with backprop + Adam, chooseDqnMove()
-src/tetris-ai.js         8 features + search bot (the opponent)
-src/tetris-visual.js     the only file that touches the DOM
-src/tetris-headless.js   fast games for the genetic algorithm
-src/ga.js, ga-worker.js  genetic algorithm for the bot's weights
-train_dqn.js             trains the network        -> dqn-model.json
-train_many.js            trains several seeds, keeps the best on a validation set
-hardmode.js              bot vs network, 5 rule modes (--lookahead adds 2-ply)
-test_dqn.js              gradient check + smoke tests for the network
-versus.html/.css/.js     play against the network, side by side
-versus-ai-worker.js      the opponent's thinking, in a background thread
-presentation.html/.css/.js   visual explanation page, network playing live
-learning.html/.css/.js   six training snapshots playing side by side
-snapshots/               the network saved at 6 moments of training
-nav.css                  the top bar shared by all pages
-bench.js                 26 tests for the game core
-train.js / compare.js    genetic algorithm for the bot -> weights.json
+src/tetris-dqn.js        the network: features, MLP with backprop + Adam, chooseDqnAction()
+src/tetris-ai.js         8 features + search bot
+src/tetris-visual.js     the Play page game (you or an agent), the only src file that touches the DOM
+src/tetris-headless.js   fast games for the tests and the genetic algorithm
+
+models/dqn-model.json    the trained network (used by every page)
+models/weights.json      the search bot's 8 weights
+models/snapshots/        the network saved at 6 moments of training (Watch it learn)
+
+scripts/train-dqn.js     trains a network                 -> models/dqn-model.json
+scripts/train-many.js    trains several seeds, keeps the best (runs/ holds each seed, not committed)
+scripts/hardmode.js      bot vs network in harder rule modes
+scripts/legacy-ga/       genetic algorithm that tuned the bot -> models/weights.json
+
+tests/bench.js           26 tests for the game core
+tests/test-dqn.js        gradient check + smoke tests for the network
 ```
+
+Run every command from the repo root (that is where `npm` runs them).
 
 ## Commands
 
 ```bash
-npm test                 # 26 core tests + the DQN checks
-node train_dqn.js        # train a new network, about 5 minutes -> dqn-model.json
-node hardmode.js         # bot vs network in all 5 modes, 10 games each
-node hardmode.js --model dqn-model.json --games 50 --seed 90000 --mode no-preview
-node hardmode.js --model dqn-model.json --lookahead --games 50 --seed 90000 --mode garbage5
-node train_many.js --seeds 1,2,3,4   # 4 networks, 2 at a time, about 15 min
-npx serve .              # then open index.html in the browser
+npm test                          # 26 core tests + the DQN checks
+npm run train:dqn                 # train a new network, about 5 minutes -> models/dqn-model.json
+npm run hard                      # bot vs network, 10 games each
+node scripts/hardmode.js --games 50 --seed 90000 --mode no-preview
+node scripts/hardmode.js --lookahead --games 50 --seed 90000 --mode garbage5
+node scripts/train-many.js --seeds 1,2,3,4   # 4 networks, 2 at a time, about 15 min
+npm run train:ga                  # the old genetic algorithm -> models/weights.json
+npx serve .                       # then open index.html in the browser
 ```
 
 Training options (all have defaults): `--epochs 3000 --decay 2000 --batch 512
---lr 1e-3 --gamma 0.99 --memory 30000 --seed 8 --pieces random --features basic --out dqn-model.json`.
+--lr 1e-3 --gamma 0.99 --memory 30000 --seed 8 --pieces random --features basic --out models/dqn-model.json`.
 Experimental, off by default: `--lr-end`, `--avg`, `--updates` (see v0.8 above),
 `--garbage N` and `--garbage-share` (see v0.9), and `--nstep N`: learn from
 the next N moves' rewards instead of one (in testing, see PLAN.md).
 `--features full` uses all 8 bot features (scaled automatically); `--scale`
 turns scaling on for the 4 basic ones. Training is deterministic: the
-defaults reproduce the shipped `dqn-model.json` exactly.
+defaults reproduce the shipped `models/dqn-model.json` exactly.
 
-Training writes over `dqn-model.json`, so use `--out` to keep the old one
-(for example `--out dqn-try2.json`). You can then compare the two networks in
+Training writes over `models/dqn-model.json`, so use `--out` to keep the old one
+(for example `--out models/dqn-try2.json`). You can then compare the two networks in
 one run:
-`node hardmode.js --model dqn-model.json,dqn-try2.json --games 50 --seed 90000`.
+`node scripts/hardmode.js --model models/dqn-model.json,models/dqn-try2.json --games 50 --seed 90000`.
 
 ## Play vs Bot page
 
@@ -349,7 +360,7 @@ piece and can hold.
   every 4 seconds with about 30% of its pieces dropped in a random spot, up to
   5 per second). Opponent and speed can be changed at any time, also during a
   match; a new mode starts when you press Restart. The opponent thinks in a background thread
-  (`versus-ai-worker.js`), so its slower searches never make your own piece
+  (`assets/js/versus-ai-worker.js`), so its slower searches never make your own piece
   stutter. On a slow computer the deep lookahead may not keep up with the
   fastest setting.
 - **Keys:** ← → move, ↑ or X rotate, Z rotate the other way, ↓ soft drop,
@@ -358,16 +369,16 @@ piece and can hold.
 
 ## Shared look
 
-All pages load `theme.css` after their own CSS: one dark palette, one page
+All pages load `assets/css/theme.css` after their own CSS: one dark palette, one page
 background, the main button (`.btn-go`), `<kbd>` keys, and the intro screen
-(`.intro`, `.intro-steps`, `.intro-chips`). `tetro-bg.js` adds the slowly
+(`.intro`, `.intro-steps`, `.intro-chips`). `assets/js/tetro-bg.js` adds the slowly
 falling tetrominoes (all 7 kinds) behind every page; tune `OPACITY` and the
 count at the top of that file. It is pure decoration and
 turns itself off when the system asks for reduced motion.
 
 ## Presentation page
 
-`presentation.html` is a visual explanation of the project, with the real
+`how-it-works.html` is a visual explanation of the project, with the real
 network playing live:
 
 1. **Watch it think:** every option for the current piece is drawn on the
@@ -383,7 +394,7 @@ network playing live:
    rules and with the Hold box.
 
 Open it like the game: `npx serve .`, then click **How it works** in the top
-bar (or go to `/presentation.html`). All pages share the bar from `nav.css`.
+bar (or go to `/how-it-works.html`). All pages share the bar from `nav.css`.
 
 ## Watch it learn page
 
@@ -393,9 +404,9 @@ the same pieces. Below them are the same six measured on 50 test games
 (average pieces survived: 21, 61, 217, 376, 2,000 = never lost, and 91 after
 training knocked it over).
 
-The copies are in `snapshots/`, made with
-`node train_dqn.js --snapshots 0,1000,1700,2200,2800,2900`. Training is
-repeatable, so `snapshots/game-2800.json` is exactly `dqn-model.json`. It only
+The copies are in `models/snapshots/`, made with
+`node scripts/train-dqn.js --snapshots 0,1000,1700,2200,2800,2900`. Training is
+repeatable, so `models/snapshots/game-2800.json` is exactly `dqn-model.json`. It only
 reads `src/` and `dqn-model.json`, and has its own `presentation.css`. The
 game page (`index.html`, `style.css`) is not touched.
 
@@ -432,10 +443,10 @@ works, but it can never beat its teacher, and it needed a large Python
 pipeline. Version 0.4 replaced it with this much smaller DQN, which learns from
 the reward alone. Version 0.5 added feature sets and scaling, and picked the
 best of several training seeds. Version 0.6 trains on random pieces.
-Version 0.7 adds the 2-ply lookahead and `train_many.js`. Version 0.8
+Version 0.7 adds the 2-ply lookahead and `scripts/train-many.js`. Version 0.8
 tests three ways to stabilise training (none helped) and ships seed 8.
 Version 0.14 adds the hold box. Version 0.15 makes tests faster and harder,
 and tests 5-step learning and training with hold (neither helped). Version
 0.17 adds Play vs Bot, 0.18 the deep (3-ply) lookahead, 0.19 lets you
-play the Play page yourself, and 0.20 gives all pages one look (`theme.css`).
+play the Play page yourself, and 0.20 gives all pages one look (`assets/css/theme.css`), and 0.28 sorts the files into folders.
 Version 0.9 adds training with garbage rows. The old code is in git history if you ever want it.

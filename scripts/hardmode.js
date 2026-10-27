@@ -1,9 +1,9 @@
 /**
  * hardmode.js - the search bot vs the DQN network, on the same games.
  *
- *   node hardmode.js                                   # all modes, 10 games
- *   node hardmode.js --games 50 --seed 90000           # a decisive test
- *   node hardmode.js --mode normal --model dqn-model.json,other.json
+ *   node scripts/hardmode.js                                   # all modes, 10 games
+ *   node scripts/hardmode.js --games 50 --seed 90000           # a decisive test
+ *   node scripts/hardmode.js --mode normal --model models/dqn-model.json,other.json
  *
  * Modes (rules), from easiest to hardest:
  *
@@ -21,6 +21,7 @@
  * add --lookahead, which also runs it with 2-ply search.
  *
  *   --lookahead   also play each network with 2-ply search (sees the next piece)
+ *   --deep        also play each network with 3-ply search (beam search)
  *   --no-bot      leave the search bot out
  *   --hold        everyone may use the hold box
  *   --workers N   games run in parallel on N CPU cores (default: all cores).
@@ -34,9 +35,9 @@
 import { readFileSync } from 'node:fs';
 import { availableParallelism } from 'node:os';
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
-import { playEpisode } from './src/tetris-core.js';
-import { chooseMoveAction, PUBLISHED_WEIGHTS } from './src/tetris-ai.js';
-import { loadDqn, chooseDqnAction } from './src/tetris-dqn.js';
+import { playEpisode } from '../src/tetris-core.js';
+import { chooseMoveAction, PUBLISHED_WEIGHTS } from '../src/tetris-ai.js';
+import { loadDqn, chooseDqnAction } from '../src/tetris-dqn.js';
 
 const argv = isMainThread ? process.argv.slice(2) : workerData.argv;
 const flag = (n, d) => {
@@ -51,7 +52,7 @@ const only = flag('mode', null);
 // --hold: every player may use the hold box (modern Tetris rule)
 const HOLD_ON = argv.includes('--hold');
 const WORKERS = Math.max(1, Number(flag('workers', availableParallelism())));
-const modelFiles = flag('model', 'dqn-model.json').split(',').filter(Boolean);
+const modelFiles = flag('model', 'models/dqn-model.json').split(',').filter(Boolean);
 
 const MODES = {
   normal: { randomizer: 'bag', preview: true, garbageEvery: 0 },
@@ -68,7 +69,7 @@ const MODES = {
 function makePlayers() {
   let weights = PUBLISHED_WEIGHTS;
   try {
-    weights = JSON.parse(readFileSync('weights.json', 'utf8')).weights;
+    weights = JSON.parse(readFileSync('models/weights.json', 'utf8')).weights;
   } catch {}
 
   const players = {};
@@ -88,6 +89,11 @@ function makePlayers() {
     // --lookahead: also run each network with 2-ply search (uses the preview)
     if (argv.includes('--lookahead')) {
       players[`${name}+2ply`] = (b, c, n, h) => chooseDqnAction(b, c, net, n, h, { lookahead: true });
+    }
+    // --deep: also run each network with 3-ply search (next piece known,
+    // the one after it averaged over all 7)
+    if (argv.includes('--deep')) {
+      players[`${name}+3ply`] = (b, c, n, h) => chooseDqnAction(b, c, net, n, h, { deep: true });
     }
   }
   return players;

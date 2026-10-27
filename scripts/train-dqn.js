@@ -1,8 +1,8 @@
 /**
- * train_dqn.js - teach the network to play by playing.
+ * train-dqn.js - teach the network to play by playing.
  *
- *   node train_dqn.js                       # defaults below, a few minutes
- *   node train_dqn.js --epochs 4000 --out dqn-model.json
+ *   node scripts/train-dqn.js                       # defaults below, a few minutes
+ *   node scripts/train-dqn.js --epochs 4000 --out dqn-model.json
  *
  * Deep Q-learning on "afterstates", following
  * vietnh1009/Tetris-deep-Q-learning-pytorch (same network, reward and
@@ -45,8 +45,8 @@
  */
 
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { createBoard, Bag, MemorylessGen, mulberry32, placements, playEpisode, addGarbageRow, PLAY_COLS } from './src/tetris-core.js';
-import { MLP, FEATURE_SETS, boardState, nextStates, chooseDqnMove, chooseDqnAction } from './src/tetris-dqn.js';
+import { createBoard, Bag, MemorylessGen, mulberry32, placements, playEpisode, addGarbageRow, PLAY_COLS } from '../src/tetris-core.js';
+import { MLP, FEATURE_SETS, boardState, nextStates, chooseDqnMove, chooseDqnAction } from '../src/tetris-dqn.js';
 
 const argv = process.argv.slice(2);
 const flag = (n, d) => {
@@ -79,13 +79,13 @@ const EPS_START = Number(flag('eps-start', 1));
 const EPS_END = Number(flag('eps-end', 1e-3));
 const MAX_PIECES = Number(flag('max-pieces', 2000)); // per training game
 const SEED = Number(flag('seed', 8)); // the defaults train the shipped dqn-model.json
-const OUT = flag('out', 'dqn-model.json');
+const OUT = flag('out', 'models/dqn-model.json');
 const LOG = Number(flag('log', 100));
 // --snapshots 0,1000,2800: also save the network as it was after these many
 // training games (0 = before any training), to snapshots/game-N.json. Used by
 // learning.html to replay how the network improved. Does not change training.
 const SNAPSHOTS = new Set(String(flag('snapshots', '')).split(',').filter(Boolean).map(Number));
-const SNAPSHOT_DIR = flag('snapshot-dir', 'snapshots');
+const SNAPSHOT_DIR = flag('snapshot-dir', 'models/snapshots');
 // Which pieces to train on:
 //   bag     the normal 7-bag
 //   random  every piece independent and random ("memoryless"; default, the
@@ -457,4 +457,4 @@ writeFileSync(OUT.replace(/\.json$/, '-last.json'), JSON.stringify(keeper().toJS
 console.log(`\nbest network: game ${bestEpoch}, ${bestGreedy.toFixed(0)} pieces in the greedy test -> ${OUT}`);
 console.log(`last network saved separately as ${OUT.replace(/\.json$/, '-last.json')}`);
 console.log(`${game} games in ${((Date.now() - started) / 60000).toFixed(1)} min`);
-console.log(`next: node hardmode.js --model ${OUT} --games 50 --seed 90000\n`);
+console.log(`next: node scripts/hardmode.js --model ${OUT} --games 50 --seed 90000\n`);

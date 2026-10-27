@@ -7,8 +7,8 @@
  * Uses the real game code read-only and draws its own boards on <canvas>.
  */
 
-import { createBoard, Bag, PLAY_LEFT, PLAY_COLS, PLAY_ROWS, idx, FRAME } from './src/tetris-core.js';
-import { loadDqn, nextStates } from './src/tetris-dqn.js';
+import { createBoard, Bag, PLAY_LEFT, PLAY_COLS, PLAY_ROWS, idx, FRAME } from '../../src/tetris-core.js';
+import { loadDqn, nextStates } from '../../src/tetris-dqn.js';
 
 const $ = (id) => document.getElementById(id);
 const fmt = (v) => (Number.isFinite(v) ? Math.round(v).toLocaleString('en-US') : '–');
@@ -245,8 +245,8 @@ async function start() {
   try {
     nets = await Promise.all(
       STAGES.map((st) =>
-        fetch(`./snapshots/game-${st.games}.json`).then((r) => {
-          if (!r.ok) throw new Error(`snapshots/game-${st.games}.json: HTTP ${r.status}`);
+        fetch(`./models/snapshots/game-${st.games}.json`).then((r) => {
+          if (!r.ok) throw new Error(`models/snapshots/game-${st.games}.json: HTTP ${r.status}`);
           return r.json();
         })
       )

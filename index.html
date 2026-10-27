@@ -4,9 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="style.css?v=26">
-    <link rel="stylesheet" href="theme.css?v=26">
-    <link rel="stylesheet" href="nav.css?v=26">
+    <link rel="stylesheet" href="assets/css/style.css?v=28">
+    <link rel="stylesheet" href="assets/css/theme.css?v=28">
+    <link rel="stylesheet" href="assets/css/nav.css?v=28">
     <title>Tetris</title>
 </head>
 
@@ -16,7 +16,7 @@
       <ul class="topnav-links">
         <li><a href="index.html" aria-current="page">Play</a></li>
         <li><a href="versus.html">Play vs Bot</a></li>
-        <li><a href="presentation.html">How it works</a></li>
+        <li><a href="how-it-works.html">How it works</a></li>
         <li><a href="learning.html">Watch it learn</a></li>
       </ul>
     </nav>
@@ -80,14 +80,14 @@
     </div>
 
 <script type="module">
-  import { startVisualGame } from './src/tetris-visual.js?v=26';
+  import { startVisualGame } from './src/tetris-visual.js?v=28';
   import { chooseMoveAction } from './src/tetris-ai.js';
   import { loadDqn, chooseDqnAction } from './src/tetris-dqn.js';
 
   const $ = (id) => document.getElementById(id);
   const json = (f) => fetch(f).then((r) => r.json());
-  const weights = (await json('./weights.json')).weights;
-  const net = loadDqn(await json('./dqn-model.json'));
+  const weights = (await json('./models/weights.json')).weights;
+  const net = loadDqn(await json('./models/dqn-model.json'));
 
   // every player may use the hold box: `hold` is { held, canHold }
   const choosers = {
@@ -151,7 +151,7 @@
     hold: true,
     human: !$('mlToggle').checked,
     msPerRow: 45,
-    imagePath: 'images/',
+    imagePath: 'assets/images/',
     onState: showOverlay,
     onStats: (s) => {
       $('stLines').textContent = s.lines;
@@ -229,7 +229,7 @@
     for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) btn.addEventListener(ev, stop);
   }
 </script>
-<script src="tetro-bg.js?v=26" defer></script>
+<script src="assets/js/tetro-bg.js?v=28" defer></script>
 </body>
 
 </html>

@@ -38,9 +38,9 @@
  */
 
 import { Worker } from 'node:worker_threads';
-import { NUM_FEATURES, FEATURE_NAMES } from './tetris-ai.js';
-import { playGame } from './tetris-headless.js';
-import { mulberry32 } from './tetris-core.js';
+import { NUM_FEATURES, FEATURE_NAMES } from '../../src/tetris-ai.js';
+import { playGame } from '../../src/tetris-headless.js';
+import { mulberry32 } from '../../src/tetris-core.js';
 
 /* ----------------------------------------------------------------- vectors */
 

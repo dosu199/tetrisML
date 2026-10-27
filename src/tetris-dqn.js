@@ -12,7 +12,7 @@
  *   4. Play the move with the highest score.
  *
  * The network learns that score by itself, from the game's reward - see
- * train_dqn.js. Nobody tells it what a good board looks like.
+ * train-dqn.js. Nobody tells it what a good board looks like.
  *
  * No DOM access in this file, so the same code trains in node and plays in
  * the browser.

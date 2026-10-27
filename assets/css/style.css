@@ -60,7 +60,7 @@ body {
   border: 1px solid var(--panel-line);
   background:
     linear-gradient(rgba(8, 11, 24, 0.6), rgba(8, 11, 24, 0.6)),
-    url('images/background.png') center / cover no-repeat,
+    url('../images/background.png') center / cover no-repeat,
     #080b18;
   box-shadow:
     0 0 0 1px rgba(139, 133, 255, 0.15),
@@ -529,7 +529,7 @@ select:focus {
 #content {
   width: 80%;
   height: 736px;
-  background-image: url('images/background.png');
+  background-image: url('../images/background.png');
   background-position: center;
   background-repeat: no-repeat;
 }

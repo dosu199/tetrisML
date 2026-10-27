@@ -1,6 +1,6 @@
 # Plan — Tetris ML
 
-Last updated: 23 October 2026 (v0.27).
+Last updated: 27 October 2026 (v0.28).
 
 **Goal:** a neural network that plays Tetris well and learns by itself.
 
@@ -112,6 +112,16 @@ Worker so your piece never stutters). Network unchanged.
   How it works paragraphs); Play panel: stat cards and a who-plays badge
   instead of the text line and key list; every file linked with `?v=26`.
 - v0.27: Play vs Bot, "You" sits above your board on wide screens.
+
+## Done on 27 October (v0.28): folder structure
+
+Pages stay in the root; `assets/{css,js,images}`, `src/`, `models/`
+(+ `snapshots/`), `scripts/` (+ `legacy-ga/`), `tests/`. Renamed
+`presentation.*` to `how-it-works.*` (`presentation.css` is now
+`assets/css/base.css`, since three pages use it); `presentation.html` forwards
+old links. Underscore names became dashes (`train-dqn.js`, `test-dqn.js`).
+Removed: `test.js` (old copy of hardmode), `tetris-ml-dqn.zip`, `runs/`
+(now ignored), 3 unused images. Older entries below use the old file names.
 
 ## ▶ NEXT: options
 

@@ -6,7 +6,7 @@
  */
 
 import { parentPort } from 'node:worker_threads';
-import { playGame } from './tetris-headless.js';
+import { playGame } from '../../src/tetris-headless.js';
 
 parentPort.on('message', ({ weights, seeds, maxPieces }) => {
   let lines = 0;

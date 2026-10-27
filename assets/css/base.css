@@ -1,4 +1,5 @@
-/* presentation.css - styles for presentation.html only. The game's style.css is not touched. */
+/* base.css - the base styles of how-it-works.html, also used by versus.html and
+   learning.html (palette names, cards, buttons, sections). The game's style.css is separate. */
 
 :root {
   --bg: #f6f7fb;

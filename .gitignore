@@ -2,8 +2,14 @@ node_modules/
 *.log
 .DS_Store
 
-# Datasets are large (30MB+) and fully regenerable from collect.js.
-data/*.csv
+# delivery zips (unzipped, then deleted) never belong in the repo
+*.zip
 
-# weights.json, model.json and value-model.json ARE committed — they are the
-# record of what was learned, and they are small.
+# written on every run of scripts/train-many.js (one network per seed)
+runs/
+
+# written by scripts/legacy-ga/train.js
+training-log.csv
+
+# models/ IS committed: dqn-model.json, weights.json and the snapshots are the
+# record of what was learned, and the website loads them.

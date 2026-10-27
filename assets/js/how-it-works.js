@@ -1,5 +1,5 @@
 /**
- * presentation.js - the live parts of presentation.html.
+ * how-it-works.js - the live parts of how-it-works.html.
  *
  * Uses the real game code and the real trained network, read-only:
  *   src/tetris-core.js   board, pieces, piece generators
@@ -10,9 +10,9 @@
  * never involved.
  */
 
-import { createBoard, PIECES, Bag, MemorylessGen, PLAY_LEFT, PLAY_COLS, PLAY_ROWS, idx, FRAME } from './src/tetris-core.js';
-import { loadDqn, nextStates, moveReward, bestFollow } from './src/tetris-dqn.js';
-import { extractFeatures } from './src/tetris-ai.js';
+import { createBoard, PIECES, Bag, MemorylessGen, PLAY_LEFT, PLAY_COLS, PLAY_ROWS, idx, FRAME } from '../../src/tetris-core.js';
+import { loadDqn, nextStates, moveReward, bestFollow } from '../../src/tetris-dqn.js';
+import { extractFeatures } from '../../src/tetris-ai.js';
 
 const GAMMA = 0.99;
 const $ = (id) => document.getElementById(id);
@@ -590,7 +590,7 @@ $('epsilon').addEventListener('input', () => {
 document.addEventListener('visibilitychange', exploreRun);
 
 /* e. training chart --------------------------------------------------- */
-// The real log of `node train_dqn.js` (the run that produced dqn-model.json):
+// The real log of `node scripts/train-dqn.js` (the run that produced dqn-model.json):
 // every 100 games -> average pieces over the last 100 training games, and the
 // greedy test (5 games, no random moves, capped at 1,000 pieces).
 const TRAIN = {
@@ -768,7 +768,7 @@ async function start() {
   $('epsOut').textContent = `${EPS[$('epsilon').value] * 100}%`;
 
   try {
-    const res = await fetch('./dqn-model.json');
+    const res = await fetch('./models/dqn-model.json');
     if (!res.ok) throw new Error(`dqn-model.json: HTTP ${res.status}`);
     net = loadDqn(await res.json());
   } catch (e) {

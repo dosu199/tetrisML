@@ -1,5 +1,5 @@
 /**
- * test_dqn.js - checks for the DQN code.   node test_dqn.js
+ * test-dqn.js - checks for the DQN code.   node tests/test-dqn.js
  *
  * 1. Gradient check: the backward pass in MLP.trainStep must agree with a
  *    numerical derivative (nudge each weight a tiny bit, see how the loss
@@ -10,8 +10,8 @@
  */
 
 import { readFileSync } from 'node:fs';
-import { mulberry32, playEpisode, HOLD } from './src/tetris-core.js';
-import { MLP, FEATURE_SETS, loadDqn, chooseDqnMove, chooseDqnAction } from './src/tetris-dqn.js';
+import { mulberry32, playEpisode, HOLD } from '../src/tetris-core.js';
+import { MLP, FEATURE_SETS, loadDqn, chooseDqnMove, chooseDqnAction } from '../src/tetris-dqn.js';
 
 let failed = 0;
 const check = (name, ok, detail = '') => {
@@ -56,7 +56,7 @@ check('backprop matches the numerical gradient', worst < 1e-4, `worst relative e
 // 2. the trained model loads and plays
 let model = null;
 try {
-  model = loadDqn(JSON.parse(readFileSync('dqn-model.json', 'utf8')));
+  model = loadDqn(JSON.parse(readFileSync(new URL('../models/dqn-model.json', import.meta.url), 'utf8')));
 } catch (e) {
   check('dqn-model.json loads', false, e.message);
 }
