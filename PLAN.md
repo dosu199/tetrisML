@@ -1,6 +1,6 @@
 # Plan — Tetris ML
 
-Last updated: 27 October 2026 (v0.28).
+Last updated: 27 October 2026 (v0.29).
 
 **Goal:** a neural network that plays Tetris well and learns by itself.
 
@@ -122,6 +122,10 @@ Pages stay in the root; `assets/{css,js,images}`, `src/`, `models/`
 old links. Underscore names became dashes (`train-dqn.js`, `test-dqn.js`).
 Removed: `test.js` (old copy of hardmode), `tetris-ml-dqn.zip`, `runs/`
 (now ignored), 3 unused images. Older entries below use the old file names.
+
+v0.29 (showcase polish): README top with live link and preview image, tab
+icon (`assets/meta/favicon.svg` + PNGs), link preview card on every page
+(`assets/meta/preview.png`, 1200x630), "Made by Suad" footer on every page.
 
 ## ▶ NEXT: options
 

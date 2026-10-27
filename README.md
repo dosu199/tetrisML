@@ -1,13 +1,29 @@
 # Tetris ML
 
-A neural network that learns to play Tetris by playing it. Nobody shows it
-good moves; it only gets the game's reward. There is also a classic search bot
-to measure it against.
+**A neural network that taught itself Tetris, running in your browser.**
 
-The approach follows
+**[▶ Play it live](https://dosu199.github.io/tetrisML/)** ·
+[Play vs Bot](https://dosu199.github.io/tetrisML/versus.html) ·
+[How it works](https://dosu199.github.io/tetrisML/how-it-works.html) ·
+[Watch it learn](https://dosu199.github.io/tetrisML/learning.html)
+
+[![Tetris ML: the network weighing every possible move](assets/meta/preview.png)](https://dosu199.github.io/tetrisML/)
+
+- **It learned on its own.** Nobody showed it a good move: it played a few
+  thousand games and was only told its score (deep Q-learning).
+- **It is small.** About 4,500 numbers, trained in about 4 minutes, in plain
+  JavaScript: no Python, no PyTorch, no server.
+- **You can play with it.** Play yourself and hand your game to the network
+  with one switch, battle it side by side, see every move it considers, or
+  watch six copies of it at different stages of training.
+
+Made by Suad. The approach follows
 [vietnh1009/Tetris-deep-Q-learning-pytorch](https://github.com/vietnh1009/Tetris-deep-Q-learning-pytorch),
-rewritten in plain JavaScript. It needs no PyTorch or Python, and the same
-code trains in node and plays in the browser.
+rewritten in JavaScript so the same code trains in Node and plays in the
+browser. Run it locally with `npx serve .`; everything below is the technical
+detail and the full history of results.
+
+---
 
 ## How the network plays
 

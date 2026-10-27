@@ -4,10 +4,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="assets/css/style.css?v=28">
-    <link rel="stylesheet" href="assets/css/theme.css?v=28">
-    <link rel="stylesheet" href="assets/css/nav.css?v=28">
-    <title>Tetris</title>
+    <link rel="stylesheet" href="assets/css/style.css?v=29">
+    <link rel="stylesheet" href="assets/css/theme.css?v=29">
+    <link rel="stylesheet" href="assets/css/nav.css?v=29">
+    <title>Tetris ML · Play</title>
+    <meta name="description" content="Play Tetris yourself, then flip one switch and let a neural network that taught itself Tetris take over your game." />
+    <meta name="theme-color" content="#0d1120" />
+    <link rel="icon" href="assets/meta/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="assets/meta/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="assets/meta/apple-touch-icon.png" />
+    <!-- preview card when the link is shared (Slack, WhatsApp, LinkedIn, X, ...) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Tetris ML" />
+    <meta property="og:title" content="Tetris ML: a neural network that taught itself Tetris" />
+    <meta property="og:description" content="Play Tetris yourself, then flip one switch and let a neural network that taught itself Tetris take over your game." />
+    <meta property="og:url" content="https://dosu199.github.io/tetrisML/" />
+    <meta property="og:image" content="https://dosu199.github.io/tetrisML/assets/meta/preview.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Tetris ML: a neural network that taught itself Tetris" />
+    <meta name="twitter:card" content="summary_large_image" />
 </head>
 
 <body>
@@ -79,8 +95,12 @@
         <button type="button" data-key="drop" aria-label="Drop">Drop</button>
     </div>
 
+    <footer class="site-footer">
+      Made by Suad · <a href="https://github.com/dosu199/tetrisML" target="_blank" rel="noopener">Source on GitHub</a> · Tetris ML
+    </footer>
+
 <script type="module">
-  import { startVisualGame } from './src/tetris-visual.js?v=28';
+  import { startVisualGame } from './src/tetris-visual.js?v=29';
   import { chooseMoveAction } from './src/tetris-ai.js';
   import { loadDqn, chooseDqnAction } from './src/tetris-dqn.js';
 
@@ -229,7 +249,7 @@
     for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) btn.addEventListener(ev, stop);
   }
 </script>
-<script src="assets/js/tetro-bg.js?v=28" defer></script>
+<script src="assets/js/tetro-bg.js?v=29" defer></script>
 </body>
 
 </html>

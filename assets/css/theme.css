@@ -221,3 +221,24 @@ kbd {
 .section.alt {
   background: rgba(255, 255, 255, 0.025) !important;
 }
+
+/* "Made by" line at the bottom of every page */
+.site-footer {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 20px 16px 24px;
+  text-align: center;
+  font-size: 0.82rem;
+  color: var(--ui-muted);
+}
+.site-footer a {
+  color: var(--ui-accent);
+  text-decoration: none;
+}
+.site-footer a:hover {
+  text-decoration: underline;
+}
+.footer + .site-footer {
+  padding-top: 0;
+  margin-top: -24px; /* sit right under a page's own footer */
+}
