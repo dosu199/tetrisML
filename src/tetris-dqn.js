@@ -1,8 +1,7 @@
 /**
  * tetris-dqn.js - the neural network that plays, and the code to run it.
  *
- * The approach follows vietnh1009/Tetris-deep-Q-learning-pytorch, rewritten
- * here in plain JavaScript so it needs no PyTorch and runs in the browser:
+ * Plain JavaScript, so it needs no PyTorch and runs in the browser:
  *
  *   1. For the current piece, try every rotation x column.
  *   2. For each resulting board, compute 4 numbers:

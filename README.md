@@ -17,10 +17,8 @@
   with one switch, battle it side by side, see every move it considers, or
   watch six copies of it at different stages of training.
 
-Made by Suad. The approach follows
-[vietnh1009/Tetris-deep-Q-learning-pytorch](https://github.com/vietnh1009/Tetris-deep-Q-learning-pytorch),
-rewritten in JavaScript so the same code trains in Node and plays in the
-browser. Run it locally with `npx serve .`; everything below is the technical
+Made by Suad. Written in plain JavaScript, so the same code trains in Node
+and plays in the browser. Run it locally with `npx serve .`; everything below is the technical
 detail and the full history of results.
 
 ---

@@ -4,9 +4,7 @@
  *   node scripts/train-dqn.js                       # defaults below, a few minutes
  *   node scripts/train-dqn.js --epochs 4000 --out dqn-model.json
  *
- * Deep Q-learning on "afterstates", following
- * vietnh1009/Tetris-deep-Q-learning-pytorch (same network, reward and
- * hyperparameters), reimplemented in plain JavaScript.
+ * Deep Q-learning on "afterstates", in plain JavaScript.
  *
  * There is no teacher and no dataset. The only signal is the game's reward:
  *

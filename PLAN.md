@@ -146,8 +146,8 @@ enough to beat the bot (9/50). Then try proposal 2 (a penalty for losing).
 
 ## Where we stopped on 20 October
 
-**Task:** combine the repo's approach with our additions into one best recipe.
-We keep the repo's core (4 features, 4→64→64→1, same reward) and add
+**Task:** combine the basic recipe with our additions into one best recipe.
+We keep the basic core (4 features, 4→64→64→1, same reward) and add
 **n-step targets** (`--nstep N` in `train_dqn.js`, off by default, so the
 defaults still rebuild the shipped `dqn-model.json`).
 
@@ -156,7 +156,7 @@ preview, seeds 70000+), average games lost out of 50:
 
 | recipe | games lost per seed | average |
 |---|---|---|
-| plain (the repo's) | 38, 36, 37, 32, 48, 44, 22, 14 | 34 |
+| plain (basic recipe) | 38, 36, 37, 32, 48, 44, 22, 14 | 34 |
 | 3-step | 50, 50, 42, 23, 22, 34, 17, 33 | 34 |
 | **5-step** | 36, 37, 18, 40, 24, 28, 19, 23 | **28** |
 | garbage (16 seeds) | see README v0.9 | 30 |
