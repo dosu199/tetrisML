@@ -133,6 +133,17 @@ every page (button contrast, heading order, logo link name), no layout shift
 on load (board sizes reserved in CSS). Left as is: compression and caching
 (GitHub Pages handles them), minifying (needs a build step).
 
+v0.32 (UI/UX review, 18 issues + Play vs Bot redesign): Play vs Bot shows a
+setup card first (Mode / Opponent / Speed as buttons, ONE Start, How to play
+collapsed) and the boards only after Start; a slim bar keeps opponent and speed
+changeable, Restart is quiet and asks first, results offer Rematch or Change
+settings. Same opponent names on every page (Network, 3 ahead / 2 ahead /
+1 piece, Search bot). Play: loading and error states, no contradictory badge,
+page heading. Phones: 44 px tap targets, short menu labels (vs Bot, Learn),
+keyboard hints hidden on touch, Watch it learn in a 2-column grid. One label
+style, no text under 12 px, honest How it works intro, two-column intros on
+wide screens. Lighthouse: accessibility 100 on every page.
+
 ## ▶ NEXT: options
 
 1. ~~Deeper lookahead with hold~~ done in v0.18. Possible follow-ups: a wider

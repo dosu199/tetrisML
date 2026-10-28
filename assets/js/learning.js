@@ -127,8 +127,8 @@ function buildCards() {
         <dl class="stage-stats">
           <div><dt>This game</dt><dd id="pc${i}">0</dd></div>
           <div><dt>Lines</dt><dd id="ln${i}">0</dd></div>
-          <div class="wide"><dt>Average pieces per game</dt><dd id="av${i}">–</dd></div>
-          <div class="wide"><dt>Games lost so far</dt><dd id="gl${i}">0</dd></div>
+          <div class="wide"><dt>Avg pieces / game</dt><dd id="av${i}" title="Counted from the games it lost">–</dd></div>
+          <div class="wide"><dt>Games lost</dt><dd id="gl${i}">0</dd></div>
         </dl>
       </div>
     </article>`
@@ -191,7 +191,8 @@ function paint(b) {
   const i = b.i;
   $(`pc${i}`).textContent = fmt(b.pieces);
   $(`ln${i}`).textContent = fmt(b.lines);
-  $(`av${i}`).textContent = b.lost ? fmt(b.totalPieces / b.lost) : 'no game lost yet';
+  // a number slot only ever shows a number: a dash until a game has ended
+  $(`av${i}`).textContent = b.lost ? fmt(b.totalPieces / b.lost) : '–';
   $(`gl${i}`).textContent = b.lost;
 }
 
@@ -239,7 +240,7 @@ function drawMeasured() {
 async function start() {
   buildCards();
   drawMeasured();
-  $('raceSpeedOut').textContent = `${SPEEDS[$('raceSpeed').value]} moves/s`;
+  $('raceSpeedOut').textContent = `${SPEEDS[$('raceSpeed').value]} pieces/s`;
 
   let nets;
   try {
@@ -281,7 +282,7 @@ async function start() {
     updateStatus();
   });
   $('raceSpeed').addEventListener('input', () => {
-    $('raceSpeedOut').textContent = `${SPEEDS[$('raceSpeed').value]} moves/s`;
+    $('raceSpeedOut').textContent = `${SPEEDS[$('raceSpeed').value]} pieces/s`;
     schedule();
   });
   document.addEventListener('visibilitychange', schedule);

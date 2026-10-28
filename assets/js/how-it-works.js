@@ -660,7 +660,7 @@ const SCORES = [
     unit: '/ 50',
     rows: [
       ['Search bot', 42],
-      ['Network', 50, 'net'],
+      ['Network, 1 piece', 50, 'net'],
     ],
     max: 50,
   },
@@ -670,7 +670,7 @@ const SCORES = [
     unit: '/ 50',
     rows: [
       ['Search bot', 41],
-      ['Network', 38, 'net'],
+      ['Network, 1 piece', 38, 'net'],
     ],
     max: 50,
   },
@@ -680,8 +680,8 @@ const SCORES = [
     unit: '/ 50',
     rows: [
       ['Search bot', 50],
-      ['Network', 38, 'net'],
-      ['Network + lookahead', 48, 'net'],
+      ['Network, 1 piece', 38, 'net'],
+      ['Network, 2 ahead', 48, 'net'],
     ],
     max: 50,
   },
@@ -691,8 +691,8 @@ const SCORES = [
     unit: '',
     rows: [
       ['Search bot', 254],
-      ['Network', 136, 'net'],
-      ['Network + lookahead', 319, 'net'],
+      ['Network, 1 piece', 136, 'net'],
+      ['Network, 2 ahead', 319, 'net'],
     ],
     max: 340,
   },
@@ -702,7 +702,7 @@ const SCORES = [
     unit: '/ 50',
     rows: [
       ['Search bot', 50],
-      ['Network', 49, 'net'],
+      ['Network, 1 piece', 49, 'net'],
     ],
     max: 50,
   },
@@ -712,8 +712,8 @@ const SCORES = [
     unit: '',
     rows: [
       ['Search bot', 1946],
-      ['Network', 486, 'net'],
-      ['Network + lookahead', 2000, 'net'],
+      ['Network, 1 piece', 486, 'net'],
+      ['Network, 2 ahead', 2000, 'net'],
     ],
     max: 2000,
   },
@@ -723,8 +723,8 @@ const SCORES = [
     unit: '',
     rows: [
       ['Search bot', 202],
-      ['Network + lookahead', 210, 'net'],
-      ['Network + deep lookahead', 403, 'net'],
+      ['Network, 2 ahead', 210, 'net'],
+      ['Network, 3 ahead', 403, 'net'],
     ],
     max: 420,
   },
@@ -734,8 +734,8 @@ const SCORES = [
     unit: '',
     rows: [
       ['Search bot', 1000],
-      ['Network + lookahead', 992, 'net'],
-      ['Network + deep lookahead', 2000, 'net'],
+      ['Network, 2 ahead', 992, 'net'],
+      ['Network, 3 ahead', 2000, 'net'],
     ],
     max: 2000,
   },
@@ -764,7 +764,7 @@ async function start() {
   drawExample();
   drawTrainChart();
   drawScoreboard();
-  $('speedOut').textContent = `${SPEEDS[$('speed').value]} moves/s`;
+  $('speedOut').textContent = `${SPEEDS[$('speed').value]} pieces/s`;
   $('epsOut').textContent = `${EPS[$('epsilon').value] * 100}%`;
 
   try {

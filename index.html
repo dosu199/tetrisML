@@ -4,9 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="assets/css/style.css?v=31">
-    <link rel="stylesheet" href="assets/css/theme.css?v=31">
-    <link rel="stylesheet" href="assets/css/nav.css?v=31">
+    <link rel="stylesheet" href="assets/css/style.css?v=32">
+    <link rel="stylesheet" href="assets/css/theme.css?v=32">
+    <link rel="stylesheet" href="assets/css/nav.css?v=32">
     <title>Tetris ML · Play</title>
     <meta name="description" content="Play Tetris yourself, then flip one switch and let a neural network that taught itself Tetris take over your game." />
     <meta name="theme-color" content="#0d1120" />
@@ -31,20 +31,21 @@
       <a class="topnav-brand" href="index.html" aria-label="Tetris ML home"><span class="topnav-logo" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span>Tetris ML</span></a>
       <ul class="topnav-links">
         <li><a href="index.html" aria-current="page">Play</a></li>
-        <li><a href="versus.html">Play vs Bot</a></li>
+        <li><a href="versus.html"><span class="nav-long">Play vs Bot</span><span class="nav-short">vs Bot</span></a></li>
         <li><a href="how-it-works.html">How it works</a></li>
-        <li><a href="learning.html">Watch it learn</a></li>
+        <li><a href="learning.html"><span class="nav-long">Watch it learn</span><span class="nav-short">Learn</span></a></li>
       </ul>
     </nav>
 
+    <h1 class="sr-only">Play Tetris, or let the neural network play</h1>
     <div id="wrapper">
         <div class="board-wrap">
             <div id="gameContainer"></div>
-            <div class="play-overlay intro-screen" id="playOverlay" hidden>
+            <div class="play-overlay intro-screen" id="playOverlay">
                 <div class="intro-box">
-                    <p class="play-overlay-title intro-title" id="playTitle">Ready to play?</p>
-                    <div id="playText"></div>
-                    <button type="button" class="btn-go" id="playGo">Start</button>
+                    <p class="play-overlay-title intro-title" id="playTitle">Loading the network…</p>
+                    <div id="playText"><p class="intro-sub">One moment: downloading the trained model (92 KB).</p></div>
+                    <button type="button" class="btn-go" id="playGo" hidden>Start</button>
                 </div>
             </div>
         </div>
@@ -62,20 +63,17 @@
     <span class="ml-track" aria-hidden="true"><span class="ml-thumb"></span></span>
     <span class="ml-text">Turn on ML</span>
   </label>
-  <p class="ml-hint" id="mlHint">Turn on to let the network continue your game.</p>
+  <p class="ml-hint" id="mlHint">You're playing. Turn on to let the network continue your game.</p>
   <div class="hint-row">
     <label class="ml-switch small">
       <input type="checkbox" id="hintToggle" role="switch">
       <span class="ml-track" aria-hidden="true"><span class="ml-thumb"></span></span>
       <span class="ml-text">Show hint</span>
     </label>
-    <kbd title="Keyboard shortcut">H</kbd>
+    <kbd class="keys-only" title="Keyboard shortcut">H</kbd>
   </div>
   <p class="hint-note" id="hintNote" hidden></p>
-  <div class="who-row">
-    <label for="agent">Who plays</label>
-    <span class="ml-badge" id="mlBadge" title="Who is playing right now">You</span>
-  </div>
+  <label for="agent" title="Used when ML plays and for hints">Network level</label>
   <select id="agent">
     <option value="dqn3">Network, 3 ahead</option>
     <option value="dqn2">Network, 2 ahead</option>
@@ -109,14 +107,28 @@
     </footer>
 
 <script type="module">
-  import { startVisualGame } from './src/tetris-visual.js?v=31';
+  import { startVisualGame } from './src/tetris-visual.js?v=32';
   import { chooseMoveAction } from './src/tetris-ai.js';
   import { loadDqn, chooseDqnAction } from './src/tetris-dqn.js';
 
   const $ = (id) => document.getElementById(id);
-  const json = (f) => fetch(f).then((r) => r.json());
-  const weights = (await json('./models/weights.json')).weights;
-  const net = loadDqn(await json('./models/dqn-model.json'));
+  const json = (f) =>
+    fetch(f).then((r) => {
+      if (!r.ok) throw new Error(`${f.replace('./', '')}: HTTP ${r.status}`);
+      return r.json();
+    });
+  let weights, net;
+  try {
+    [weights, net] = await Promise.all([
+      json('./models/weights.json').then((w) => w.weights),
+      json('./models/dqn-model.json').then(loadDqn),
+    ]);
+  } catch (e) {
+    // say so on the board instead of leaving a blank game that never starts
+    $('playTitle').textContent = "Couldn't load the network";
+    $('playText').innerHTML = '<p class="intro-sub">Check your connection, then reload the page.</p>';
+    throw e;
+  }
 
   // every player may use the hold box: `hold` is { held, canHold }
   const choosers = {
@@ -172,6 +184,7 @@
     $('playTitle').textContent = o[0];
     $('playText').innerHTML = o[1];
     $('playGo').textContent = o[2];
+    $('playGo').hidden = false;
     $('playOverlay').dataset.state = state;
   }
 
@@ -206,9 +219,9 @@
     save();
   }
   function setHint(ml) {
-    $('mlHint').textContent = ml ? 'Turn off to take over the same game.' : 'Turn on to let the network continue your game.';
-    $('mlBadge').textContent = ml ? 'Network' : 'You';
-    $('mlBadge').classList.toggle('on', ml);
+    $('mlHint').textContent = ml
+      ? 'The network is playing. Turn off to take over the same game.'
+      : "You're playing. Turn on to let the network continue your game.";
   }
   document.body.classList.toggle('human', !$('mlToggle').checked);
   setHint($('mlToggle').checked);
@@ -281,7 +294,7 @@
     for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) btn.addEventListener(ev, stop);
   }
 </script>
-<script src="assets/js/tetro-bg.js?v=31" defer></script>
+<script src="assets/js/tetro-bg.js?v=32" defer></script>
 </body>
 
 </html>

@@ -71,7 +71,7 @@
 }
 .chip {
   display: inline-block;
-  font-size: 0.74rem;
+  font-size: 0.78rem;
   font-weight: 600;
   padding: 2px 8px;
   border-radius: 999px;
@@ -183,8 +183,31 @@
   .race-status {
     grid-column: 1 / -1;
   }
+  /* phones: two small boards per row, so they can still be compared */
   .race {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .stage {
     grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 10px;
+  }
+  .stage-board {
+    width: 100%;
+  }
+  .stage h3 {
+    font-size: 0.95rem;
+  }
+  .stage p {
+    display: none; /* short on phones: the chip already names the stage */
+  }
+  .stage .chip {
+    margin-bottom: 2px;
+  }
+  /* the two numbers that compare the stages; this game's count stays on desktop */
+  .stage-stats div:not(.wide) {
+    display: none;
   }
   .mrow {
     grid-template-columns: 1fr 120px;

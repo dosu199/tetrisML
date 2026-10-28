@@ -20,18 +20,18 @@
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="Tetris ML: a neural network that taught itself Tetris" />
     <meta name="twitter:card" content="summary_large_image" />
-    <link rel="stylesheet" href="assets/css/base.css?v=31" />
-    <link rel="stylesheet" href="assets/css/theme.css?v=31" />
-    <link rel="stylesheet" href="assets/css/nav.css?v=31" />
+    <link rel="stylesheet" href="assets/css/base.css?v=32" />
+    <link rel="stylesheet" href="assets/css/theme.css?v=32" />
+    <link rel="stylesheet" href="assets/css/nav.css?v=32" />
   </head>
   <body>
     <nav class="topnav" aria-label="Main">
       <a class="topnav-brand" href="index.html" aria-label="Tetris ML home"><span class="topnav-logo" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span>Tetris ML</span></a>
       <ul class="topnav-links">
         <li><a href="index.html">Play</a></li>
-        <li><a href="versus.html">Play vs Bot</a></li>
+        <li><a href="versus.html"><span class="nav-long">Play vs Bot</span><span class="nav-short">vs Bot</span></a></li>
         <li><a href="how-it-works.html" aria-current="page">How it works</a></li>
-        <li><a href="learning.html">Watch it learn</a></li>
+        <li><a href="learning.html"><span class="nav-long">Watch it learn</span><span class="nav-short">Learn</span></a></li>
       </ul>
     </nav>
 
@@ -41,13 +41,13 @@
         <h1>A neural network that taught itself Tetris</h1>
         <p class="lede">
           Nobody showed it a single good move. It played a few thousand games and was only told its
-          score. What came out is about 4,500 numbers that now play better than a hand-tuned bot.
+          score. What came out is about 4,500 numbers that hold their own against a hand-tuned bot, and beat it clearly when they look ahead.
           Below, the real network is playing live in your browser.
         </p>
         <div class="stats">
           <div class="stat"><span class="stat-num">4</span><span class="stat-label">numbers it looks at per move</span></div>
           <div class="stat"><span class="stat-num">~4 min</span><span class="stat-label">of training, from nothing</span></div>
-          <div class="stat"><span class="stat-num">0 / 50</span><span class="stat-label">games lost on normal pieces (bot: 8)</span></div>
+          <div class="stat"><span class="stat-num">50 / 50</span><span class="stat-label">games survived on normal pieces (bot: 42)</span></div>
         </div>
         <nav class="toc" aria-label="Sections">
           <a href="#watch">1 · Watch it think</a>
@@ -84,7 +84,7 @@
               <label class="slider">
                 <span>Speed</span>
                 <input id="speed" type="range" min="0" max="5" step="1" value="2" />
-                <output id="speedOut">2 moves/s</output>
+                <output id="speedOut">2 pieces/s</output>
               </label>
               <p id="demoStatus" class="hint demo-status" aria-live="polite"></p>
               <div class="toggles">
@@ -402,16 +402,17 @@
           <p class="intro">
             The network against a classic search bot with hand-tuned weights. Each line is 50 games
             the network never saw in training, and every player gets exactly the same pieces.
-            <b>Network + lookahead</b> is the same network, also trying every placement of the next piece.
-            The first four cards use the classic rules; the others show what the <b>Hold box</b> changes.
-            <b>Deep lookahead</b> also looks at the piece after next, averaged over all 7 possibilities.
+            <b>Network, 1 piece</b> decides on the current piece alone; <b>Network, 2 ahead</b> is the same
+            network also trying every placement of the next piece; <b>Network, 3 ahead</b> also looks at the
+            piece after that, averaged over all 7 possibilities. The first four cards use the classic rules;
+            the others show what the <b>Hold box</b> changes.
             The network was never trained with hold: it simply also scores the options holding gives it.
           </p>
           <div id="scoreboard" class="scoreboard"></div>
           <p class="footnote">
             Classic rules: with fully random pieces and no preview, the bot loses 9 games and the network 12.
             With hold, both almost never lose ordinary games, so the hardest tests use garbage: there the
-            network with lookahead never lost in 2,000 pieces, and the bot lost 4 of 50.
+            network looking 2 ahead never lost in 2,000 pieces, and the bot lost 4 of 50.
           </p>
         </div>
       </section>
@@ -430,7 +431,7 @@
       Made by Suad · <a href="https://github.com/dosu199/tetrisML" target="_blank" rel="noopener">Source on GitHub</a> · Tetris ML
     </footer>
 
-    <script type="module" src="assets/js/how-it-works.js?v=31"></script>
-      <script src="assets/js/tetro-bg.js?v=31" defer></script>
+    <script type="module" src="assets/js/how-it-works.js?v=32"></script>
+      <script src="assets/js/tetro-bg.js?v=32" defer></script>
   </body>
 </html>

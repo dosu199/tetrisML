@@ -85,7 +85,7 @@ kbd {
   border-bottom-width: 2px;
   background: var(--ui-bg);
   font: inherit;
-  font-size: 0.8em;
+  font-size: max(0.75rem, 0.8em);
   line-height: 1.5;
   text-align: center;
   color: var(--ui-text);
@@ -115,7 +115,7 @@ kbd {
 }
 .intro-kicker {
   margin: 0 0 6px !important;
-  font-size: 0.7rem;
+  font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -246,4 +246,74 @@ kbd {
 /* the other purple buttons (Start, Pause/Play, Race): dark text as well */
 button.primary {
   color: #0b0e1d !important;
+}
+
+/* text only screen readers read (a page heading that is not shown) */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* keyboard hints only where there is a keyboard; touch hints only on touch screens */
+.touch-only {
+  display: none;
+}
+@media (pointer: coarse) {
+  .keys-only {
+    display: none !important;
+  }
+  .touch-only {
+    display: revert;
+  }
+}
+
+/* ONE style for every small label above a number or a box, on every page
+   (Hold, Next, Score, Lines, Pieces, Game, Best...): capitals, 12.5 px, muted */
+#name,
+#holdTetromino::before,
+#nextTetromino::before,
+.agent-panel > label:not(.ml-switch),
+.play-stats dt,
+.vs-mini span,
+.vs-stats dt,
+.vs-field > span,
+.vs-choice legend,
+.counters dt,
+.stage-stats dt {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ui-muted);
+}
+
+/* touch screens: everything you tap is at least 44 px (the usual minimum) */
+@media (pointer: coarse) {
+  button,
+  select,
+  .toc a,
+  label.ml-switch {
+    min-height: 44px;
+  }
+  input[type='range'] {
+    min-height: 44px;
+  }
+  .toc a {
+    display: inline-flex;
+    align-items: center;
+  }
+  .site-footer a {
+    display: inline-block;
+    padding: 14px 4px;
+  }
+}
+
+/* sliders: a comfortable grab area everywhere, not just on touch screens */
+input[type='range'] {
+  min-height: 24px;
+  cursor: pointer;
 }

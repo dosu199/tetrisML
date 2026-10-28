@@ -20,167 +20,181 @@
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="Tetris ML: a neural network that taught itself Tetris" />
     <meta name="twitter:card" content="summary_large_image" />
-    <link rel="stylesheet" href="assets/css/base.css?v=31" />
-    <link rel="stylesheet" href="assets/css/versus.css?v=31" />
-    <link rel="stylesheet" href="assets/css/theme.css?v=31" />
-    <link rel="stylesheet" href="assets/css/nav.css?v=31" />
+    <link rel="stylesheet" href="assets/css/base.css?v=32" />
+    <link rel="stylesheet" href="assets/css/versus.css?v=32" />
+    <link rel="stylesheet" href="assets/css/theme.css?v=32" />
+    <link rel="stylesheet" href="assets/css/nav.css?v=32" />
   </head>
   <body>
     <nav class="topnav" aria-label="Main">
       <a class="topnav-brand" href="index.html" aria-label="Tetris ML home"><span class="topnav-logo" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span>Tetris ML</span></a>
       <ul class="topnav-links">
         <li><a href="index.html">Play</a></li>
-        <li><a href="versus.html" aria-current="page">Play vs Bot</a></li>
+        <li><a href="versus.html" aria-current="page"><span class="nav-long">Play vs Bot</span><span class="nav-short">vs Bot</span></a></li>
         <li><a href="how-it-works.html">How it works</a></li>
-        <li><a href="learning.html">Watch it learn</a></li>
+        <li><a href="learning.html"><span class="nav-long">Watch it learn</span><span class="nav-short">Learn</span></a></li>
       </ul>
     </nav>
 
     <main class="vs-main">
-      <div class="vs-setup card" id="setup">
-        <label class="vs-field">
-          <span>Mode</span>
-          <select id="mode">
-            <option value="battle">Battle: clear lines to send garbage</option>
-            <option value="race">Race: first to 40 lines</option>
-          </select>
-        </label>
-        <label class="vs-field">
-          <span>Opponent</span>
-          <select id="opponent">
-            <option value="dqn3">Neural network + deep lookahead (strongest)</option>
-            <option value="dqn2">Neural network + lookahead</option>
-            <option value="dqn">Neural network</option>
-            <option value="bot">Search bot</option>
-          </select>
-        </label>
-        <label class="vs-field">
-          <span>Opponent speed</span>
-          <select id="speed">
-            <option value="0.25" data-mistakes="0.3">Super easy: 1 piece every 4 s, makes mistakes</option>
-            <option value="0.5">Easy: 1 piece every 2 s</option>
-            <option value="1" selected>Normal: 1 piece per second</option>
-            <option value="1.5">Hard: 1.5 pieces per second</option>
-            <option value="2.5">Expert: 2.5 pieces per second</option>
-            <option value="5">Machine: 5 pieces per second</option>
-          </select>
-        </label>
-        <button id="startBtn" class="primary" type="button">Start</button>
-        <button id="pauseBtn" type="button" disabled>Pause</button>
-        <p class="vs-setup-note" id="setupNote" hidden></p>
-      </div>
+      <!-- ============ before the match: one setup card, one Start ============ -->
+      <section class="vs-lobby card" id="lobby" aria-labelledby="lobbyTitle">
+        <h1 id="lobbyTitle">Play vs Bot</h1>
+        <p class="vs-lobby-sub">You and the network get exactly the same pieces. Pick a match, then press Start.</p>
 
-      <div class="vs-arena">
-        <!-- you -->
-        <section class="vs-player" aria-label="Your board">
-          <header class="vs-head">
-            <h2>You</h2>
-            <span class="vs-badge" id="youBadge"></span>
-          </header>
-          <div class="vs-body">
-            <div class="vs-side">
-              <div class="vs-mini"><span>Hold</span><canvas id="youHold"></canvas></div>
-              <div class="vs-mini"><span>Next</span><canvas id="youNext"></canvas></div>
-              <dl class="vs-stats">
-                <div><dt>Lines</dt><dd id="youLines">0</dd></div>
-                <div><dt>Score</dt><dd id="youScore">0</dd></div>
-                <div><dt>Pieces/s</dt><dd id="youPps">0.0</dd></div>
-              </dl>
-            </div>
-            <div class="vs-boardwrap">
-              <div class="vs-garbage" title="Garbage coming your way"><i id="youGarbage"></i></div>
-              <div class="vs-board">
-                <canvas id="youBoard" aria-label="Your Tetris board"></canvas>
-                <div class="vs-overlay intro-screen" id="overlay">
-                  <div class="intro-box">
-                    <p class="vs-overlay-title intro-title" id="overlayTitle">Ready to battle?</p>
-                    <div id="overlayText">
-                      <p class="intro-sub">Human vs machine, same pieces, one winner.</p>
-                      <ol class="intro-steps">
-                        <li><span><b>Mode:</b> Battle or Race</span></li>
-                        <li><span><b>Opponent</b> and its speed</span></li>
-                        <li><span><b>Start</b> and stack fast</span></li>
-                      </ol>
-                      <p class="intro-chips" id="introPick"></p>
-                      <button type="button" class="btn-go" id="introStart">Start</button>
+        <fieldset class="vs-choice" id="modeChoice">
+          <legend>Mode</legend>
+          <label><input type="radio" name="mode" value="battle" checked /><span><b>Battle</b><small>Clear 2+ lines to send garbage. Top out and you lose.</small></span></label>
+          <label><input type="radio" name="mode" value="race" /><span><b>Race</b><small>First to 40 lines wins.</small></span></label>
+        </fieldset>
+
+        <fieldset class="vs-choice" id="opponentChoice">
+          <legend>Opponent</legend>
+          <label><input type="radio" name="opponent" value="dqn3" checked /><span><b>Network, 3 ahead</b><small>Strongest. Thinks 3 pieces ahead.</small></span></label>
+          <label><input type="radio" name="opponent" value="dqn2" /><span><b>Network, 2 ahead</b><small>Looks at this piece and the next.</small></span></label>
+          <label><input type="radio" name="opponent" value="dqn" /><span><b>Network, 1 piece</b><small>Current piece only. Misses more.</small></span></label>
+          <label><input type="radio" name="opponent" value="bot" /><span><b>Search bot</b><small>No network: hand-tuned search.</small></span></label>
+        </fieldset>
+
+        <fieldset class="vs-choice vs-choice-pills" id="speedChoice">
+          <legend>Opponent speed</legend>
+          <label><input type="radio" name="speed" value="0.25" /><span><b>Super easy</b><small>1 piece / 4 s, makes mistakes</small></span></label>
+          <label><input type="radio" name="speed" value="0.5" /><span><b>Easy</b><small>1 piece / 2 s</small></span></label>
+          <label><input type="radio" name="speed" value="1" checked /><span><b>Normal</b><small>1 piece / s</small></span></label>
+          <label><input type="radio" name="speed" value="1.5" /><span><b>Hard</b><small>1.5 pieces / s</small></span></label>
+          <label><input type="radio" name="speed" value="2.5" /><span><b>Expert</b><small>2.5 pieces / s</small></span></label>
+          <label><input type="radio" name="speed" value="5" /><span><b>Machine</b><small>5 pieces / s</small></span></label>
+        </fieldset>
+
+        <button id="startBtn" class="btn-go vs-start" type="button" disabled>Loading the network…</button>
+        <p class="vs-lobby-error" id="lobbyError" hidden></p>
+
+        <details class="vs-howto">
+          <summary>How to play</summary>
+          <ul class="vs-keys keys-only">
+            <li><kbd>←</kbd> <kbd>→</kbd> move</li>
+            <li><kbd>↑</kbd> or <kbd>X</kbd> rotate, <kbd>Z</kbd> rotate the other way</li>
+            <li><kbd>↓</kbd> drop faster, <kbd>Space</kbd> drop at once</li>
+            <li><kbd>C</kbd> or <kbd>Shift</kbd> hold, <kbd>P</kbd> or <kbd>Esc</kbd> pause</li>
+          </ul>
+          <p class="touch-only">Use the buttons under the boards: ◀ ▶ move, ⟲ ⟳ rotate, ▼ faster, Drop, Hold.</p>
+          <p>
+            <b>Battle:</b> clearing 2 lines at once sends 1 garbage row to the other board, 3 lines send 2, and a
+            Tetris (4 lines) sends 4. The red bar beside a board shows garbage on its way; your own clears cancel
+            it. Whoever fills up to the top first loses.
+            <b>Race:</b> first to 40 lines wins; topping out loses.
+          </p>
+        </details>
+      </section>
+
+      <!-- ============ the match: shown after Start ============ -->
+      <div class="vs-match" id="matchView" hidden>
+        <h1 class="sr-only">Play vs Bot match</h1>
+        <div class="vs-bar card">
+          <p class="vs-bar-mode" id="barMode">Battle</p>
+          <label class="vs-field">
+            <span>Opponent</span>
+            <select id="opponent">
+              <option value="dqn3">Network, 3 ahead</option>
+              <option value="dqn2">Network, 2 ahead</option>
+              <option value="dqn">Network, 1 piece</option>
+              <option value="bot">Search bot</option>
+            </select>
+          </label>
+          <label class="vs-field">
+            <span>Speed</span>
+            <select id="speed">
+              <option value="0.25" data-mistakes="0.3">Super easy</option>
+              <option value="0.5">Easy</option>
+              <option value="1" selected>Normal</option>
+              <option value="1.5">Hard</option>
+              <option value="2.5">Expert</option>
+              <option value="5">Machine</option>
+            </select>
+          </label>
+          <div class="vs-bar-buttons">
+            <button id="pauseBtn" type="button">Pause</button>
+            <button id="restartBtn" type="button">Restart</button>
+            <button id="settingsBtn" type="button">Settings</button>
+          </div>
+        </div>
+
+        <div class="vs-arena">
+          <!-- you -->
+          <section class="vs-player" aria-label="Your board">
+            <header class="vs-head">
+              <h2>You</h2>
+              <span class="vs-badge" id="youBadge"></span>
+            </header>
+            <div class="vs-body">
+              <div class="vs-side">
+                <div class="vs-mini"><span>Hold</span><canvas id="youHold"></canvas></div>
+                <div class="vs-mini"><span>Next</span><canvas id="youNext"></canvas></div>
+                <dl class="vs-stats">
+                  <div><dt>Lines</dt><dd id="youLines">0</dd></div>
+                  <div><dt>Score</dt><dd id="youScore">0</dd></div>
+                  <div><dt>Pieces/s</dt><dd id="youPps">0.0</dd></div>
+                </dl>
+              </div>
+              <div class="vs-boardwrap">
+                <div class="vs-garbage" title="Garbage coming your way" aria-label="Garbage coming your way"><i id="youGarbage"></i></div>
+                <div class="vs-board">
+                  <canvas id="youBoard" aria-label="Your Tetris board"></canvas>
+                  <div class="vs-overlay" id="overlay" hidden>
+                    <div class="intro-box">
+                      <p class="vs-overlay-title" id="overlayTitle"></p>
+                      <div id="overlayText"></div>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
+          </section>
+
+          <!-- the middle -->
+          <div class="vs-center">
+            <div class="vs-timer" id="timer">0:00</div>
+            <div class="vs-goal" id="goal">Battle</div>
+            <div class="vs-vs">VS</div>
           </div>
-        </section>
 
-        <!-- the middle -->
-        <div class="vs-center">
-          <div class="vs-timer" id="timer">0:00</div>
-          <div class="vs-goal" id="goal">Battle</div>
-          <div class="vs-vs">VS</div>
-        </div>
-
-        <!-- the network -->
-        <section class="vs-player vs-ai" aria-label="The network's board">
-          <header class="vs-head">
-            <h2 id="aiName"><span class="long">Network</span><span class="short">Network</span></h2>
-            <span class="vs-badge" id="aiBadge"></span>
-          </header>
-          <div class="vs-body">
-            <div class="vs-boardwrap">
-              <div class="vs-garbage"><i id="aiGarbage"></i></div>
-              <div class="vs-board">
-                <canvas id="aiBoard" aria-label="The network's Tetris board"></canvas>
-                <div class="vs-overlay" id="aiOverlay" hidden><div><p class="vs-overlay-title" id="aiOverlayTitle"></p></div></div>
-                <div class="vs-overlay intro-screen" id="aiIntro">
-                  <div class="intro-box">
-                    <p class="intro-kicker">Your opponent</p>
-                    <p class="intro-title" id="aiIntroName">Neural network + deep lookahead</p>
-                    <p class="intro-sub" id="aiIntroText"></p>
-                    <p class="intro-chips" id="aiIntroChips"></p>
-                  </div>
+          <!-- the opponent -->
+          <section class="vs-player vs-ai" aria-label="The opponent's board">
+            <header class="vs-head">
+              <h2 id="aiName"><span class="long">Network, 3 ahead</span><span class="short">Network 3</span></h2>
+              <span class="vs-badge" id="aiBadge"></span>
+            </header>
+            <div class="vs-body">
+              <div class="vs-boardwrap">
+                <div class="vs-garbage" title="Garbage coming its way" aria-label="Garbage coming its way"><i id="aiGarbage"></i></div>
+                <div class="vs-board">
+                  <canvas id="aiBoard" aria-label="The opponent's Tetris board"></canvas>
+                  <div class="vs-overlay" id="aiOverlay" hidden><div><p class="vs-overlay-title" id="aiOverlayTitle"></p></div></div>
                 </div>
               </div>
+              <div class="vs-side">
+                <div class="vs-mini"><span>Hold</span><canvas id="aiHold"></canvas></div>
+                <div class="vs-mini"><span>Next</span><canvas id="aiNext"></canvas></div>
+                <dl class="vs-stats">
+                  <div><dt>Lines</dt><dd id="aiLines">0</dd></div>
+                  <div><dt>Score</dt><dd id="aiScore">0</dd></div>
+                  <div><dt>Pieces/s</dt><dd id="aiPps">0.0</dd></div>
+                </dl>
+              </div>
             </div>
-            <div class="vs-side">
-              <div class="vs-mini"><span>Hold</span><canvas id="aiHold"></canvas></div>
-              <div class="vs-mini"><span>Next</span><canvas id="aiNext"></canvas></div>
-              <dl class="vs-stats">
-                <div><dt>Lines</dt><dd id="aiLines">0</dd></div>
-                <div><dt>Score</dt><dd id="aiScore">0</dd></div>
-                <div><dt>Pieces/s</dt><dd id="aiPps">0.0</dd></div>
-              </dl>
-            </div>
-          </div>
-        </section>
-      </div>
+          </section>
+        </div>
 
-      <!-- touch controls (phones and tablets) -->
-      <div class="vs-touch" id="touch" aria-label="Touch controls">
-        <button type="button" data-key="hold">Hold</button>
-        <button type="button" data-key="ccw" aria-label="Rotate left">⟲</button>
-        <button type="button" data-key="cw" aria-label="Rotate right">⟳</button>
-        <button type="button" data-key="left" aria-label="Move left">◀</button>
-        <button type="button" data-key="down" aria-label="Move down">▼</button>
-        <button type="button" data-key="right" aria-label="Move right">▶</button>
-        <button type="button" data-key="drop" class="wide">Drop</button>
-      </div>
-
-      <div class="vs-help card">
-        <h3>How to play</h3>
-        <ul class="vs-keys">
-          <li><kbd>←</kbd> <kbd>→</kbd> move</li>
-          <li><kbd>↑</kbd> or <kbd>X</kbd> rotate, <kbd>Z</kbd> rotate the other way</li>
-          <li><kbd>↓</kbd> drop faster, <kbd>Space</kbd> drop at once</li>
-          <li><kbd>C</kbd> or <kbd>Shift</kbd> hold</li>
-          <li><kbd>P</kbd> or <kbd>Esc</kbd> pause</li>
-        </ul>
-        <p class="hint">
-          <b>Battle:</b> clearing 2 lines at once sends 1 garbage row to the other board, 3 lines send 2, and a
-          tetris (4 lines) sends 4. Clearing lines also cancels garbage that is coming your way. Whoever fills
-          up to the top first loses.
-          <b>Race:</b> first to 40 lines wins; topping out loses.
-          Both of you get exactly the same pieces and can see the next one and use hold. The network decides at
-          the speed you choose; set it low to warm up.
-        </p>
+        <!-- touch controls (phones and tablets) -->
+        <div class="vs-touch" id="touch" aria-label="Touch controls">
+          <button type="button" data-key="hold">Hold</button>
+          <button type="button" data-key="ccw" aria-label="Rotate left">⟲</button>
+          <button type="button" data-key="cw" aria-label="Rotate right">⟳</button>
+          <button type="button" data-key="left" aria-label="Move left">◀</button>
+          <button type="button" data-key="down" aria-label="Move down">▼</button>
+          <button type="button" data-key="right" aria-label="Move right">▶</button>
+          <button type="button" data-key="drop" class="wide">Drop</button>
+        </div>
       </div>
     </main>
 
@@ -188,7 +202,7 @@
       Made by Suad · <a href="https://github.com/dosu199/tetrisML" target="_blank" rel="noopener">Source on GitHub</a> · Tetris ML
     </footer>
 
-    <script type="module" src="assets/js/versus.js?v=31"></script>
-      <script src="assets/js/tetro-bg.js?v=31" defer></script>
+    <script type="module" src="assets/js/versus.js?v=32"></script>
+      <script src="assets/js/tetro-bg.js?v=32" defer></script>
   </body>
 </html>

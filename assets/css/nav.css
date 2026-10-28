@@ -118,3 +118,33 @@ html {
     font-size: 0.84rem;
   }
 }
+
+/* phones: shorter labels so all four links fit, none hidden off the edge */
+.nav-short {
+  display: none;
+}
+@media (max-width: 480px) {
+  .nav-long {
+    display: none;
+  }
+  .nav-short {
+    display: inline;
+  }
+  .topnav-links a {
+    padding: 7px 11px;
+  }
+}
+/* touch screens: every link at least 44 px tall */
+@media (pointer: coarse) {
+  .topnav-links a,
+  .topnav-brand {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    box-sizing: border-box;
+  }
+  .topnav-brand {
+    min-width: 44px;
+    justify-content: center;
+  }
+}

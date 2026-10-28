@@ -660,7 +660,7 @@ button:disabled {
 .train-chart .axis text,
 .train-chart .lbl {
   fill: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 .train-chart .grid line {
   stroke: var(--line);
@@ -738,7 +738,7 @@ button:disabled {
 }
 .badge {
   display: inline-block;
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 700;
   color: var(--good);
   border: 1px solid var(--good);
@@ -866,5 +866,32 @@ button:disabled {
   }
   .feat-bar span {
     transition: none;
+  }
+}
+
+/* wide screens: the intro uses the full width instead of leaving the right
+   half empty (text on the left, the key facts or the reading guide on the right) */
+@media (min-width: 1100px) {
+  .hero .wrap {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    column-gap: 40px;
+    align-items: start;
+  }
+  .hero .wrap > * {
+    grid-column: 1;
+  }
+  .hero .wrap > h1 {
+    grid-column: 1 / -1;
+  }
+  .hero .wrap > .stats,
+  .hero .wrap > .howto {
+    grid-column: 2;
+    grid-row: 3 / span 2;
+    margin-top: 0;
+  }
+  .hero .wrap > .stats {
+    grid-template-columns: 1fr;
+    max-width: none;
   }
 }

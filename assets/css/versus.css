@@ -15,12 +15,155 @@ body {
   gap: 16px;
 }
 
-/* ------------------------------------------------------------ settings */
-.vs-setup {
+/* ------------------------------------------- before the match: setup card */
+.vs-lobby {
+  max-width: 760px;
+  width: 100%;
+  margin: 8px auto 0;
+  padding: 28px;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr)) auto auto;
-  gap: 12px;
+  gap: 20px;
+}
+.vs-lobby h1 {
+  margin: 0;
+  font-size: 2rem;
+  line-height: 1.15;
+}
+.vs-lobby-sub {
+  margin: -8px 0 0;
+  color: var(--muted);
+}
+.vs-choice {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.vs-choice legend {
+  padding: 0;
+  margin-bottom: 8px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.vs-choice-pills {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.vs-choice label {
+  position: relative;
+  cursor: pointer;
+}
+/* the real radio stays for keyboards and screen readers, only visually hidden */
+.vs-choice input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+.vs-choice label > span {
+  display: grid;
+  gap: 2px;
+  min-height: 48px;
+  box-sizing: border-box;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+.vs-choice b {
+  font-size: 0.98rem;
+}
+.vs-choice small {
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: var(--muted);
+}
+.vs-choice label:hover > span {
+  border-color: var(--accent);
+}
+.vs-choice input:checked + span {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.vs-choice input:focus-visible + span {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.vs-start {
+  justify-self: center;
+  min-width: 220px;
+  min-height: 52px;
+  font-size: 1.1rem;
+}
+.vs-start:disabled {
+  opacity: 0.6;
+  cursor: progress;
+  transform: none;
+}
+.vs-lobby-error {
+  margin: -8px 0 0;
+  text-align: center;
+  color: var(--bad);
+}
+.vs-howto {
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+.vs-howto summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--text);
+  min-height: 32px;
+}
+.vs-howto p {
+  margin: 8px 0 0;
+}
+
+/* ------------------------------------------------ during the match: the bar */
+.vs-match {
+  display: grid;
+  gap: 16px;
+  scroll-margin-top: calc(var(--topnav-h, 56px) + 8px);
+}
+.vs-match[hidden],
+.vs-lobby[hidden] {
+  display: none;
+}
+.vs-bar {
+  display: flex;
+  flex-wrap: wrap;
   align-items: end;
+  gap: 12px;
+  padding: 12px 16px;
+}
+.vs-bar-mode {
+  margin: 0 8px 0 0;
+  align-self: center;
+  font-weight: 700;
+}
+.vs-bar .vs-field {
+  min-width: 170px;
+  flex: 1;
+}
+.vs-bar-buttons {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+.vs-bar-buttons button {
+  min-width: 88px;
+  min-height: 40px;
 }
 .vs-field {
   display: grid;
@@ -42,11 +185,33 @@ body {
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: 8px 10px;
+  min-height: 40px;
   width: 100%;
 }
-.vs-setup button {
-  min-width: 96px;
-  height: 40px;
+.vs-field select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* two buttons in the board's message (Rematch / Change settings, confirmations) */
+.vs-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+.vs-confirm button:not(.btn-go) {
+  flex: none;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 999px;
+}
+.vs-tip {
+  max-width: 220px;
+  margin: 8px auto 0;
+  font-size: 0.85rem;
+  color: #ffb4b4;
 }
 
 /* --------------------------------------------------------------- arena */
@@ -226,26 +391,8 @@ body {
   font-size: 1.5rem;
   font-weight: 800;
 }
-.vs-setup-note {
-  grid-column: 1 / -1;
-  margin: 0;
-  font-size: 0.85rem;
-  color: var(--accent);
-}
-.vs-setup-note[hidden] {
-  display: none;
-}
 
-#aiIntroName {
-  font-size: 1.5rem;
-}
-#aiIntroName .short {
-  display: none;
-}
 
-.vs-rematch {
-  margin-top: 14px;
-}
 .vs-rematch-hint {
   display: block;
   margin-top: 10px;
@@ -306,9 +453,6 @@ body {
 }
 
 /* ---------------------------------------------------------------- help */
-.vs-help h3 {
-  margin: 0 0 6px;
-}
 .vs-keys {
   margin: 0 0 8px;
   padding: 0;
@@ -332,11 +476,38 @@ kbd {
 
 /* ---------------------------------------------------------- small screens */
 @media (max-width: 860px) {
-  .vs-setup {
+  .vs-lobby {
+    padding: 20px 16px;
+    gap: 16px;
+  }
+  .vs-lobby h1 {
+    font-size: 1.6rem;
+  }
+  .vs-choice,
+  .vs-choice-pills {
     grid-template-columns: 1fr 1fr;
   }
-  .vs-setup .vs-field:first-child {
-    grid-column: 1 / -1;
+  .vs-bar {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+  .vs-bar-mode {
+    width: 100%;
+  }
+  .vs-bar .vs-field {
+    min-width: 0;
+  }
+  .vs-bar .vs-field select {
+    font-size: 0.85rem;
+    padding: 8px 6px;
+  }
+  .vs-bar-buttons {
+    width: 100%;
+    margin-left: 0;
+  }
+  .vs-bar-buttons button {
+    flex: 1;
+    min-height: 44px;
   }
   .vs-arena {
     grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
@@ -402,19 +573,5 @@ kbd {
   }
   .vs-overlay-title {
     font-size: 1.1rem;
-  }
-  /* the opponent's board is narrow on phones: short name and speed only */
-  #aiIntro {
-    padding: 8px;
-  }
-  #aiIntroName {
-    font-size: 1.05rem;
-  }
-  #aiIntroName .long,
-  #aiIntroText {
-    display: none;
-  }
-  #aiIntroName .short {
-    display: inline;
   }
 }

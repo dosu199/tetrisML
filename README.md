@@ -369,14 +369,14 @@ piece and can hold.
   the other board, and your own clears cancel garbage coming at you. Whoever
   tops out first loses.
 - **Race:** first to 40 lines wins; topping out loses.
-- **Opponent:** network + deep lookahead (strongest), network + lookahead,
-  network, or search bot, at a speed you choose (from **Super easy**, 1 piece
-  every 4 seconds with about 30% of its pieces dropped in a random spot, up to
-  5 per second). Opponent and speed can be changed at any time, also during a
-  match; a new mode starts when you press Restart. The opponent thinks in a background thread
-  (`assets/js/versus-ai-worker.js`), so its slower searches never make your own piece
-  stutter. On a slow computer the deep lookahead may not keep up with the
-  fastest setting.
+- **Setup first:** the page opens on one card: pick Mode, Opponent
+  (Network, 3 ahead / 2 ahead / 1 piece, or Search bot) and Speed (Super easy,
+  1 piece every 4 s with about 30% random drops, up to Machine, 5 per second),
+  then press the one Start button. The boards appear only after Start.
+- **During a match:** a slim bar keeps opponent and speed changeable at any
+  time; Restart and Settings ask before ending the match. The result screen
+  offers Rematch (or Enter) and Change settings. The opponent thinks in a
+  background thread (`assets/js/versus-ai-worker.js`).
 - **Keys:** ← → move, ↑ or X rotate, Z rotate the other way, ↓ soft drop,
   Space hard drop, C or Shift hold, P or Esc pause. On phones and tablets,
   touch buttons appear under the boards.

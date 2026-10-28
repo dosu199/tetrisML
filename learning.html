@@ -20,19 +20,19 @@
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="Tetris ML: a neural network that taught itself Tetris" />
     <meta name="twitter:card" content="summary_large_image" />
-    <link rel="stylesheet" href="assets/css/base.css?v=31" />
-    <link rel="stylesheet" href="assets/css/learning.css?v=31" />
-    <link rel="stylesheet" href="assets/css/theme.css?v=31" />
-    <link rel="stylesheet" href="assets/css/nav.css?v=31" />
+    <link rel="stylesheet" href="assets/css/base.css?v=32" />
+    <link rel="stylesheet" href="assets/css/learning.css?v=32" />
+    <link rel="stylesheet" href="assets/css/theme.css?v=32" />
+    <link rel="stylesheet" href="assets/css/nav.css?v=32" />
   </head>
   <body>
     <nav class="topnav" aria-label="Main">
       <a class="topnav-brand" href="index.html" aria-label="Tetris ML home"><span class="topnav-logo" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span>Tetris ML</span></a>
       <ul class="topnav-links">
         <li><a href="index.html">Play</a></li>
-        <li><a href="versus.html">Play vs Bot</a></li>
+        <li><a href="versus.html"><span class="nav-long">Play vs Bot</span><span class="nav-short">vs Bot</span></a></li>
         <li><a href="how-it-works.html">How it works</a></li>
-        <li><a href="learning.html" aria-current="page">Watch it learn</a></li>
+        <li><a href="learning.html" aria-current="page"><span class="nav-long">Watch it learn</span><span class="nav-short">Learn</span></a></li>
       </ul>
     </nav>
 
@@ -50,7 +50,7 @@
           <ul>
             <li><b>Each board is the same network at a different age.</b> The first one has never trained; the last ones are fully trained.</li>
             <li><b>When a board fills up to the top, that game is lost.</b> The board shows how long it lasted, then starts a new game with the next set of pieces.</li>
-            <li><b>Watch the "average pieces per game" number.</b> It's the simplest measure of skill: the longer it survives, the better it plays.</li>
+            <li><b>Watch the "avg pieces / game" number.</b> It's the simplest measure of skill: the longer it survives, the better it plays.</li>
           </ul>
         </div>
       </div>
@@ -65,7 +65,7 @@
             <label class="slider">
               <span>Speed</span>
               <input id="raceSpeed" type="range" min="0" max="4" step="1" value="3" />
-              <output id="raceSpeedOut">30 moves/s</output>
+              <output id="raceSpeedOut">30 pieces/s</output>
             </label>
             <p id="raceStatus" class="hint race-status"></p>
           </div>
@@ -127,7 +127,7 @@
       Made by Suad · <a href="https://github.com/dosu199/tetrisML" target="_blank" rel="noopener">Source on GitHub</a> · Tetris ML
     </footer>
 
-    <script type="module" src="assets/js/learning.js?v=31"></script>
-      <script src="assets/js/tetro-bg.js?v=31" defer></script>
+    <script type="module" src="assets/js/learning.js?v=32"></script>
+      <script src="assets/js/tetro-bg.js?v=32" defer></script>
   </body>
 </html>

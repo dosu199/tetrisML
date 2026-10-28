@@ -426,48 +426,83 @@ function setOverlay(title, html) {
   $('overlay').hidden = false;
 }
 
-/* Opponent and speed can change at any time, even mid-match: the next piece
-   it places uses the new settings. The mode only changes on (Re)start. */
+/* One name per opponent, the same on every page. */
+const OPPONENTS = {
+  dqn3: { name: 'Network, 3 ahead', short: 'Network 3' },
+  dqn2: { name: 'Network, 2 ahead', short: 'Network 2' },
+  dqn: { name: 'Network, 1 piece', short: 'Network 1' },
+  bot: { name: 'Search bot', short: 'Bot' },
+};
+const checked = (name) => document.querySelector(`input[name=${name}]:checked`).value;
+
+/* Opponent and speed can change at any time, even mid-match (the bar above
+   the boards): the next piece it places uses the new settings. The mode is
+   chosen on the setup card and changes only with a new match. */
 function applyOpponent() {
   aiPps = Number($('speed').value);
   aiMistakes = Number($('speed').selectedOptions[0].dataset.mistakes || 0);
   aiKind = $('opponent').value;
   chooser = makeChooser(aiKind);
   aiNextAt = Math.min(aiNextAt, performance.now() + 1000 / aiPps); // a faster speed kicks in at once
-  const full = $('opponent').selectedOptions[0].textContent.replace(/ \(.*\)$/, '');
-  const short = { dqn3: 'Network++', dqn2: 'Network+', dqn: 'Network', bot: 'Bot' }[aiKind];
-  $('aiName').innerHTML = `<span class="long">${full}</span><span class="short">${short}</span>`;
-  updateIntroPick();
+  const o = OPPONENTS[aiKind];
+  $('aiName').innerHTML = `<span class="long">${o.name}</span><span class="short">${o.short}</span>`;
 }
 
-const AI_ABOUT = {
-  dqn3: 'Looks three pieces ahead: this one, the next, and every piece that could come after.',
-  dqn2: 'Looks two pieces ahead: this one and the next.',
-  dqn: 'Looks at the current piece only. Quick, but it misses more.',
-  bot: 'No network: a hand-tuned search with 8 weights.',
-};
+/* the setup card's choices and the bar's dropdowns always agree */
+for (const name of ['opponent', 'speed']) {
+  for (const radio of document.querySelectorAll(`input[name=${name}]`)) {
+    radio.addEventListener('change', () => {
+      $(name).value = radio.value;
+      applyOpponent();
+    });
+  }
+  $(name).addEventListener('change', (e) => {
+    document.querySelector(`input[name=${name}][value="${e.target.value}"]`).checked = true;
+    applyOpponent();
+    e.target.blur(); // arrow keys go back to your piece, not the dropdown
+  });
+}
 
-function updateIntroPick() {
-  const txt = (id) => $(id).selectedOptions[0].textContent.replace(/ \(.*\)$/, '').replace(/:.*$/, '');
-  // the opponent's intro screen, until the first match starts
-  const full = $('opponent').selectedOptions[0].textContent.replace(/ \(.*\)$/, '');
-  const short = { dqn3: 'Network++', dqn2: 'Network+', dqn: 'Network', bot: 'Bot' }[$('opponent').value];
-  $('aiIntroName').innerHTML = `<span class="long">${full}</span><span class="short">${short}</span>`;
-  $('aiIntroText').textContent = AI_ABOUT[$('opponent').value];
-  $('aiIntroChips').innerHTML = `<span>${txt('speed')} speed</span>`;
-  if (!$('introPick')) return; // your intro is replaced by the first countdown
-  $('introPick').innerHTML = `<span>${txt('mode')}</span><span>${txt('opponent')}</span><span>${txt('speed')}</span>`;
+/* the two screens: the setup card before a match, the boards during one */
+function showMatchView(on) {
+  $('lobby').hidden = on;
+  $('matchView').hidden = !on;
+}
+
+function backToSetup() {
+  matchId++; // drops any answer the opponent is still thinking about
+  aiThinking = false;
+  aiAnim = null;
+  state = 'idle';
+  $('overlay').hidden = true;
+  showMatchView(false);
+  $('startBtn').focus();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/** A question on your board with two buttons (restart or leave a match). */
+function confirmOnBoard(title, yesLabel, yesId) {
+  if (state === 'playing' || state === 'countdown') state = 'paused';
+  setOverlay(
+    title,
+    `<p class="intro-sub">The current match will be lost.</p>` +
+      `<div class="vs-confirm"><button type="button" class="btn-go" id="${yesId}">${yesLabel}</button>` +
+      `<button type="button" id="keepPlaying">Keep playing</button></div>`
+  );
+  $('pauseBtn').textContent = 'Resume';
+  $('keepPlaying').focus();
 }
 
 const matchRunning = () => state === 'countdown' || state === 'playing' || state === 'paused';
 
 function start() {
   if (state === 'loading') return;
-  mode = $('mode').value;
+  mode = checked('mode');
   applyOpponent();
   matchId++;
   aiThinking = false;
-  $('setupNote').hidden = true;
+  showMatchView(true);
+  $('barMode').textContent = mode === 'race' ? `Race to ${RACE_LINES} lines` : 'Battle';
   $('goal').textContent = mode === 'race' ? `Race to ${RACE_LINES} lines` : 'Battle';
   const seed = (Math.random() * 2 ** 31) >>> 0;
   you = newPlayer(seed);
@@ -485,19 +520,25 @@ function start() {
     $(id).className = 'vs-badge';
   }
   $('aiOverlay').hidden = true;
-  $('aiIntro').hidden = true;
-  $('startBtn').textContent = 'Restart';
   $('pauseBtn').disabled = false;
   $('pauseBtn').textContent = 'Pause';
-  // on phones, bring the boards and touch buttons into view
-  if (window.matchMedia('(pointer: coarse)').matches) $('youBoard').scrollIntoView({ block: 'center', behavior: 'smooth' });
+  // bring the boards (and on phones the touch buttons) into view
+  $('matchView').scrollIntoView({ block: 'start', behavior: 'smooth' });
 }
 
 function setPaused(on) {
-  if (on && state === 'playing') {
+  if (on && state === 'countdown') {
     state = 'paused';
-    setOverlay('Paused', 'Press <b>P</b> or <b>Pause</b> to continue.');
+    setOverlay('Paused', '<p class="intro-sub">Tap <b>Resume</b> to continue.</p>');
     $('pauseBtn').textContent = 'Resume';
+  } else if (on && state === 'playing') {
+    countdownLeft = 0;
+    state = 'paused';
+    setOverlay('Paused', '<p class="intro-sub"><span class="keys-only">Press <kbd>P</kbd> or </span>Tap <b>Resume</b> to continue.</p>');
+    $('pauseBtn').textContent = 'Resume';
+  } else if (!on && state === 'paused' && countdownLeft > 0) {
+    state = 'countdown'; // paused during the countdown: carry on counting
+    $('pauseBtn').textContent = 'Pause';
   } else if (!on && state === 'paused') {
     state = 'playing';
     $('overlay').hidden = true;
@@ -526,24 +567,26 @@ function fmtTime(ms) {
 function endMatch(winner) {
   state = 'over';
   const title = winner === 'you' ? 'You win! 🎉' : winner === 'ai' ? (aiKind === 'bot' ? 'The bot wins' : 'The network wins') : 'Draw';
+  // say what actually decided it: a full stack, or the race finish line
   const why =
-    mode === 'race'
-      ? winner === 'you'
+    winner === 'you'
+      ? ai.dead
+        ? 'Its stack reached the top.'
+        : `You reached ${RACE_LINES} lines first.`
+      : winner === 'ai'
         ? you.dead
-          ? ''
-          : `You reached ${RACE_LINES} lines first.`
-        : ai.dead
-          ? ''
+          ? 'Your stack reached the top.'
           : `It reached ${RACE_LINES} lines first.`
-      : '';
+        : 'Both stacks reached the top.';
   const pps = (p) => (elapsed > 0 ? (p.pieces / (elapsed / 1000)).toFixed(2) : '0');
   setOverlay(
     title,
-    `${why} ${winner === 'you' && ai.dead ? 'Its stack reached the top.' : winner === 'ai' && you.dead ? 'Your stack reached the top.' : ''}<br />` +
+    `${why}<br />` +
       `Time ${fmtTime(elapsed)} · you ${you.lines} lines, ${pps(you)} pieces/s` +
       (mode === 'battle' ? `, ${you.sent} garbage sent` : '') +
-      `<br /><button type="button" class="btn-go vs-rematch" id="rematchBtn">Rematch</button>` +
-      `<span class="vs-rematch-hint">or press <kbd>Enter</kbd></span>`
+      `<div class="vs-confirm"><button type="button" class="btn-go" id="rematchBtn">Rematch</button>` +
+      `<button type="button" id="settingsFromEnd">Change settings</button></div>` +
+      `<span class="vs-rematch-hint keys-only">or press <kbd>Enter</kbd> for a rematch</span>`
   );
   if (winner !== 'draw') {
     $(winner === 'you' ? 'youBadge' : 'aiBadge').textContent = 'Winner';
@@ -587,7 +630,11 @@ function frame(t) {
       $('overlay').hidden = true;
       aiNextAt = t + 300;
     } else {
-      setOverlay(`<span class="big">${Math.ceil(countdownLeft / 1000)}</span>`, 'Get ready…');
+      setOverlay(
+        `<span class="big">${Math.ceil(countdownLeft / 1000)}</span>`,
+        `<p class="intro-sub">Get ready…</p>` +
+          (mode === 'battle' ? '<p class="vs-tip">The red bar beside a board shows garbage on its way.</p>' : '')
+      );
     }
   } else if (state === 'playing') {
     elapsed += dt;
@@ -722,34 +769,27 @@ for (const btn of document.querySelectorAll('#touch button')) {
   for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) btn.addEventListener(ev, stop);
 }
 
-for (const id of ['opponent', 'speed']) {
-  $(id).addEventListener('change', (e) => {
-    applyOpponent();
-    e.target.blur(); // arrow keys go back to your piece, not the dropdown
-  });
-}
-$('mode').addEventListener('change', (e) => {
-  updateIntroPick();
-  e.target.blur();
-  if (matchRunning() && $('mode').value !== mode) {
-    $('setupNote').textContent = 'The new mode starts when you press Restart.';
-    $('setupNote').hidden = false;
-  } else $('setupNote').hidden = true;
-});
-// the Rematch button lives inside the result screen, which is rebuilt each match
+// buttons inside the board's message (results, confirmations)
 $('overlay').addEventListener('click', (e) => {
-  if (!e.target.closest?.('#rematchBtn')) return;
-  e.target.blur();
-  start();
-});
-$('introStart').addEventListener('click', (e) => {
-  e.currentTarget.blur();
-  start();
+  const id = e.target.closest?.('button')?.id;
+  if (id === 'rematchBtn' || id === 'confirmRestart') start();
+  else if (id === 'settingsFromEnd' || id === 'confirmLeave') backToSetup();
+  else if (id === 'keepPlaying') setPaused(false);
 });
 
 $('startBtn').addEventListener('click', (e) => {
   e.currentTarget.blur(); // so Space drops a piece instead of pressing the button again
   start();
+});
+$('restartBtn').addEventListener('click', (e) => {
+  e.currentTarget.blur();
+  if (matchRunning()) confirmOnBoard('Restart this match?', 'Restart', 'confirmRestart');
+  else start();
+});
+$('settingsBtn').addEventListener('click', (e) => {
+  e.currentTarget.blur();
+  if (matchRunning()) confirmOnBoard('Leave this match?', 'Change settings', 'confirmLeave');
+  else backToSetup();
 });
 $('pauseBtn').addEventListener('click', (e) => {
   e.currentTarget.blur();
@@ -779,8 +819,12 @@ async function init() {
     net = loadDqn(model);
     if (w?.weights) weights = w.weights;
     state = 'idle';
+    $('startBtn').disabled = false;
+    $('startBtn').textContent = 'Start';
   } catch (e) {
-    setOverlay('Could not load the network', `${e.message}. Open this page through a local server (npx serve .).`);
+    $('startBtn').textContent = 'Could not load the network';
+    $('lobbyError').textContent = `${e.message}. Check your connection and reload the page.`;
+    $('lobbyError').hidden = false;
   }
 }
 
