@@ -5,9 +5,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="preload" href="assets/fonts/outfit-latin.woff2" as="font" type="font/woff2" crossorigin>
-    <link rel="stylesheet" href="assets/css/style.css?v=35">
-    <link rel="stylesheet" href="assets/css/theme.css?v=35">
-    <link rel="stylesheet" href="assets/css/nav.css?v=35">
+    <link rel="stylesheet" href="assets/css/style.css?v=36">
+    <link rel="stylesheet" href="assets/css/theme.css?v=36">
+    <link rel="stylesheet" href="assets/css/nav.css?v=36">
     <title>Tetris ML · Play</title>
     <meta name="description" content="Play Tetris yourself, then flip one switch and let a neural network that taught itself Tetris take over your game." />
     <meta name="theme-color" content="#141218" />
@@ -105,17 +105,19 @@
       </div>
 
       <aside class="play-side play-right">
-        <div class="score-blob shape-blob">
-          <span class="tile-label">Score</span>
-          <span id="scoreBoard">0</span>
-          <span class="score-note" id="scoreNote"></span>
-        </div>
-        <dl class="stat-tiles">
-          <div class="t-cyan"><dt>Lines</dt><dd id="stLines">0</dd></div>
-          <div class="t-yellow"><dt>Pieces</dt><dd id="stPieces">0</dd></div>
-          <div class="t-rose"><dt>Best</dt><dd id="stBest">0</dd></div>
-        </dl>
-        <p class="game-line" id="stGame">Game 1</p>
+        <section class="score-card" aria-label="Score">
+          <div class="score-panel">
+            <span class="tile-label">Score</span>
+            <span class="score-note" id="scoreNote"></span>
+            <span id="scoreBoard">0</span>
+          </div>
+          <dl class="score-stats">
+            <div class="s-cyan"><dt>Lines</dt><dd id="stLines">0</dd></div>
+            <div class="s-yellow"><dt>Pieces</dt><dd id="stPieces">0</dd></div>
+            <div class="s-rose"><dt>Best</dt><dd id="stBest">0</dd></div>
+          </dl>
+          <p class="game-line" id="stGame">Game 1</p>
+        </section>
       </aside>
     </main>
 
@@ -148,8 +150,8 @@
       Made by Suad · <a href="https://github.com/dosu199/tetrisML" target="_blank" rel="noopener">Source on GitHub</a> · Tetris ML
     </footer>
 
-    <script type="module" src="assets/js/play.js?v=35"></script>
-    <script src="assets/js/tetro-bg.js?v=35" defer></script>
+    <script type="module" src="assets/js/play.js?v=36"></script>
+    <script src="assets/js/tetro-bg.js?v=36" defer></script>
 </body>
 
 </html>

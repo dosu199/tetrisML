@@ -192,38 +192,127 @@ body:not(.human) .hint-card {
   outline-offset: 2px;
 }
 
-/* the score, and the numbers under it */
-.score-blob {
-  align-self: center;
-  width: 250px;
-  height: 196px;
+/* the score card: the score on a purple panel, then lines, pieces, best and
+   the game number under it */
+.score-card {
   display: flex;
   flex-direction: column;
+  padding: 8px;
+  border-radius: 30px;
+  background: var(--ui-surface);
+}
+.score-panel {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: 1fr auto;
   align-items: center;
-  justify-content: center;
+  row-gap: 4px;
+  min-height: 132px;
+  box-sizing: border-box;
+  padding: 18px 20px 16px;
+  border-radius: 24px;
   background: var(--ui-accent-box);
   color: var(--ui-on-accent-box);
 }
-.score-blob .tile-label {
-  color: inherit;
+/* a soft blob in the corner: the expressive touch, kept out of the way */
+.score-panel::after {
+  content: '';
+  position: absolute;
+  right: -34px;
+  bottom: -46px;
+  width: 132px;
+  height: 120px;
+  border-radius: 46% 54% 52% 48% / 54% 46% 54% 46%;
+  background: rgba(208, 188, 255, 0.14);
+  pointer-events: none;
 }
-#scoreBoard {
-  font-size: 3.6rem;
-  line-height: 1.05;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums;
+.score-panel .tile-label {
+  color: inherit;
+  opacity: 0.85;
 }
 .score-note {
-  min-height: 1.3em;
-  font-size: 0.9rem;
+  justify-self: end;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--ui-on-accent);
+  background: var(--ui-accent);
+  animation: note-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.score-note:empty {
+  display: none;
+}
+@keyframes note-in {
+  from {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+}
+#scoreBoard {
+  position: relative;
+  z-index: 1;
+  grid-column: 1 / -1;
+  font-size: 3.2rem;
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+}
+.score-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  padding: 14px 0 6px;
+}
+.score-stats > div {
+  padding: 0 14px;
+}
+.score-stats > div + div {
+  border-left: 1px solid var(--ui-line);
+}
+.score-stats dt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
   font-weight: 600;
-  color: var(--ui-accent);
+  color: var(--ui-muted);
+}
+.score-stats dt::before {
+  content: '';
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 3px;
+  background: var(--stat-color);
+}
+.score-stats dd {
+  margin: 2px 0 0;
+  font-size: 1.6rem;
+  line-height: 1.15;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--stat-color);
+}
+.s-cyan {
+  --stat-color: var(--ui-on-cyan);
+}
+.s-yellow {
+  --stat-color: var(--ui-on-yellow);
+}
+.s-rose {
+  --stat-color: var(--ui-on-rose);
 }
 .game-line {
-  margin: 0;
+  margin: 8px 6px 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--ui-line);
   text-align: center;
-  font-size: 0.92rem;
+  font-size: 0.85rem;
   color: var(--ui-muted);
 }
 
@@ -537,7 +626,10 @@ body:not(.human) #pauseBtn {
     width: 250px;
   }
   #scoreBoard {
-    font-size: 3rem;
+    font-size: 2.7rem;
+  }
+  .score-stats > div {
+    padding: 0 10px;
   }
 }
 
@@ -620,20 +712,28 @@ body:not(.human) #pauseBtn {
     gap: 6px;
     --mini-cell: 9px;
   }
-  .score-blob.shape-blob {
+  .score-card {
+    display: contents;
+  }
+  .score-panel {
     grid-area: score;
-    align-self: stretch;
-    width: auto;
+    grid-template-columns: auto 1fr;
+    min-height: 0;
     height: 68px;
-    flex-direction: row;
-    justify-content: space-between;
     padding: 0 18px;
-    border-radius: 34px 34px 34px 12px;
+    border-radius: 22px;
+  }
+  .score-panel::after {
+    right: -50px;
+    bottom: -70px;
   }
   .score-note {
     display: none;
   }
   #scoreBoard {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
     font-size: 2rem;
   }
   .board-wrap {
@@ -648,11 +748,17 @@ body:not(.human) #pauseBtn {
     grid-area: level;
     justify-self: center;
   }
-  .stat-tiles {
+  .score-stats {
     grid-area: tiles;
+    padding: 12px 0;
+    border-radius: 22px;
+    background: var(--ui-surface);
   }
   .game-line {
     grid-area: game;
+    margin: 0;
+    padding: 0;
+    border: 0;
   }
   .hint-card {
     grid-area: hint;
@@ -662,5 +768,11 @@ body:not(.human) #pauseBtn {
   }
   .players {
     grid-area: players;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .score-note {
+    animation: none;
   }
 }

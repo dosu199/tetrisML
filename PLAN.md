@@ -174,6 +174,9 @@ longer used. Checked: 42/42 tests, ESLint, axe (WCAG 2 AA) with no
 violations on all four pages, no sideways scroll at 360 px.
 v0.34.1: the Play start screen is just "Ready to play?", Start and "Press Space
 to start" (the keys are already in the toolbar under the board).
+v0.34.2: the Play score is one card instead of the oval blob and three
+coloured boxes: the score on a purple panel (with the last clear as a chip),
+then lines / pieces / best in one row with coloured dots, and the game number.
 
 ## ▶ NEXT: options
 

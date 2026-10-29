@@ -437,7 +437,7 @@ shared is in `assets/css/theme.css`, loaded after each page's own CSS:
   `--ui-pink`), plus the older names (`--bg`, `--accent`, ...) mapped onto them.
 - **Font:** Outfit, self-hosted in `assets/fonts/` (no request to Google).
 - **Parts:** buttons (`.btn-go` main, `.btn-tonal`, `.btn-text`, `.icon-btn`),
-  the switch (`.switch`), stat tiles (`.stat-tiles`), the blob shape
+  the switch (`.switch`), stat tiles (`.stat-tiles`, Play vs Bot), the blob shape
   (`.shape-blob`), small piece previews (`.mini`), `<kbd>`, the floating
   toolbar (`.toolbar`) and the snackbar (`.snackbar`).
 - **Pieces** are flat rounded blocks with a darker bottom edge, in the same
@@ -500,8 +500,8 @@ and has its own `learning.css`.
   would put your piece, or the Hold box lights up when it would hold; a line
   under the switch says which. The hint is worked out in a background thread,
   so your piece never stutters while it thinks.
-- **Right:** the score (with the last clear, e.g. "+300 · double"), lines,
-  pieces and best lines, and the game number. **Under the board:** the level
+- **Right:** one score card: the score (with the last clear as a chip, e.g.
+  "+300 · double"), then lines, pieces and best lines, and the game number. **Under the board:** the level
   (the game speeds up every 10 lines) and a wavy line for how far you are.
 - **Toolbar** at the bottom: pause, restart and the keys. Keys: ← → move, ↑ or
   X rotate, Z rotate back, ↓ soft drop, Space hard drop, C or Shift hold, P or
