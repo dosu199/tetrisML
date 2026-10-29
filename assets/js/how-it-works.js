@@ -12,7 +12,7 @@
 import { createBoard, createPieceGenerator, PIECES, Bag, PLAY_LEFT, PLAY_COLS, PLAY_ROWS, idx } from '../../src/tetris-core.js';
 import { loadDqn, nextStates, greedyPick, moveReward, bestFollow, expectedFollow, GAMMA } from '../../src/tetris-dqn.js';
 import { extractFeatures, FEATURE } from '../../src/tetris-ai.js';
-import { setupCanvas, cssVar, drawPlayfield, drawBlock, blockColor, outlineCells } from './lib/canvas.js';
+import { setupCanvas, cssVar, drawPlayfield, drawBlock, blockColor, outlineCells, paletteRgb, paletteColor } from './lib/canvas.js';
 import { fetchModel } from './lib/models.js';
 
 const $ = (id) => document.getElementById(id);
@@ -20,7 +20,13 @@ const $ = (id) => document.getElementById(id);
 /* ---------------------------------------------------------------- helpers */
 
 // 0 = worst option (red) ... 1 = best option (green)
-const scoreColor = (t, a = 1) => `hsla(${Math.round(t * 125)}, 80%, 52%, ${a})`;
+/** How much the network likes an option, t = 0 (worst) .. 1 (best): the palette's dim grey to its main colour. */
+function scoreColor(t, a = 1) {
+  const DIM = paletteRgb('faint');
+  const hi = paletteRgb('accent');
+  const c = DIM.map((v, i) => Math.round(v + (hi[i] - v) * t));
+  return `rgba(${c.join(', ')}, ${a})`;
+}
 const fmt = (v, d = 0) => (Number.isFinite(v) ? v.toLocaleString('en-US', { maximumFractionDigits: d, minimumFractionDigits: d }) : '–');
 const piecesPerSecond = (v) => `${v} piece${v === 1 ? '' : 's'}/s`;
 
@@ -224,14 +230,14 @@ function render() {
       outlineCells(boardCtx, moveCells(c.piece, c.move), CELL, scoreColor(t(c)), 3, scoreColor(t(c), 0.45), dash(c));
     } else {
       if (!fast) {
-        // every option, faint; the better it scores, the greener and stronger
+        // every option, faint; the better it scores, the brighter and stronger
         for (let i = cands.length - 1; i >= 1; i--) {
           const k = t(cands[i]);
           outlineCells(boardCtx, moveCells(cands[i].piece, cands[i].move), CELL, scoreColor(k, 0.25 + 0.5 * k), 1.5, null, dash(cands[i]));
         }
       }
       const c0 = cands[0];
-      outlineCells(boardCtx, moveCells(c0.piece, c0.move), CELL, '#ffffff', 2.5, blockColor(PIECES[c0.piece].value) + 'cc', dash(c0));
+      outlineCells(boardCtx, moveCells(c0.piece, c0.move), CELL, paletteColor('text'), 2.5, blockColor(PIECES[c0.piece].value) + 'cc', dash(c0));
     }
   }
 
@@ -428,7 +434,7 @@ function drawExample() {
       if (filled && top < 0) top = r;
       if (filled) seenBlock = true;
       else if (seenBlock) {
-        ctx.fillStyle = '#f87171';
+        ctx.fillStyle = paletteColor('second');
         ctx.beginPath();
         ctx.arc(c * s + s / 2, r * s + s / 2, s * 0.22, 0, Math.PI * 2);
         ctx.fill();
@@ -537,7 +543,7 @@ function drawTrainChart() {
   const x = (g) => m.l + (g / 3000) * iw;
   const y = (v) => m.t + ih - ((Math.log(v) - Math.log(yMin)) / (Math.log(yMax) - Math.log(yMin))) * ih;
   const accent = cssVar('--accent');
-  const good = cssVar('--good');
+  const good = cssVar('--ui-second'); // the saved copies
   const muted = cssVar('--muted');
 
   const path = (vals) => vals.map((v, i) => `${i ? 'L' : 'M'}${x(TRAIN.games[i]).toFixed(1)},${y(v).toFixed(1)}`).join('');
@@ -685,6 +691,17 @@ function drawScoreboard() {
 }
 
 /* ------------------------------------------------------------------ start */
+
+/** The visitor picked other colours: redraw everything drawn with them. */
+document.addEventListener('palettechange', () => {
+  drawExample();
+  drawTrainChart();
+  if (net) {
+    render();
+    renderOptions();
+  }
+  if (explore.board) drawBoard(exCtx, explore.board, EX_CELL);
+});
 
 async function start() {
   drawRewards();

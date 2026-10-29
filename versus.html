@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Tetris ML · Play vs Bot</title>
     <meta name="description" content="Play Tetris against a neural network: same pieces, side by side, with garbage battles or a race to 40 lines." />
-    <meta name="theme-color" content="#141218" />
+    <meta name="theme-color" content="#131314" />
     <link rel="icon" href="assets/meta/favicon.svg" type="image/svg+xml" />
     <link rel="icon" href="assets/meta/favicon-32.png" sizes="32x32" type="image/png" />
     <link rel="apple-touch-icon" href="assets/meta/apple-touch-icon.png" />
@@ -21,10 +21,11 @@
     <meta property="og:image:alt" content="Tetris ML: a neural network that taught itself Tetris" />
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="preload" href="assets/fonts/outfit-latin.woff2" as="font" type="font/woff2" crossorigin />
-    <link rel="stylesheet" href="assets/css/base.css?v=36" />
-    <link rel="stylesheet" href="assets/css/versus.css?v=36" />
-    <link rel="stylesheet" href="assets/css/theme.css?v=36" />
-    <link rel="stylesheet" href="assets/css/nav.css?v=36" />
+    <script src="assets/js/palette.js?v=38"></script><!-- first: applies the saved colours before anything is drawn -->
+    <link rel="stylesheet" href="assets/css/base.css?v=38" />
+    <link rel="stylesheet" href="assets/css/versus.css?v=38" />
+    <link rel="stylesheet" href="assets/css/theme.css?v=38" />
+    <link rel="stylesheet" href="assets/css/nav.css?v=38" />
   </head>
   <body>
     <nav class="topnav" aria-label="Main">
@@ -35,7 +36,9 @@
         <li><a href="how-it-works.html">How it works</a></li>
         <li><a href="learning.html"><span class="nav-long">Watch it learn</span><span class="nav-short">Learn</span></a></li>
       </ul>
-      <a class="topnav-gh" href="https://github.com/dosu199/tetrisML" target="_blank" rel="noopener">GitHub</a>
+      <div class="topnav-end">
+        <a class="topnav-gh" href="https://github.com/dosu199/tetrisML" target="_blank" rel="noopener">GitHub</a>
+      </div>
     </nav>
 
     <main class="vs-main">
@@ -82,7 +85,7 @@
           <p class="touch-only">Use the buttons under the boards: ◀ ▶ move, ⟲ ⟳ rotate, ▼ faster, Drop, Hold.</p>
           <p>
             <b>Battle:</b> clearing 2 lines at once sends 1 garbage row to the other board, 3 lines send 2, and a
-            Tetris (4 lines) sends 4. The red bar beside a board shows garbage on its way; your own clears cancel
+            Tetris (4 lines) sends 4. The bar beside a board shows garbage on its way; your own clears cancel
             it. Whoever fills up to the top first loses.
             <b>Race:</b> first to 40 lines wins; topping out loses.
           </p>
@@ -150,7 +153,7 @@
               </div>
             </div>
             <dl class="stat-tiles compact">
-              <div class="t-cyan"><dt>Lines</dt><dd id="youLines">0</dd></div>
+              <div class="t-second"><dt>Lines</dt><dd id="youLines">0</dd></div>
               <div class="t-accent"><dt>Score</dt><dd id="youScore">0</dd></div>
               <div><dt>Pieces/s</dt><dd id="youPps">0.0</dd></div>
             </dl>
@@ -188,7 +191,7 @@
               </div>
             </div>
             <dl class="stat-tiles compact">
-              <div class="t-cyan"><dt>Lines</dt><dd id="aiLines">0</dd></div>
+              <div class="t-second"><dt>Lines</dt><dd id="aiLines">0</dd></div>
               <div class="t-accent"><dt>Score</dt><dd id="aiScore">0</dd></div>
               <div><dt>Pieces/s</dt><dd id="aiPps">0.0</dd></div>
             </dl>
@@ -214,7 +217,7 @@
       Made by Suad · <a href="https://github.com/dosu199/tetrisML" target="_blank" rel="noopener">Source on GitHub</a> · Tetris ML
     </footer>
 
-    <script type="module" src="assets/js/versus.js?v=36"></script>
-    <script src="assets/js/tetro-bg.js?v=36" defer></script>
+    <script type="module" src="assets/js/versus.js?v=38"></script>
+    <script src="assets/js/tetro-bg.js?v=38" defer></script>
   </body>
 </html>

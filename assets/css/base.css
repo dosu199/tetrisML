@@ -2,21 +2,9 @@
    learning.html (sections, cards, buttons, the demo's panels). Colours and type
    come from theme.css, which loads after this file. The game's style.css is separate. */
 
-/* the site is dark only (every page has data-theme="dark") */
+/* the site is dark only (every page has data-theme="dark"); all colours,
+   including --bg, --accent, --good... used below, are set in theme.css */
 :root {
-  --bg: #0e1220;
-  --bg-alt: #121729;
-  --surface: #171d31;
-  --text: #e8ebf3;
-  --muted: #9aa3b8;
-  --line: #2a3250;
-  --accent: #8b85ff;
-  --accent-soft: #252654;
-  --good: #22c55e;
-  --bad: #f87171;
-  --board-bg: #0a0e1a;
-  --board-grid: #161c30;
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 20px rgba(0, 0, 0, 0.25);
   color-scheme: dark;
 }
 
@@ -63,7 +51,7 @@ code {
 .hero {
   padding: 56px 0 36px;
   /* a see-through tint, so the falling background pieces stay visible */
-  background: radial-gradient(1200px 300px at 20% -10%, rgba(139, 133, 255, 0.12), transparent 70%);
+  background: radial-gradient(1200px 300px at 20% -10%, color-mix(in srgb, var(--ui-accent) 12%, transparent), transparent 70%);
 }
 .eyebrow {
   margin: 0 0 10px;
@@ -169,11 +157,12 @@ h3 {
   border-radius: 3px;
   vertical-align: -1px;
 }
+/* the board's options run from dim grey (bad) to the main colour (good) */
 .swatch.bad {
-  background: var(--bad);
+  background: var(--ui-faint);
 }
 .swatch.good {
-  background: var(--good);
+  background: var(--ui-accent);
 }
 
 .card {
@@ -218,8 +207,8 @@ h3 {
   z-index: 1;
   display: grid;
   place-items: center;
-  background: rgba(20, 18, 24, 0.8);
-  color: #fff;
+  background: color-mix(in srgb, var(--ui-bg) 80%, transparent);
+  color: var(--ui-text);
   font-size: 1rem;
   line-height: 1.4;
   font-weight: 600;
@@ -488,7 +477,7 @@ button:disabled {
   margin: 3px 0;
 }
 .mark-hole {
-  color: var(--bad);
+  color: var(--ui-second);
 }
 .dot-best {
   display: inline-block;

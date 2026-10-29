@@ -212,10 +212,12 @@ body:not(.human) .hint-card {
   box-sizing: border-box;
   padding: 18px 20px 16px;
   border-radius: 24px;
-  background: var(--ui-accent-box);
+  background: var(--ui-accent-box); /* under the gradient, for old browsers */
+  background: var(--ui-hero);
   color: var(--ui-on-accent-box);
 }
-/* a soft blob in the corner: the expressive touch, kept out of the way */
+/* a soft blob in the corner in the palette's brightest colour: the
+   expressive touch, kept out of the way of the number */
 .score-panel::after {
   content: '';
   position: absolute;
@@ -224,12 +226,13 @@ body:not(.human) .hint-card {
   width: 132px;
   height: 120px;
   border-radius: 46% 54% 52% 48% / 54% 46% 54% 46%;
-  background: rgba(208, 188, 255, 0.14);
+  background: var(--ui-hero-blob);
   pointer-events: none;
 }
 .score-panel .tile-label {
+  position: relative;
+  z-index: 1;
   color: inherit;
-  opacity: 0.85;
 }
 .score-note {
   justify-self: end;
@@ -260,7 +263,7 @@ body:not(.human) .hint-card {
   font-weight: 800;
   letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
-  color: #fff;
+  color: var(--ui-text);
 }
 .score-stats {
   display: grid;
@@ -298,14 +301,15 @@ body:not(.human) .hint-card {
   font-variant-numeric: tabular-nums;
   color: var(--stat-color);
 }
-.s-cyan {
-  --stat-color: var(--ui-on-cyan);
+/* the palette's two colours, then plain white */
+.s-accent {
+  --stat-color: var(--ui-accent);
 }
-.s-yellow {
-  --stat-color: var(--ui-on-yellow);
+.s-second {
+  --stat-color: var(--ui-second);
 }
-.s-rose {
-  --stat-color: var(--ui-on-rose);
+.s-plain {
+  --stat-color: var(--ui-text);
 }
 .game-line {
   margin: 8px 6px 4px;
@@ -402,7 +406,7 @@ body:not(.human) .hint-card {
 body.human #holdTetromino.hint-hold {
   box-shadow:
     0 0 0 3px var(--ui-accent),
-    0 0 24px rgba(208, 188, 255, 0.45);
+    0 0 24px color-mix(in srgb, var(--ui-accent) 45%, transparent);
 }
 
 .board-wrap {
@@ -457,35 +461,35 @@ body.human #holdTetromino.hint-hold {
   box-shadow: inset 0 calc(var(--cell) * -0.15) 0 rgba(0, 0, 0, 0.22);
 }
 .v1 {
-  background: #e6483d;
+  background: var(--piece-1);
 }
 .v2 {
-  background: #4ec3e0;
+  background: var(--piece-2);
 }
 .v3 {
-  background: #f2c94c;
+  background: var(--piece-3);
 }
 .v4 {
-  background: #5fc27e;
+  background: var(--piece-4);
 }
 .v5 {
-  background: #f2994a;
+  background: var(--piece-5);
 }
 .v6 {
-  background: #4a7ef2;
+  background: var(--piece-6);
 }
 .v7 {
-  background: #9b51e0;
+  background: var(--piece-7);
 }
 .v8 {
-  background: #6b7280;
+  background: var(--piece-8);
 }
 .block.ghost {
   background: transparent;
-  border: 2px solid rgba(230, 224, 233, 0.35);
+  border: 2px solid color-mix(in srgb, var(--ui-text) 35%, transparent);
 }
 .block.hint {
-  background: rgba(208, 188, 255, 0.14);
+  background: color-mix(in srgb, var(--ui-accent) 14%, transparent);
   border: 2px dashed var(--ui-accent);
 }
 
@@ -498,7 +502,7 @@ body.human #holdTetromino.hint-hold {
   padding: 20px;
   text-align: center;
   border-radius: 26px;
-  background: rgba(20, 18, 24, 0.88);
+  background: color-mix(in srgb, var(--ui-bg) 88%, transparent);
   color: var(--ui-text);
   line-height: 1.5;
 }
@@ -512,7 +516,7 @@ body.human #holdTetromino.hint-hold {
   font-size: 1.9rem;
   font-weight: 800;
   letter-spacing: -0.02em;
-  color: #fff;
+  color: var(--ui-text);
 }
 
 /* level progress: a wavy line, as far as you have come in this level */
@@ -583,7 +587,7 @@ body:not(.human) #pauseBtn {
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 8px;
     padding: 10px 16px calc(12px + env(safe-area-inset-bottom));
-    background: rgba(20, 18, 24, 0.94);
+    background: color-mix(in srgb, var(--ui-bg) 94%, transparent);
     -webkit-backdrop-filter: blur(10px);
     backdrop-filter: blur(10px);
   }

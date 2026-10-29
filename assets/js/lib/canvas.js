@@ -6,7 +6,6 @@
  */
 
 import { PLAY_LEFT, PLAY_COLS, PLAY_ROWS, idx } from '../../../src/tetris-core.js';
-import { PIECE_COLORS, GARBAGE_COLOR } from './piece-style.js';
 
 /** A CSS custom property of the page, e.g. cssVar('--ui-accent'). */
 export const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -25,8 +24,33 @@ export function setupCanvas(canvas, w, h) {
   return ctx;
 }
 
-/** The colour of a cell value: a piece's colour, or grey for garbage and the frame. */
-export const blockColor = (value) => PIECE_COLORS[value] ?? GARBAGE_COLOR;
+/*
+ * Colours come from the palette the visitor picked (CSS custom properties in
+ * theme.css). They are read once and cached; the cache is emptied when the
+ * visitor picks another palette (the 'palettechange' event from palette.js).
+ */
+let colorCache = {};
+if (typeof document !== 'undefined') document.addEventListener('palettechange', () => (colorCache = {}));
+
+/** A colour custom property, e.g. themeColor('--ui-accent'), cached; `fallback` until the stylesheet is there. */
+function themeColor(name, fallback) {
+  if (colorCache[name]) return colorCache[name];
+  const value = cssVar(name);
+  if (!value) return fallback;
+  return (colorCache[name] = value);
+}
+
+/** '#rrggbb' -> [r, g, b] */
+const hexRgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+
+/** A palette colour as [r, g, b]: paletteRgb('accent'), 'second' or 'faint' (--ui-accent ...). */
+export const paletteRgb = (name) => hexRgb(themeColor(`--ui-${name}`, '#9f9f9f'));
+
+/** A palette colour with alpha `a`, for canvas fills and strokes. */
+export const paletteColor = (name, a = 1) => `rgba(${paletteRgb(name).join(', ')}, ${a})`;
+
+/** The colour of a cell value (Z=1 ... T=7, garbage and frame 8): --piece-1 ... --piece-8. */
+export const blockColor = (value) => themeColor(`--piece-${value >= 1 && value <= 7 ? value : 8}`, '#808080');
 
 /** The rounded square of the cell at (x, y), in cells of size `s`, as a path. */
 function cellPath(ctx, x, y, s) {
@@ -93,17 +117,5 @@ export function drawPlayfield(ctx, board, { cell: s, firstRow = 0 }) {
   }
 }
 
-let cachedBoardColors = null;
-
-/**
- * The board colours from the stylesheet (--ui-board, --ui-slot). Read once
- * (the theme never changes while a page is open), but only cached once the
- * stylesheet has provided them.
- */
-export function boardColors() {
-  if (cachedBoardColors) return cachedBoardColors;
-  const bg = cssVar('--ui-board');
-  const slot = cssVar('--ui-slot');
-  if (bg && slot) cachedBoardColors = { bg, slot };
-  return { bg: bg || '#18161c', slot: slot || '#221f27' };
-}
+/** The board colours of the palette: the well (--ui-board) and an empty cell (--ui-slot). */
+export const boardColors = () => ({ bg: themeColor('--ui-board', '#151515'), slot: themeColor('--ui-slot', '#212121') });

@@ -5,12 +5,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="preload" href="assets/fonts/outfit-latin.woff2" as="font" type="font/woff2" crossorigin>
-    <link rel="stylesheet" href="assets/css/style.css?v=36">
-    <link rel="stylesheet" href="assets/css/theme.css?v=36">
-    <link rel="stylesheet" href="assets/css/nav.css?v=36">
+    <script src="assets/js/palette.js?v=38"></script><!-- first: applies the saved colours before anything is drawn -->
+    <link rel="stylesheet" href="assets/css/style.css?v=38">
+    <link rel="stylesheet" href="assets/css/theme.css?v=38">
+    <link rel="stylesheet" href="assets/css/nav.css?v=38">
     <title>Tetris ML · Play</title>
     <meta name="description" content="Play Tetris yourself, then flip one switch and let a neural network that taught itself Tetris take over your game." />
-    <meta name="theme-color" content="#141218" />
+    <meta name="theme-color" content="#131314" />
     <link rel="icon" href="assets/meta/favicon.svg" type="image/svg+xml" />
     <link rel="icon" href="assets/meta/favicon-32.png" sizes="32x32" type="image/png" />
     <link rel="apple-touch-icon" href="assets/meta/apple-touch-icon.png" />
@@ -36,7 +37,9 @@
         <li><a href="how-it-works.html">How it works</a></li>
         <li><a href="learning.html"><span class="nav-long">Watch it learn</span><span class="nav-short">Learn</span></a></li>
       </ul>
-      <a class="topnav-gh" href="https://github.com/dosu199/tetrisML" target="_blank" rel="noopener">GitHub</a>
+      <div class="topnav-end">
+        <a class="topnav-gh" href="https://github.com/dosu199/tetrisML" target="_blank" rel="noopener">GitHub</a>
+      </div>
     </nav>
 
     <h1 class="sr-only">Play Tetris, or let the neural network play</h1>
@@ -112,9 +115,9 @@
             <span id="scoreBoard">0</span>
           </div>
           <dl class="score-stats">
-            <div class="s-cyan"><dt>Lines</dt><dd id="stLines">0</dd></div>
-            <div class="s-yellow"><dt>Pieces</dt><dd id="stPieces">0</dd></div>
-            <div class="s-rose"><dt>Best</dt><dd id="stBest">0</dd></div>
+            <div class="s-accent"><dt>Lines</dt><dd id="stLines">0</dd></div>
+            <div class="s-second"><dt>Pieces</dt><dd id="stPieces">0</dd></div>
+            <div class="s-plain"><dt>Best</dt><dd id="stBest">0</dd></div>
           </dl>
           <p class="game-line" id="stGame">Game 1</p>
         </section>
@@ -150,8 +153,8 @@
       Made by Suad · <a href="https://github.com/dosu199/tetrisML" target="_blank" rel="noopener">Source on GitHub</a> · Tetris ML
     </footer>
 
-    <script type="module" src="assets/js/play.js?v=36"></script>
-    <script src="assets/js/tetro-bg.js?v=36" defer></script>
+    <script type="module" src="assets/js/play.js?v=38"></script>
+    <script src="assets/js/tetro-bg.js?v=38" defer></script>
 </body>
 
 </html>

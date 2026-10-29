@@ -1,5 +1,6 @@
 /*
- * tetro-bg.js - slowly falling tetrominoes, all 7 kinds, as decoration.
+ * tetro-bg.js - slowly falling tetrominoes, all 7 kinds, as decoration, in
+ * the palette's four colours (--pal-1..4; see theme.css).
  *
  *  - a subtle layer behind every page (fixed, behind all content; boards
  *    and cards cover it, so none fall over the game itself)
@@ -11,15 +12,15 @@
 (() => {
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
-  // the 7 tetrominoes as [col, row] cells, in the game's colours
+  // the 7 tetrominoes as [col, row] cells, in turn in the palette's four colours
   const SHAPES = [
-    { cells: [[0, 0], [1, 0], [1, 1], [2, 1]], color: '#e6483d' }, // Z
-    { cells: [[0, 0], [1, 0], [2, 0], [3, 0]], color: '#4ec3e0' }, // I
-    { cells: [[0, 0], [1, 0], [0, 1], [1, 1]], color: '#f2c94c' }, // O
-    { cells: [[1, 0], [2, 0], [0, 1], [1, 1]], color: '#5fc27e' }, // S
-    { cells: [[2, 0], [0, 1], [1, 1], [2, 1]], color: '#f2994a' }, // L
-    { cells: [[0, 0], [0, 1], [1, 1], [2, 1]], color: '#4a7ef2' }, // J
-    { cells: [[1, 0], [0, 1], [1, 1], [2, 1]], color: '#9b51e0' }, // T
+    { cells: [[0, 0], [1, 0], [1, 1], [2, 1]], color: 'var(--pal-1)' }, // Z
+    { cells: [[0, 0], [1, 0], [2, 0], [3, 0]], color: 'var(--pal-2)' }, // I
+    { cells: [[0, 0], [1, 0], [0, 1], [1, 1]], color: 'var(--pal-3)' }, // O
+    { cells: [[1, 0], [2, 0], [0, 1], [1, 1]], color: 'var(--pal-4)' }, // S
+    { cells: [[2, 0], [0, 1], [1, 1], [2, 1]], color: 'var(--pal-1)' }, // L
+    { cells: [[0, 0], [0, 1], [1, 1], [2, 1]], color: 'var(--pal-2)' }, // J
+    { cells: [[1, 0], [0, 1], [1, 1], [2, 1]], color: 'var(--pal-3)' }, // T
   ];
 
   function pieceSvg(shape) {
@@ -28,7 +29,7 @@
     const rects = shape.cells
       .map(([c, r]) => `<rect x="${c * 10 + 0.6}" y="${r * 10 + 0.6}" width="8.8" height="8.8" rx="1.6"/>`)
       .join('');
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w * 10} ${h * 10}" width="${w}em" height="${h}em" fill="${shape.color}">${rects}</svg>`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w * 10} ${h * 10}" width="${w}em" height="${h}em" style="fill: ${shape.color}">${rects}</svg>`;
   }
 
   const rand = (a, b) => a + Math.random() * (b - a);

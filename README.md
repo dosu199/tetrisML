@@ -318,8 +318,9 @@ assets/js/               the website (browser only)
   how-it-works.js, learning.js  the two explanation pages
   ai-worker.js                  an AI player thinking in a background thread
   tetro-bg.js                   the falling pieces in the background
+  palette.js                    the colour picker (Ink wash, Spiced chai, Retro sunset)
   lib/                          shared by the pages: models (download), ai-client (worker or here),
-                                canvas (board drawing), piece-style (colours), touch-pad
+                                canvas (board drawing, colours from CSS), touch-pad
 assets/css/              style (Play), theme (shared look, loaded last), nav (top bar),
                          base (How it works + base for the others), versus, learning
 assets/fonts/            Outfit, the site's font (self-hosted, OFL licence)
@@ -428,25 +429,40 @@ piece and can hold.
 
 ## Shared look
 
-Since v0.34 every page uses one design: a dark tonal palette in the style of
-Material 3 Expressive, with pill buttons and a floating toolbar. Everything
-shared is in `assets/css/theme.css`, loaded after each page's own CSS:
+Every page uses one design (in the style of Material 3 Expressive: pill
+buttons, a floating toolbar, one blob shape), coloured by a palette the
+visitor picks with the round button in the top bar. The three palettes come
+from Figma's colour combinations
+(<https://www.figma.com/resource-library/color-combinations/>):
 
-- **Colours** as custom properties (`--ui-bg`, `--ui-surface`, `--ui-accent`,
-  and four coloured containers: `--ui-cyan`, `--ui-yellow`, `--ui-rose`,
-  `--ui-pink`), plus the older names (`--bg`, `--accent`, ...) mapped onto them.
+| Palette | Figma's 4 colours | Mood here |
+|---|---|---|
+| **Ink wash** (default) | `#5c5c5c` `#cbcbcb` `#ffffe3` `#6d8196` | charcoal gallery: ivory text and buttons, slate highlights |
+| **Spiced chai** | `#fdfbd8` `#d47e30` `#8d5a2b` `#825e34` | dark roast: cream text, cinnamon buttons, nutmeg panels |
+| **Retro sunset** | `#c4621c` `#ffce1b` `#069494` `#b7410e` | 70s: deep teal background, mustard buttons, rust and orange score, teal highlights |
+
+The choice is remembered (`localStorage`) and applies to every page.
+
+- `assets/css/theme.css` holds every colour, one block per palette: the
+  surfaces and text (tinted from the palette), `--ui-accent` (actions, the
+  current choice, good results), `--ui-second` (highlights, the opponent,
+  best / saved marks), the score panel's gradient (`--ui-hero`), the
+  palette's 4 colours (`--pal-1..4`: logo, swatches, background pieces) and
+  the 7 pieces plus garbage (`--piece-1..8`). Nothing else adds a colour.
+- `assets/js/palette.js` runs first in `<head>` (so there is no flash of the
+  wrong colours), builds the picker, and fires a `palettechange` event that
+  the canvas pages use to redraw (`assets/js/lib/canvas.js` reads the colours
+  from CSS: `blockColor`, `boardColors`, `paletteColor`).
 - **Font:** Outfit, self-hosted in `assets/fonts/` (no request to Google).
 - **Parts:** buttons (`.btn-go` main, `.btn-tonal`, `.btn-text`, `.icon-btn`),
-  the switch (`.switch`), stat tiles (`.stat-tiles`, Play vs Bot), the blob shape
-  (`.shape-blob`), small piece previews (`.mini`), `<kbd>`, the floating
-  toolbar (`.toolbar`) and the snackbar (`.snackbar`).
-- **Pieces** are flat rounded blocks with a darker bottom edge, in the same
-  colours everywhere (`assets/js/lib/piece-style.js`; the Play page's DOM board
-  repeats them as `.v1`-`.v8` in `style.css`). Canvas boards are drawn by
-  `assets/js/lib/canvas.js` (`drawPlayfield`, `drawBlock`, `outlineCells`).
-  No images are used for blocks any more.
+  the switch (`.switch`), stat tiles (`.stat-tiles`, `.t-accent`, `.t-second`),
+  the blob shape (`.shape-blob`), small piece previews (`.mini`), `<kbd>`, the
+  floating toolbar (`.toolbar`) and the snackbar (`.snackbar`).
+- On How it works, the network's options run from dim grey (bad) to the
+  palette's main colour (good).
 
-`assets/js/tetro-bg.js` adds the slowly falling tetrominoes behind every page;
+`assets/js/tetro-bg.js` adds the slowly falling tetrominoes behind every page,
+in the palette's four colours;
 tune `OPACITY` and the count at the top of that file. It is pure decoration and
 turns itself off when the system asks for reduced motion.
 
@@ -533,6 +549,7 @@ modules instead of copies, Node's built-in test runner with move-by-move
 regression tests, checked command-line flags, and fixes for 16 bugs found in
 review (mostly in failure paths: a frozen opponent when the worker failed,
 stuck keys after switching windows, Ctrl+C acting as Hold).
-Version 0.34 gives every page a new look ("B+": Material 3 Expressive colours
+Version 0.36 colours the whole site, pieces included, with one of three
+Figma palettes the visitor picks (Ink wash, Spiced chai, Retro sunset). Version 0.34 gives every page a new look ("B+": Material 3 Expressive colours
 and shapes, self-hosted Outfit font, flat blocks instead of images).
 Version 0.9 adds training with garbage rows. The old code is in git history if you ever want it.

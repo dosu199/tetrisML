@@ -178,6 +178,23 @@ v0.34.2: the Play score is one card instead of the oval blob and three
 coloured boxes: the score on a purple panel (with the last clear as a chip),
 then lines / pieces / best in one row with coloured dots, and the game number.
 
+v0.35 (two colours): every page uses neutral greys plus two colours only,
+and the visitor picks the pair in the top bar (Lilac & mint, Ocean & amber,
+Coral & sand; remembered). All colours are tokens in theme.css
+(--ui-accent, --ui-second); the old cyan / yellow / rose / pink, red and green
+are gone. How it works colours options dim grey -> main colour (was red ->
+green). The pieces keep their 7 colours. Checked: 42/42 tests, ESLint, axe
+with no violations on all 4 pages in all 3 palettes.
+
+v0.36 (Figma palettes): the three palettes are now Figma's Ink wash, Spiced
+chai and Retro sunset (4 colours each, sampled from Figma's swatches), and
+each one colours everything: background and text tints, buttons, the score
+panel gradient, highlights, the logo, the background pieces and the 7 game
+pieces (now CSS variables --piece-1..8; piece-style.js is gone, canvas.js
+reads the colours from CSS and redraws on 'palettechange'). Default: Ink wash.
+Checked: 42/42 tests, 16/16 browser checks, ESLint, axe with no violations on
+all 4 pages in all 3 palettes.
+
 ## ▶ NEXT: options
 
 1. ~~Deeper lookahead with hold~~ done in v0.18. Possible follow-ups: a wider

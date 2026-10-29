@@ -82,12 +82,12 @@
   margin-bottom: 8px;
 }
 .chip.good {
-  background: var(--ui-cyan);
-  color: var(--ui-on-cyan);
+  background: var(--ui-second-box);
+  color: var(--ui-on-second-box);
 }
 .chip.bad {
-  background: var(--ui-rose);
-  color: var(--ui-on-rose);
+  background: var(--ui-surface-top);
+  color: var(--ui-text);
 }
 .stage p {
   margin: 0 0 10px;

@@ -156,6 +156,11 @@ function paint(b) {
   $(`gl${i}`).textContent = b.lost;
 }
 
+// the visitor picked other colours: repaint the boards (also when paused)
+document.addEventListener('palettechange', () => {
+  for (const b of boards) if (b.board) paint(b);
+});
+
 function tick() {
   for (const b of boards) {
     step(b);

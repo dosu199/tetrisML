@@ -3,10 +3,18 @@
  * components more than one page uses. Loaded after each page's own CSS, so
  * these values win.
  *
- * The look ("expressive play") follows Material 3's dark tonal colours:
- * surfaces are tinted greys, and colour comes in soft "containers" (a dark
- * tint of a hue with a light text of the same hue). One accent, lilac
- * (#d0bcff, dark text on it). The pieces bring the bright colours.
+ * The look ("expressive play") follows Material 3's dark tonal colours. The
+ * visitor picks one of three palettes from Figma's colour combinations
+ * (assets/js/palette.js): Ink wash (default), Spiced chai, Retro sunset.
+ * Each palette below sets every colour, so nothing else may add one:
+ *   surfaces and text    --ui-bg ... --ui-faint, tinted from the palette
+ *   --ui-accent          actions, the current choice, good results
+ *   --ui-second          highlights, the opponent, best / saved marks
+ *   -box / on-           a container and the text on it
+ *   --ui-hero(-blob)     the score panel's gradient and its corner blob
+ *   --pal-1..4           the palette's 4 colours as Figma shows them
+ *                        (logo, picker swatches, background pieces)
+ *   --piece-1..8         the pieces by cell value, and garbage
  * Type: Outfit. Shapes: large radii; pills for actions; one playful
  * "blob" shape for the hero number of a page.
  */
@@ -34,38 +42,12 @@
 :root[data-theme='dark'] {
   --ui-font: 'Outfit', system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 
-  /* surfaces, from the page up */
-  --ui-bg: #141218;
-  --ui-surface: #1d1b20;
-  --ui-surface-high: #2b2930;
-  --ui-surface-top: #36343b;
-  --ui-board: #18161c;
-  --ui-slot: #221f27; /* an empty cell of a board */
-  --ui-line: #49454f;
-  --ui-line-soft: rgba(230, 224, 233, 0.1);
+  /* every colour comes from the palette blocks below */
+  --ui-line-soft: color-mix(in srgb, var(--ui-text) 10%, transparent);
 
-  /* text */
-  --ui-text: #e6e0e9;
-  --ui-muted: #cac4d0;
-  --ui-faint: #938f99;
-
-  /* the accent, and the tonal containers (background / text on it) */
-  --ui-accent: #d0bcff;
-  --ui-on-accent: #381e72;
-  --ui-accent-box: #4f378b;
-  --ui-on-accent-box: #eaddff;
-  --ui-tonal: #4a4458;
-  --ui-on-tonal: #e8def8;
-  --ui-cyan: #004f58;
-  --ui-on-cyan: #9eefff;
-  --ui-yellow: #4a3f00;
-  --ui-on-yellow: #ffe17a;
-  --ui-rose: #5c1a2b;
-  --ui-on-rose: #ffb1c1;
-  --ui-pink: #633b48;
-  --ui-on-pink: #ffd8e4;
-  --ui-danger: #ffb4ab;
-  --ui-good: #7fdc94;
+  /* best / win / saved: the second colour; bad / danger: plain light grey */
+  --ui-good: var(--ui-second);
+  --ui-danger: var(--ui-text);
 
   --ui-radius: 24px;
   --ui-radius-lg: 32px;
@@ -82,12 +64,144 @@
   --accent: var(--ui-accent);
   --accent-soft: var(--ui-tonal);
   --good: var(--ui-good);
-  --bad: var(--ui-danger);
+  --bad: var(--ui-faint);
   --board-bg: var(--ui-board);
   --board-grid: var(--ui-slot);
   --radius: var(--ui-radius);
   --shadow: none;
   color-scheme: dark;
+}
+
+/* The three palettes, from Figma's colour combinations (Ink wash, Spiced
+   chai, Retro sunset; the 4 colours sampled from Figma's swatches are
+   --pal-1..4). Each palette sets EVERY colour: the surfaces and text are
+   tinted from it, its colours become the accent, the second colour, the
+   hero panel and the 7 pieces (--piece-1..7, garbage --piece-8, by cell
+   value: Z I O S L J T). Plain attribute selectors, so a swatch with
+   data-palette="retro" shows Retro sunset's colours on any page. */
+
+/* Ink wash: charcoal black, cool grey, soft ivory, slate */
+:root,
+[data-palette='ink'] {
+  --pal-1: #5c5c5c;
+  --pal-2: #cbcbcb;
+  --pal-3: #ffffe3;
+  --pal-4: #6d8196;
+
+  --ui-bg: #111111;
+  --ui-surface: #1b1b1b;
+  --ui-surface-high: #262626;
+  --ui-surface-top: #323232;
+  --ui-board: #151515;
+  --ui-slot: #212121; /* an empty cell of a board */
+  --ui-line: #5c5c5c;
+  --ui-text: #ffffe3;
+  --ui-muted: #cbcbcb;
+  --ui-faint: #8f8f8f;
+  --ui-tonal: #2c3239;
+  --ui-on-tonal: #ffffe3;
+
+  --ui-accent: #ffffe3;
+  --ui-on-accent: #1b1b1b;
+  --ui-accent-box: #5c5c5c;
+  --ui-on-accent-box: #ffffe3;
+  --ui-second: #9fb2c6;
+  --ui-on-second: #111111;
+  --ui-second-box: #6d8196;
+  --ui-on-second-box: #111111;
+  --ui-hero: linear-gradient(135deg, #5c5c5c 0%, #4d5866 100%);
+  --ui-hero-blob: rgba(109, 129, 150, 0.55);
+
+  --piece-1: #6d8196;
+  --piece-2: #ffffe3;
+  --piece-3: #cbcbcb;
+  --piece-4: #a9bed3;
+  --piece-5: #d9d4a8;
+  --piece-6: #4f6378;
+  --piece-7: #8c8c8c;
+  --piece-8: #474747;
+}
+
+/* Spiced chai: cream, cinnamon, nutmeg, toasted brown */
+[data-palette='chai'] {
+  --pal-1: #fdfbd8;
+  --pal-2: #d47e30;
+  --pal-3: #8d5a2b;
+  --pal-4: #825e34;
+
+  --ui-bg: #17100a;
+  --ui-surface: #21170f;
+  --ui-surface-high: #2c1f14;
+  --ui-surface-top: #38291b;
+  --ui-board: #1b130c;
+  --ui-slot: #281d13; /* an empty cell of a board */
+  --ui-line: #5a3f26;
+  --ui-text: #fdfbd8;
+  --ui-muted: #e6d9b8;
+  --ui-faint: #a68e6e;
+  --ui-tonal: #3d2b1c;
+  --ui-on-tonal: #fdfbd8;
+
+  --ui-accent: #d47e30;
+  --ui-on-accent: #1b0f05;
+  --ui-accent-box: #8d5a2b;
+  --ui-on-accent-box: #fdfbd8;
+  --ui-second: #e3b787;
+  --ui-on-second: #1b0f05;
+  --ui-second-box: #825e34;
+  --ui-on-second-box: #fdfbd8;
+  --ui-hero: linear-gradient(135deg, #8d5a2b 0%, #825e34 55%, #9a5a22 100%);
+  --ui-hero-blob: rgba(212, 126, 48, 0.55);
+
+  --piece-1: #d47e30;
+  --piece-2: #fdfbd8;
+  --piece-3: #efc078;
+  --piece-4: #a86b34;
+  --piece-5: #e8a25a;
+  --piece-6: #825e34;
+  --piece-7: #c9b48f;
+  --piece-8: #4a3826;
+}
+
+/* Retro sunset: burnt orange, mustard yellow, teal, rust */
+[data-palette='retro'] {
+  --pal-1: #c4621c;
+  --pal-2: #ffce1b;
+  --pal-3: #069494;
+  --pal-4: #b7410e;
+
+  --ui-bg: #0d1616;
+  --ui-surface: #132121;
+  --ui-surface-high: #1b2c2c;
+  --ui-surface-top: #243838;
+  --ui-board: #0f1b1b;
+  --ui-slot: #1a2b2b; /* an empty cell of a board */
+  --ui-line: #2e4d4d;
+  --ui-text: #fff3e0;
+  --ui-muted: #d9d3c3;
+  --ui-faint: #93a29d;
+  --ui-tonal: #1f3a3a;
+  --ui-on-tonal: #fff3e0;
+
+  --ui-accent: #ffce1b;
+  --ui-on-accent: #2a1d00;
+  --ui-accent-box: #b7410e;
+  --ui-on-accent-box: #fff3e0;
+  --ui-second: #1fb5b5;
+  --ui-on-second: #001f1f;
+  --ui-second-box: #069494;
+  --ui-on-second-box: #001f1f;
+  --ui-hero: linear-gradient(135deg, #b7410e 0%, #a8480f 60%, #c4621c 100%);
+  --ui-hero-blob: rgba(255, 206, 27, 0.5);
+
+  --piece-1: #b7410e;
+  --piece-2: #069494;
+  --piece-3: #ffce1b;
+  --piece-4: #3fbfae;
+  --piece-5: #c4621c;
+  --piece-6: #0a6b6b;
+  --piece-7: #f08a3c;
+  --piece-8: #3d4f4f;
 }
 
 body {
@@ -121,7 +235,7 @@ textarea {
     background 0.15s;
 }
 .btn-go:hover {
-  background: #dccbff;
+  background: color-mix(in srgb, var(--ui-accent) 85%, #fff);
   transform: scale(1.03);
 }
 .btn-go:active {
@@ -148,7 +262,7 @@ textarea {
   transition: border-radius 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 .btn-tonal:hover {
-  background: #564f66;
+  background: #48484f;
 }
 /* the quietest action */
 .btn-text {
@@ -180,7 +294,7 @@ textarea {
   transition: border-radius 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 .icon-btn:hover {
-  background: #43414a;
+  background: #45454b;
 }
 /* pressed buttons get a squarer shape (Material 3's "shape morph") */
 .icon-btn:active,
@@ -270,7 +384,7 @@ button.primary {
   color: var(--ui-muted);
 }
 
-/* numbers in coloured containers: <dl class="stat-tiles"><div class="t-cyan"><dt>Lines</dt><dd>18</dd></div>... */
+/* numbers in containers (t-accent / t-second, or plain grey): <dl class="stat-tiles"><div class="t-second"><dt>Lines</dt><dd>18</dd></div>... */
 .stat-tiles {
   margin: 0;
   display: grid;
@@ -308,17 +422,9 @@ button.primary {
   background: var(--ui-accent-box) !important;
   color: var(--ui-on-accent-box);
 }
-.t-cyan {
-  background: var(--ui-cyan) !important;
-  color: var(--ui-on-cyan);
-}
-.t-yellow {
-  background: var(--ui-yellow) !important;
-  color: var(--ui-on-yellow);
-}
-.t-rose {
-  background: var(--ui-rose) !important;
-  color: var(--ui-on-rose);
+.t-second {
+  background: var(--ui-second-box) !important;
+  color: var(--ui-on-second-box);
 }
 
 /* the playful shape for a page's hero number (the score, "VS") */
@@ -402,7 +508,7 @@ kbd {
   padding: 12px 20px;
   border-radius: var(--ui-radius-sm);
   background: var(--ui-text);
-  color: #322f35;
+  color: #1e1e21;
   font-weight: 600;
   box-shadow: var(--ui-shadow);
   transition:
@@ -419,7 +525,7 @@ kbd {
 
 .intro-screen {
   overflow: hidden;
-  background: rgba(20, 18, 24, 0.9) !important;
+  background: color-mix(in srgb, var(--ui-bg) 90%, transparent) !important;
 }
 .intro-box {
   position: relative;
@@ -434,7 +540,7 @@ kbd {
   font-weight: 800;
   line-height: 1.1;
   letter-spacing: -0.02em;
-  color: #fff;
+  color: var(--ui-text);
 }
 .intro-sub {
   margin: 0 0 4px;
@@ -470,12 +576,14 @@ kbd {
   font-size: 0.88rem;
   color: var(--ui-muted);
 }
+/* underlined: in some palettes the link colour is as light as the text */
 .site-footer a {
   color: var(--ui-accent);
-  text-decoration: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 .site-footer a:hover {
-  text-decoration: underline;
+  text-decoration-thickness: 2px;
 }
 .footer + .site-footer {
   padding-top: 0;
