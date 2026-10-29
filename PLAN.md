@@ -195,6 +195,13 @@ reads the colours from CSS and redraws on 'palettechange'). Default: Ink wash.
 Checked: 42/42 tests, 16/16 browser checks, ESLint, axe with no violations on
 all 4 pages in all 3 palettes.
 
+v0.37: a fourth, brighter palette: Figma's Jewel box (#61cd85 emerald,
+#0f52ba sapphire, #9966cc amethyst, #cfb53b gold) on dark navy: gold buttons,
+emerald highlights, a sapphire-to-amethyst score panel with a gold blob.
+Chosen over Pop art (too bright), Cotton candy skies, Tropical punch and
+Glowing horizon, compared side by side on the real pages. New tokens for the
+score panel: --ui-on-hero, --ui-chip, --ui-on-chip.
+
 ## ▶ NEXT: options
 
 1. ~~Deeper lookahead with hold~~ done in v0.18. Possible follow-ups: a wider

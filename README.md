@@ -318,7 +318,7 @@ assets/js/               the website (browser only)
   how-it-works.js, learning.js  the two explanation pages
   ai-worker.js                  an AI player thinking in a background thread
   tetro-bg.js                   the falling pieces in the background
-  palette.js                    the colour picker (Ink wash, Spiced chai, Retro sunset)
+  palette.js                    the colour picker (Ink wash, Spiced chai, Retro sunset, Jewel box)
   lib/                          shared by the pages: models (download), ai-client (worker or here),
                                 canvas (board drawing, colours from CSS), touch-pad
 assets/css/              style (Play), theme (shared look, loaded last), nav (top bar),
@@ -431,7 +431,7 @@ piece and can hold.
 
 Every page uses one design (in the style of Material 3 Expressive: pill
 buttons, a floating toolbar, one blob shape), coloured by a palette the
-visitor picks with the round button in the top bar. The three palettes come
+visitor picks with the round button in the top bar. The four palettes come
 from Figma's colour combinations
 (<https://www.figma.com/resource-library/color-combinations/>):
 
@@ -440,13 +440,15 @@ from Figma's colour combinations
 | **Ink wash** (default) | `#5c5c5c` `#cbcbcb` `#ffffe3` `#6d8196` | charcoal gallery: ivory text and buttons, slate highlights |
 | **Spiced chai** | `#fdfbd8` `#d47e30` `#8d5a2b` `#825e34` | dark roast: cream text, cinnamon buttons, nutmeg panels |
 | **Retro sunset** | `#c4621c` `#ffce1b` `#069494` `#b7410e` | 70s: deep teal background, mustard buttons, rust and orange score, teal highlights |
+| **Jewel box** | `#61cd85` `#0f52ba` `#9966cc` `#cfb53b` | the bright one: dark navy, gold buttons, emerald highlights, sapphire-to-amethyst score panel |
 
 The choice is remembered (`localStorage`) and applies to every page.
 
 - `assets/css/theme.css` holds every colour, one block per palette: the
   surfaces and text (tinted from the palette), `--ui-accent` (actions, the
   current choice, good results), `--ui-second` (highlights, the opponent,
-  best / saved marks), the score panel's gradient (`--ui-hero`), the
+  best / saved marks), the score panel (`--ui-hero`, its text `--ui-on-hero`
+  and last-clear chip `--ui-chip`), the
   palette's 4 colours (`--pal-1..4`: logo, swatches, background pieces) and
   the 7 pieces plus garbage (`--piece-1..8`). Nothing else adds a colour.
 - `assets/js/palette.js` runs first in `<head>` (so there is no flash of the
@@ -550,6 +552,7 @@ regression tests, checked command-line flags, and fixes for 16 bugs found in
 review (mostly in failure paths: a frozen opponent when the worker failed,
 stuck keys after switching windows, Ctrl+C acting as Hold).
 Version 0.36 colours the whole site, pieces included, with one of three
-Figma palettes the visitor picks (Ink wash, Spiced chai, Retro sunset). Version 0.34 gives every page a new look ("B+": Material 3 Expressive colours
+Figma palettes the visitor picks (Ink wash, Spiced chai, Retro sunset);
+0.37 adds a brighter one, Jewel box. Version 0.34 gives every page a new look ("B+": Material 3 Expressive colours
 and shapes, self-hosted Outfit font, flat blocks instead of images).
 Version 0.9 adds training with garbage rows. The old code is in git history if you ever want it.

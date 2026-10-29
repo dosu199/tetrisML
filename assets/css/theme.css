@@ -5,13 +5,15 @@
  *
  * The look ("expressive play") follows Material 3's dark tonal colours. The
  * visitor picks one of three palettes from Figma's colour combinations
- * (assets/js/palette.js): Ink wash (default), Spiced chai, Retro sunset.
+ * (assets/js/palette.js): Ink wash (default), Spiced chai, Retro sunset,
+ * Jewel box.
  * Each palette below sets every colour, so nothing else may add one:
  *   surfaces and text    --ui-bg ... --ui-faint, tinted from the palette
  *   --ui-accent          actions, the current choice, good results
  *   --ui-second          highlights, the opponent, best / saved marks
  *   -box / on-           a container and the text on it
- *   --ui-hero(-blob)     the score panel's gradient and its corner blob
+ *   --ui-hero(-blob)     the score panel's gradient, its corner blob,
+ *   --ui-on-hero, -chip  its text and its last-clear chip
  *   --pal-1..4           the palette's 4 colours as Figma shows them
  *                        (logo, picker swatches, background pieces)
  *   --piece-1..8         the pieces by cell value, and garbage
@@ -73,7 +75,7 @@
 }
 
 /* The three palettes, from Figma's colour combinations (Ink wash, Spiced
-   chai, Retro sunset; the 4 colours sampled from Figma's swatches are
+   chai, Retro sunset, Jewel box; the 4 colours sampled from Figma's swatches are
    --pal-1..4). Each palette sets EVERY colour: the surfaces and text are
    tinted from it, its colours become the accent, the second colour, the
    hero panel and the 7 pieces (--piece-1..7, garbage --piece-8, by cell
@@ -111,6 +113,9 @@
   --ui-on-second-box: #111111;
   --ui-hero: linear-gradient(135deg, #5c5c5c 0%, #4d5866 100%);
   --ui-hero-blob: rgba(109, 129, 150, 0.55);
+  --ui-on-hero: var(--ui-on-accent-box);
+  --ui-chip: var(--ui-accent); /* the last-clear chip on the score panel */
+  --ui-on-chip: var(--ui-on-accent);
 
   --piece-1: #6d8196;
   --piece-2: #ffffe3;
@@ -152,6 +157,9 @@
   --ui-on-second-box: #fdfbd8;
   --ui-hero: linear-gradient(135deg, #8d5a2b 0%, #825e34 55%, #9a5a22 100%);
   --ui-hero-blob: rgba(212, 126, 48, 0.55);
+  --ui-on-hero: var(--ui-on-accent-box);
+  --ui-chip: var(--ui-accent); /* the last-clear chip on the score panel */
+  --ui-on-chip: var(--ui-on-accent);
 
   --piece-1: #d47e30;
   --piece-2: #fdfbd8;
@@ -193,6 +201,9 @@
   --ui-on-second-box: #001f1f;
   --ui-hero: linear-gradient(135deg, #b7410e 0%, #a8480f 60%, #c4621c 100%);
   --ui-hero-blob: rgba(255, 206, 27, 0.5);
+  --ui-on-hero: var(--ui-on-accent-box);
+  --ui-chip: var(--ui-accent); /* the last-clear chip on the score panel */
+  --ui-on-chip: var(--ui-on-accent);
 
   --piece-1: #b7410e;
   --piece-2: #069494;
@@ -203,6 +214,52 @@
   --piece-7: #f08a3c;
   --piece-8: #3d4f4f;
 }
+
+/* Jewel box: emerald, sapphire, amethyst, gold - the bright one: rich jewel
+   colours on dark navy, gold buttons, a sapphire-to-amethyst score panel */
+[data-palette='jewel'] {
+  --pal-1: #61cd85;
+  --pal-2: #0f52ba;
+  --pal-3: #9966cc;
+  --pal-4: #cfb53b;
+
+  --ui-bg: #0e0f17;
+  --ui-surface: #171926;
+  --ui-surface-high: #202334;
+  --ui-surface-top: #2a2e42;
+  --ui-board: #121420;
+  --ui-slot: #1c1f2f; /* an empty cell of a board */
+  --ui-line: #3b4060;
+  --ui-text: #f4f2ff;
+  --ui-muted: #d3d2e6;
+  --ui-faint: #9497b3;
+  --ui-tonal: #26284a;
+  --ui-on-tonal: #f4f2ff;
+
+  --ui-accent: #cfb53b;
+  --ui-on-accent: #1f1800;
+  --ui-accent-box: #0f52ba;
+  --ui-on-accent-box: #e8efff;
+  --ui-second: #61cd85;
+  --ui-on-second: #04210f;
+  --ui-second-box: #6a3fa0;
+  --ui-on-second-box: #f2e8ff;
+  --ui-hero: linear-gradient(135deg, #0f52ba 0%, #7a4fb0 100%);
+  --ui-hero-blob: rgba(207, 181, 59, 0.8);
+  --ui-on-hero: #ffffff;
+  --ui-chip: #cfb53b;
+  --ui-on-chip: #1f1800;
+
+  --piece-1: #9966cc;
+  --piece-2: #4f8ff0;
+  --piece-3: #cfb53b;
+  --piece-4: #61cd85;
+  --piece-5: #e0a84a;
+  --piece-6: #0f52ba;
+  --piece-7: #c38fe8;
+  --piece-8: #3f4258;
+}
+
 
 body {
   font-family: var(--ui-font);

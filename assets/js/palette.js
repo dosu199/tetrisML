@@ -1,6 +1,6 @@
 /**
- * palette.js - the visitor's choice of colours: one of three palettes from
- * Figma's colour combinations (Ink wash, Spiced chai, Retro sunset). Each
+ * palette.js - the visitor's choice of colours: one of four palettes from
+ * Figma's colour combinations (Ink wash, Spiced chai, Retro sunset, Jewel box). Each
  * palette sets every colour of the site, pieces included (see the palette
  * blocks in assets/css/theme.css); this picks which one.
  *
@@ -18,6 +18,7 @@
     { id: 'ink', name: 'Ink wash' },
     { id: 'chai', name: 'Spiced chai' },
     { id: 'retro', name: 'Retro sunset' },
+    { id: 'jewel', name: 'Jewel box' },
   ];
   const DEFAULT = PALETTES[0].id;
   const root = document.documentElement;
