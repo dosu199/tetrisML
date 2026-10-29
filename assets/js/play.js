@@ -60,14 +60,8 @@ for (const input of playerInputs) input.checked = input.value === initialPlayer;
 
 /* ---------------------------------------------------------------- overlay */
 
-const READY_TEXT = isTouch
-  ? '<p class="intro-sub">You play. Press <b>Network plays</b> to let the network take over.</p>'
-  : `<p class="intro-sub">You play. Press <b>Network plays</b> to let the network take over.</p>
-     <ol class="intro-steps">
-       <li><span><kbd>←</kbd><kbd>→</kbd> move, <kbd>↑</kbd> rotate</span></li>
-       <li><span><kbd>↓</kbd> soft drop, <kbd>Space</kbd> drop</span></li>
-       <li><span><kbd>C</kbd> hold, <kbd>P</kbd> pause</span></li>
-     </ol>`;
+// short: the keys are in the toolbar under the board, You play / Network plays above it
+const READY_TEXT = isTouch ? '' : '<p class="intro-sub">Press <kbd>Space</kbd> to start</p>';
 
 /** What the overlay says in each phase of your game (none: hidden). */
 const OVERLAYS = {

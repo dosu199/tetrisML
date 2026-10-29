@@ -429,7 +429,8 @@ kbd {
 }
 .intro-screen .intro-title {
   margin: 0 0 6px;
-  font-size: 1.9rem;
+  font-size: clamp(1.4rem, 2.4vw, 1.9rem);
+  white-space: nowrap;
   font-weight: 800;
   line-height: 1.1;
   letter-spacing: -0.02em;
@@ -440,62 +441,9 @@ kbd {
   font-size: 0.95rem;
   color: var(--ui-muted);
 }
-.intro-steps {
-  list-style: none;
-  counter-reset: step;
-  margin: 14px auto;
-  padding: 0;
-  display: grid;
-  gap: 8px;
-  text-align: left;
-}
-.intro-steps li {
-  counter-increment: step;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  border-radius: var(--ui-radius-sm);
-  font-size: 0.92rem;
-  color: var(--ui-muted);
-  background: var(--ui-surface-high);
-  animation: intro-in 0.5s both;
-}
-.intro-steps li:nth-child(2) {
-  animation-delay: 0.1s;
-}
-.intro-steps li:nth-child(3) {
-  animation-delay: 0.2s;
-}
-.intro-steps li::before {
-  content: counter(step);
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: var(--ui-on-accent);
-  background: var(--ui-accent);
-}
-.intro-steps b {
-  color: var(--ui-text);
-}
-
 /* the falling tetrominoes bring their own styles: see tetro-bg.js */
 
-@keyframes intro-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-}
 @media (prefers-reduced-motion: reduce) {
-  .intro-steps li {
-    animation: none;
-  }
   *,
   *::before,
   *::after {
@@ -503,13 +451,10 @@ kbd {
   }
 }
 
-/* short boards on phones: keep the title, the choices and the button */
+/* short boards on phones */
 @media (max-width: 720px) {
   .intro-screen .intro-title {
     font-size: 1.4rem;
-  }
-  .intro-screen .intro-steps {
-    display: none;
   }
   .intro-sub {
     font-size: 0.85rem;

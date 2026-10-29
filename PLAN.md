@@ -172,6 +172,8 @@ coloured tiles, a garbage meter, rows sent, a snackbar when garbage arrives.
 All boards share one drawing style (`lib/canvas.js`); block images are no
 longer used. Checked: 42/42 tests, ESLint, axe (WCAG 2 AA) with no
 violations on all four pages, no sideways scroll at 360 px.
+v0.34.1: the Play start screen is just "Ready to play?", Start and "Press Space
+to start" (the keys are already in the toolbar under the board).
 
 ## ▶ NEXT: options
 
