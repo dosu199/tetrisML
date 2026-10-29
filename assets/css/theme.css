@@ -1,103 +1,425 @@
 /*
- * theme.css - the shared look of every page (Play, Play vs Bot, How it works,
- * Watch it learn). Loaded after each page's own CSS, so these values win.
+ * theme.css - the shared look of every page: colours, type, shapes and the
+ * components more than one page uses. Loaded after each page's own CSS, so
+ * these values win.
  *
- *  - one dark palette: the names used by base.css (--bg, --surface,
- *    --line, --accent, ...) and by style.css (--page, --panel, ...) all point
- *    at the same colours
- *  - one page background, one primary button, one <kbd>
- *  - the intro screen used on top of the boards
- *  - falling tetrominoes (made by tetro-bg.js) behind every page
+ * The look ("expressive play") follows Material 3's dark tonal colours:
+ * surfaces are tinted greys, and colour comes in soft "containers" (a dark
+ * tint of a hue with a light text of the same hue). One accent, lilac
+ * (#d0bcff, dark text on it). The pieces bring the bright colours.
+ * Type: Outfit. Shapes: large radii; pills for actions; one playful
+ * "blob" shape for the hero number of a page.
  */
 
-:root[data-theme='dark'] {
-  --ui-bg: #0d1120;
-  --ui-surface: #161c30;
-  --ui-line: rgba(255, 255, 255, 0.09);
-  --ui-text: #e8ebf3;
-  --ui-muted: #9aa3b8;
-  --ui-accent: #8b85ff;
-  --ui-accent-soft: rgba(139, 133, 255, 0.16);
-  --ui-radius: 14px;
+/* Outfit (SIL Open Font License, assets/fonts/OFL.txt), served from this
+   site: no third-party request, works offline. One variable file per
+   alphabet; the browser only downloads latin-ext if a page needs it. */
+@font-face {
+  font-family: 'Outfit';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('../fonts/outfit-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Outfit';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('../fonts/outfit-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
 
-  /* base.css / versus.css / learning.css names */
+:root[data-theme='dark'] {
+  --ui-font: 'Outfit', system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+
+  /* surfaces, from the page up */
+  --ui-bg: #141218;
+  --ui-surface: #1d1b20;
+  --ui-surface-high: #2b2930;
+  --ui-surface-top: #36343b;
+  --ui-board: #18161c;
+  --ui-slot: #221f27; /* an empty cell of a board */
+  --ui-line: #49454f;
+  --ui-line-soft: rgba(230, 224, 233, 0.1);
+
+  /* text */
+  --ui-text: #e6e0e9;
+  --ui-muted: #cac4d0;
+  --ui-faint: #938f99;
+
+  /* the accent, and the tonal containers (background / text on it) */
+  --ui-accent: #d0bcff;
+  --ui-on-accent: #381e72;
+  --ui-accent-box: #4f378b;
+  --ui-on-accent-box: #eaddff;
+  --ui-tonal: #4a4458;
+  --ui-on-tonal: #e8def8;
+  --ui-cyan: #004f58;
+  --ui-on-cyan: #9eefff;
+  --ui-yellow: #4a3f00;
+  --ui-on-yellow: #ffe17a;
+  --ui-rose: #5c1a2b;
+  --ui-on-rose: #ffb1c1;
+  --ui-pink: #633b48;
+  --ui-on-pink: #ffd8e4;
+  --ui-danger: #ffb4ab;
+  --ui-good: #7fdc94;
+
+  --ui-radius: 24px;
+  --ui-radius-lg: 32px;
+  --ui-radius-sm: 16px;
+  --ui-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+
+  /* the names base.css, versus.css and learning.css use */
   --bg: var(--ui-bg);
-  --bg-alt: #111628;
+  --bg-alt: var(--ui-surface);
   --surface: var(--ui-surface);
-  --line: #262e48;
+  --line: var(--ui-line);
   --text: var(--ui-text);
   --muted: var(--ui-muted);
   --accent: var(--ui-accent);
-  --accent-soft: #232650;
+  --accent-soft: var(--ui-tonal);
+  --good: var(--ui-good);
+  --bad: var(--ui-danger);
+  --board-bg: var(--ui-board);
+  --board-grid: var(--ui-slot);
   --radius: var(--ui-radius);
-
-  /* style.css (Play page) names */
-  --page: var(--ui-bg);
-  --panel: var(--ui-surface);
-  --panel-line: var(--ui-line);
-  --accent-2: var(--ui-accent);
+  --shadow: none;
   color-scheme: dark;
 }
 
-/* one calm background everywhere: a faint glow at the top left */
 body {
-  background:
-    radial-gradient(900px 480px at 12% 0%, rgba(139, 133, 255, 0.1), transparent 65%),
-    var(--ui-bg);
-  background-attachment: fixed;
+  font-family: var(--ui-font);
+  background: var(--ui-bg);
+  color: var(--ui-text);
+}
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
 }
 
-/* the main button (Start, Play again, ...) */
+/* ------------------------------------------------------------- buttons */
+
+/* the main action (Start, Play again, Rematch): a lilac pill */
 .btn-go {
   font: inherit;
   font-size: 1rem;
   font-weight: 700;
-  letter-spacing: 0.02em;
-  padding: 10px 30px;
-  border: 1px solid transparent;
+  min-height: 48px;
+  padding: 0 28px;
+  border: 0;
   border-radius: 999px;
-  color: #0b0e1d; /* dark text on the purple: readable (contrast 6.3:1) */
+  color: var(--ui-on-accent);
   background: var(--ui-accent);
-  box-shadow: 0 4px 18px rgba(139, 133, 255, 0.28);
   cursor: pointer;
   transition:
-    transform 0.15s,
-    box-shadow 0.15s,
+    transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
     background 0.15s;
 }
 .btn-go:hover {
-  background: #9a95ff;
-  box-shadow: 0 6px 22px rgba(139, 133, 255, 0.4);
-  transform: translateY(-1px);
+  background: #dccbff;
+  transform: scale(1.03);
 }
-.btn-go:focus-visible {
-  outline: 2px solid #fff;
+.btn-go:active {
+  transform: scale(0.97);
+}
+.btn-go:focus-visible,
+.btn-tonal:focus-visible,
+.btn-text:focus-visible,
+.icon-btn:focus-visible {
+  outline: 2px solid var(--ui-text);
   outline-offset: 3px;
+}
+/* a softer action next to it */
+.btn-tonal {
+  font: inherit;
+  font-weight: 700;
+  min-height: 44px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 999px;
+  color: var(--ui-on-tonal);
+  background: var(--ui-tonal);
+  cursor: pointer;
+  transition: border-radius 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.btn-tonal:hover {
+  background: #564f66;
+}
+/* the quietest action */
+.btn-text {
+  font: inherit;
+  font-weight: 600;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  color: var(--ui-text);
+  background: transparent;
+  cursor: pointer;
+}
+.btn-text:hover {
+  background: var(--ui-line-soft);
+}
+/* a round button with an icon (give it an aria-label) */
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  color: var(--ui-text);
+  background: var(--ui-surface-top);
+  cursor: pointer;
+  transition: border-radius 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.icon-btn:hover {
+  background: #43414a;
+}
+/* pressed buttons get a squarer shape (Material 3's "shape morph") */
+.icon-btn:active,
+.btn-tonal:active {
+  border-radius: 16px;
+}
+.icon-btn svg {
+  display: block;
+}
+
+/* the other lilac buttons (Pause/Play, Race): the same dark text */
+button.primary {
+  color: var(--ui-on-accent) !important;
+}
+
+/* ------------------------------------------------------------- switch */
+/* <label class="switch"><input type="checkbox" role="switch"><span class="switch-track"><span class="switch-thumb"></span></span> Text</label> */
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.switch input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+.switch-track {
+  position: relative;
+  flex: none;
+  width: 52px;
+  height: 32px;
+  box-sizing: border-box;
+  border-radius: 999px;
+  border: 2px solid var(--ui-faint);
+  background: var(--ui-surface-top);
+  transition:
+    background 0.2s,
+    border-color 0.2s;
+}
+.switch-thumb {
+  position: absolute;
+  top: 50%;
+  left: 6px;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: var(--ui-faint);
+  transform: translateY(-50%);
+  transition:
+    left 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
+    width 0.2s,
+    height 0.2s,
+    background 0.2s;
+}
+.switch input:checked + .switch-track {
+  background: var(--ui-accent);
+  border-color: var(--ui-accent);
+}
+.switch input:checked + .switch-track .switch-thumb {
+  left: 24px;
+  width: 22px;
+  height: 22px;
+  background: var(--ui-on-accent);
+}
+.switch input:focus-visible + .switch-track {
+  outline: 2px solid var(--ui-text);
+  outline-offset: 3px;
+}
+
+/* ---------------------------------------------------- tiles and numbers */
+
+/* ONE label style for every small label above a number or a box, on every
+   page (Hold, Next, Score, Lines...): sentence case, muted */
+.tile-label,
+.vs-mini span,
+.vs-field > span,
+.counters dt,
+.stage-stats dt {
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ui-muted);
+}
+
+/* numbers in coloured containers: <dl class="stat-tiles"><div class="t-cyan"><dt>Lines</dt><dd>18</dd></div>... */
+.stat-tiles {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.stat-tiles > div {
+  display: flex;
+  flex-direction: column-reverse; /* the number first, the label under it */
+  align-items: center;
+  padding: 12px 4px;
+  border-radius: var(--ui-radius);
+  background: var(--ui-surface-high);
+}
+.stat-tiles dt {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: inherit;
+}
+.stat-tiles dd {
+  margin: 0;
+  font-size: 1.75rem;
+  line-height: 1.15;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.stat-tiles.compact dd {
+  font-size: 1.35rem;
+}
+.stat-tiles.compact > div {
+  padding: 8px 2px;
+  border-radius: var(--ui-radius-sm);
+}
+.t-accent {
+  background: var(--ui-accent-box) !important;
+  color: var(--ui-on-accent-box);
+}
+.t-cyan {
+  background: var(--ui-cyan) !important;
+  color: var(--ui-on-cyan);
+}
+.t-yellow {
+  background: var(--ui-yellow) !important;
+  color: var(--ui-on-yellow);
+}
+.t-rose {
+  background: var(--ui-rose) !important;
+  color: var(--ui-on-rose);
+}
+
+/* the playful shape for a page's hero number (the score, "VS") */
+.shape-blob {
+  border-radius: 46% 54% 52% 48% / 54% 46% 54% 46%;
+}
+
+/* a small piece preview (Hold, Next), drawn as cells: see assets/js/tetris-visual.js */
+.mini {
+  display: grid;
+  grid-template-columns: repeat(var(--w, 4), var(--mini-cell, 13px));
+  grid-auto-rows: var(--mini-cell, 13px);
+  gap: 2px;
+}
+.mini i {
+  border-radius: calc(var(--mini-cell, 13px) * 0.3);
 }
 
 kbd {
   display: inline-block;
-  min-width: 1.4em;
-  padding: 0 5px;
+  min-width: 1.6em;
+  padding: 1px 7px;
   margin: 0 1px;
-  border-radius: 5px;
-  border: 1px solid var(--ui-line);
-  border-bottom-width: 2px;
-  background: var(--ui-bg);
+  border: 0;
+  border-radius: 8px;
+  background: var(--ui-surface-top);
   font: inherit;
-  font-size: max(0.75rem, 0.8em);
+  font-size: max(0.75rem, 0.82em);
+  font-weight: 600;
   line-height: 1.5;
   text-align: center;
   color: var(--ui-text);
+}
+
+/* -------------------------------------------- floating toolbar, snackbar */
+
+.toolbar {
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  z-index: 20;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 999px;
+  background: var(--ui-surface-high);
+  box-shadow: var(--ui-shadow);
+  max-width: calc(100vw - 32px);
+  box-sizing: border-box;
+}
+.toolbar-sep {
+  width: 1px;
+  height: 28px;
+  margin: 0 6px;
+  background: var(--ui-line);
+}
+.toolbar-keys {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-right: 12px;
+  font-size: 0.88rem;
+  color: var(--ui-muted);
+  white-space: nowrap;
+}
+
+.snackbar {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  z-index: 30;
+  transform: translate(-50%, 0);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  box-sizing: border-box;
+  padding: 12px 20px;
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-text);
+  color: #322f35;
+  font-weight: 600;
+  box-shadow: var(--ui-shadow);
+  transition:
+    opacity 0.2s,
+    transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.snackbar.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 16px);
 }
 
 /* ------------------------------------------------- intro screen on a board */
 
 .intro-screen {
   overflow: hidden;
-  background:
-    radial-gradient(110% 50% at 50% 0%, rgba(139, 133, 255, 0.16), transparent 70%),
-    rgba(10, 13, 26, 0.9) !important;
+  background: rgba(20, 18, 24, 0.9) !important;
 }
 .intro-box {
   position: relative;
@@ -113,17 +435,9 @@ kbd {
   letter-spacing: -0.02em;
   color: #fff;
 }
-.intro-kicker {
-  margin: 0 0 6px !important;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--ui-accent);
-}
 .intro-sub {
   margin: 0 0 4px;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   color: var(--ui-muted);
 }
 .intro-steps {
@@ -141,11 +455,10 @@ kbd {
   align-items: center;
   gap: 10px;
   padding: 8px 10px;
-  border-radius: 10px;
-  font-size: 0.9rem;
+  border-radius: var(--ui-radius-sm);
+  font-size: 0.92rem;
   color: var(--ui-muted);
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--ui-line);
+  background: var(--ui-surface-high);
   animation: intro-in 0.5s both;
 }
 .intro-steps li:nth-child(2) {
@@ -159,31 +472,16 @@ kbd {
   flex: none;
   display: grid;
   place-items: center;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   font-weight: 700;
-  color: var(--ui-accent);
-  background: var(--ui-accent-soft);
+  color: var(--ui-on-accent);
+  background: var(--ui-accent);
 }
 .intro-steps b {
   color: var(--ui-text);
-}
-.intro-chips {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 6px;
-  margin: 0 0 16px !important;
-}
-.intro-chips span {
-  padding: 2px 10px;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  color: var(--ui-text);
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid var(--ui-line);
 }
 
 /* the falling tetrominoes bring their own styles: see tetro-bg.js */
@@ -198,6 +496,11 @@ kbd {
   .intro-steps li {
     animation: none;
   }
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* short boards on phones: keep the title, the choices and the button */
@@ -209,17 +512,8 @@ kbd {
     display: none;
   }
   .intro-sub {
-    font-size: 0.8rem;
+    font-size: 0.85rem;
   }
-}
-
-/* How it works / Watch it learn: the hero and the shaded sections had solid
-   backgrounds that hid the falling pieces; keep only a see-through tint */
-.hero {
-  background: radial-gradient(1200px 300px at 20% -10%, rgba(139, 133, 255, 0.12), transparent 70%) !important;
-}
-.section.alt {
-  background: rgba(255, 255, 255, 0.025) !important;
 }
 
 /* "Made by" line at the bottom of every page */
@@ -228,7 +522,7 @@ kbd {
   box-sizing: border-box;
   padding: 20px 16px 24px;
   text-align: center;
-  font-size: 0.82rem;
+  font-size: 0.88rem;
   color: var(--ui-muted);
 }
 .site-footer a {
@@ -241,11 +535,6 @@ kbd {
 .footer + .site-footer {
   padding-top: 0;
   margin-top: -24px; /* sit right under a page's own footer */
-}
-
-/* the other purple buttons (Start, Pause/Play, Race): dark text as well */
-button.primary {
-  color: #0b0e1d !important;
 }
 
 /* text only screen readers read (a page heading that is not shown) */
@@ -271,32 +560,11 @@ button.primary {
   }
 }
 
-/* ONE style for every small label above a number or a box, on every page
-   (Hold, Next, Score, Lines, Pieces, Game, Best...): capitals, 12.5 px, muted */
-#name,
-#holdTetromino::before,
-#nextTetromino::before,
-.agent-panel > label:not(.ml-switch),
-.play-stats dt,
-.vs-mini span,
-.vs-stats dt,
-.vs-field > span,
-.vs-choice legend,
-.counters dt,
-.stage-stats dt {
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--ui-muted);
-}
-
 /* touch screens: everything you tap is at least 44 px (the usual minimum) */
 @media (pointer: coarse) {
   button,
   select,
-  .toc a,
-  label.ml-switch {
+  .toc a {
     min-height: 44px;
   }
   input[type='range'] {
@@ -316,4 +584,5 @@ button.primary {
 input[type='range'] {
   min-height: 24px;
   cursor: pointer;
+  accent-color: var(--ui-accent);
 }

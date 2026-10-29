@@ -1,14 +1,16 @@
 /**
  * learning.js - the live part of learning.html.
  *
- * Six copies of the network, saved during training (snapshots/game-N.json),
+ * Six copies of the network, saved during training (models/snapshots/game-N.json),
  * play side by side. Game k of every board uses the same pieces (seed
  * base + k), so the only difference between the boards is the network.
  * Uses the real game code read-only and draws its own boards on <canvas>.
  */
 
-import { createBoard, Bag, PLAY_LEFT, PLAY_COLS, PLAY_ROWS, idx, FRAME } from '../../src/tetris-core.js';
-import { loadDqn, nextStates } from '../../src/tetris-dqn.js';
+import { createBoard, Bag, PLAY_COLS, PLAY_ROWS } from '../../src/tetris-core.js';
+import { loadDqn, nextStates, greedyPick } from '../../src/tetris-dqn.js';
+import { setupCanvas, drawPlayfield } from './lib/canvas.js';
+import { fetchModel } from './lib/models.js';
 
 const $ = (id) => document.getElementById(id);
 const fmt = (v) => (Number.isFinite(v) ? Math.round(v).toLocaleString('en-US') : '–');
@@ -69,41 +71,7 @@ const CELL = 12;
 
 /* --------------------------------------------------------------- drawing */
 
-// piece value -> colour (Z=1, I=2, O=3, S=4, L=5, J=6, T=7, garbage/frame=8)
-const PIECE_COLORS = ['#000', '#ef4444', '#22d3ee', '#facc15', '#22c55e', '#f97316', '#3b82f6', '#a855f7', '#6b7280'];
-const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-
-function setupCanvas(canvas, w, h) {
-  const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
-  canvas.width = Math.round(w * dpr);
-  canvas.height = Math.round(h * dpr);
-  canvas.style.aspectRatio = `${w} / ${h}`;
-  const ctx = canvas.getContext('2d');
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  return ctx;
-}
-
-function drawBoard(ctx, board) {
-  const s = CELL;
-  ctx.fillStyle = css('--board-bg');
-  ctx.fillRect(0, 0, PLAY_COLS * s, PLAY_ROWS * s);
-  ctx.strokeStyle = css('--board-grid');
-  ctx.lineWidth = 1;
-  for (let c = 1; c < PLAY_COLS; c++) {
-    ctx.beginPath();
-    ctx.moveTo(c * s + 0.5, 0);
-    ctx.lineTo(c * s + 0.5, PLAY_ROWS * s);
-    ctx.stroke();
-  }
-  for (let r = 0; r < PLAY_ROWS; r++) {
-    for (let c = 0; c < PLAY_COLS; c++) {
-      const v = board[idx(r, c + PLAY_LEFT)];
-      if (!v) continue;
-      ctx.fillStyle = PIECE_COLORS[v === FRAME ? 8 : v] || PIECE_COLORS[8];
-      ctx.fillRect(c * s + 1, r * s + 1, s - 2, s - 2);
-    }
-  }
-}
+const drawBoard = (ctx, board) => drawPlayfield(ctx, board, { cell: CELL });
 
 /* ------------------------------------------------------------------ race */
 
@@ -163,7 +131,7 @@ function step(b) {
     }
     return;
   }
-  const opts = nextStates(b.board, b.gen.next(), b.net.input);
+  const opts = nextStates(b.board, b.gen.next(), b.net.inputSpec);
   if (opts.length === 0) {
     b.lost++;
     b.totalPieces += b.pieces;
@@ -172,15 +140,7 @@ function step(b) {
     b.wait = Math.max(2, Math.round(SPEEDS[$('raceSpeed').value] * 0.9));
     return;
   }
-  let best = opts[0];
-  let bestV = -Infinity;
-  for (const o of opts) {
-    const v = b.net.predict(o.state);
-    if (v > bestV) {
-      bestV = v;
-      best = o;
-    }
-  }
+  const best = greedyPick(opts, b.net);
   b.board = best.board;
   b.pieces++;
   b.lines += best.lines;
@@ -237,21 +197,18 @@ function drawMeasured() {
 
 /* ------------------------------------------------------------------ start */
 
+function showRaceSpeed() {
+  $('raceSpeedOut').textContent = `${SPEEDS[$('raceSpeed').value]} pieces/s`;
+}
+
 async function start() {
   buildCards();
   drawMeasured();
-  $('raceSpeedOut').textContent = `${SPEEDS[$('raceSpeed').value]} pieces/s`;
+  showRaceSpeed();
 
   let nets;
   try {
-    nets = await Promise.all(
-      STAGES.map((st) =>
-        fetch(`./models/snapshots/game-${st.games}.json`).then((r) => {
-          if (!r.ok) throw new Error(`models/snapshots/game-${st.games}.json: HTTP ${r.status}`);
-          return r.json();
-        })
-      )
-    );
+    nets = await Promise.all(STAGES.map((st) => fetchModel(`snapshots/game-${st.games}.json`)));
   } catch (e) {
     $('raceStatus').textContent = `Could not load the saved networks (${e.message}). Open this page through a local server (npx serve .).`;
     return;
@@ -282,11 +239,10 @@ async function start() {
     updateStatus();
   });
   $('raceSpeed').addEventListener('input', () => {
-    $('raceSpeedOut').textContent = `${SPEEDS[$('raceSpeed').value]} pieces/s`;
+    showRaceSpeed();
     schedule();
   });
   document.addEventListener('visibilitychange', schedule);
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => boards.forEach(paint));
 
   schedule();
 }

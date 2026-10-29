@@ -1,43 +1,9 @@
 /* base.css - the base styles of how-it-works.html, also used by versus.html and
-   learning.html (palette names, cards, buttons, sections). The game's style.css is separate. */
+   learning.html (sections, cards, buttons, the demo's panels). Colours and type
+   come from theme.css, which loads after this file. The game's style.css is separate. */
 
+/* the site is dark only (every page has data-theme="dark") */
 :root {
-  --bg: #f6f7fb;
-  --bg-alt: #eceff6;
-  --surface: #ffffff;
-  --text: #1b1f2a;
-  --muted: #5d6576;
-  --line: #d9dee8;
-  --accent: #4f46e5;
-  --accent-soft: #e7e6fd;
-  --good: #16a34a;
-  --bad: #dc2626;
-  --board-bg: #0f1424;
-  --board-grid: #1c2338;
-  --shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 4px 16px rgba(16, 24, 40, 0.06);
-  --radius: 14px;
-  color-scheme: light;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
-    --bg: #0e1220;
-    --bg-alt: #121729;
-    --surface: #171d31;
-    --text: #e8ebf3;
-    --muted: #9aa3b8;
-    --line: #2a3250;
-    --accent: #8b85ff;
-    --accent-soft: #252654;
-    --good: #22c55e;
-    --bad: #f87171;
-    --board-bg: #0a0e1a;
-    --board-grid: #161c30;
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 20px rgba(0, 0, 0, 0.25);
-    color-scheme: dark;
-  }
-}
-:root[data-theme='dark'] {
   --bg: #0e1220;
   --bg-alt: #121729;
   --surface: #171d31;
@@ -65,7 +31,8 @@ body {
   padding-top: var(--topnav-h, 0px);
   background: var(--bg);
   color: var(--text);
-  font: 16px/1.6 system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
 }
 a {
@@ -95,23 +62,21 @@ code {
 /* ---------------------------------------------------------------- hero */
 .hero {
   padding: 56px 0 36px;
-  background:
-    radial-gradient(1200px 300px at 20% -10%, var(--accent-soft), transparent 70%),
-    var(--bg);
+  /* a see-through tint, so the falling background pieces stay visible */
+  background: radial-gradient(1200px 300px at 20% -10%, rgba(139, 133, 255, 0.12), transparent 70%);
 }
 .eyebrow {
-  margin: 0 0 8px;
+  margin: 0 0 10px;
   color: var(--accent);
   font-weight: 600;
-  font-size: 0.85rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-size: 1rem;
 }
 h1 {
-  font-size: clamp(1.9rem, 4.5vw, 3rem);
-  line-height: 1.12;
-  margin: 0 0 14px;
-  letter-spacing: -0.02em;
+  font-size: clamp(2.2rem, 5vw, 3.6rem);
+  line-height: 1.05;
+  margin: 0 0 16px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
 }
 .lede {
   max-width: 720px;
@@ -127,16 +92,14 @@ h1 {
 }
 .stat {
   background: var(--surface);
-  border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 14px 16px;
-  box-shadow: var(--shadow);
+  padding: 16px 18px;
   display: flex;
   flex-direction: column;
 }
 .stat-num {
-  font-size: 1.6rem;
-  font-weight: 700;
+  font-size: 1.9rem;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
 .stat-label {
@@ -153,15 +116,15 @@ h1 {
 .toc a {
   text-decoration: none;
   color: var(--text);
-  border: 1px solid var(--line);
-  background: var(--surface);
-  padding: 6px 12px;
+  background: var(--ui-surface-high);
+  padding: 8px 16px;
   border-radius: 999px;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
+  font-weight: 600;
 }
 .toc a:hover {
-  border-color: var(--accent);
-  color: var(--accent);
+  background: var(--ui-tonal);
+  color: var(--ui-on-tonal);
 }
 
 /* ------------------------------------------------------------- sections */
@@ -169,12 +132,13 @@ h1 {
   padding: 56px 0;
 }
 .section.alt {
-  background: var(--bg-alt);
+  background: rgba(255, 255, 255, 0.025); /* see-through, like .hero */
 }
 h2 {
-  font-size: clamp(1.5rem, 3vw, 2rem);
+  font-size: clamp(1.6rem, 3.2vw, 2.3rem);
   margin: 0 0 10px;
-  letter-spacing: -0.01em;
+  font-weight: 800;
+  letter-spacing: -0.02em;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -182,12 +146,12 @@ h2 {
 h2 .num {
   display: inline-grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
+  width: 44px;
+  height: 44px;
+  border-radius: 46% 54% 52% 48% / 54% 46% 54% 46%;
   background: var(--accent);
-  color: #0b0e1d;
-  font-size: 1.05rem;
+  color: var(--ui-on-accent);
+  font-size: 1.15rem;
 }
 h3 {
   margin: 0 0 6px;
@@ -214,10 +178,8 @@ h3 {
 
 .card {
   background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 16px;
-  box-shadow: var(--shadow);
+  border-radius: var(--ui-radius-lg);
+  padding: 20px;
 }
 
 /* ------------------------------------------------------------- the demo */
@@ -235,7 +197,8 @@ h3 {
 }
 .board-frame {
   position: relative;
-  border-radius: 12px;
+  padding: 8px; /* keeps the rounded corners off the corner cells */
+  border-radius: var(--ui-radius);
   overflow: hidden;
   background: var(--board-bg);
   box-shadow: var(--shadow);
@@ -255,7 +218,7 @@ h3 {
   z-index: 1;
   display: grid;
   place-items: center;
-  background: rgba(10, 14, 26, 0.72);
+  background: rgba(20, 18, 24, 0.8);
   color: #fff;
   font-size: 1rem;
   line-height: 1.4;
@@ -270,23 +233,32 @@ h3 {
 button {
   flex: 1;
   font: inherit;
-  font-size: 0.88rem;
+  font-size: 0.95rem;
   font-weight: 600;
   white-space: nowrap;
-  padding: 8px 6px;
-  border-radius: 10px;
-  border: 1px solid var(--line);
-  background: var(--surface);
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 0;
+  background: var(--ui-surface-high);
   color: var(--text);
   cursor: pointer;
+  transition: border-radius 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 button:hover {
-  border-color: var(--accent);
+  background: var(--ui-surface-top);
+}
+button:active {
+  border-radius: 14px;
+}
+button:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
 }
 button.primary {
   background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
+  color: var(--ui-on-accent);
+  font-weight: 700;
 }
 button:disabled {
   opacity: 0.45;
@@ -312,10 +284,10 @@ button:disabled {
 }
 .demo-status {
   margin: 0;
-  padding: 8px 10px;
-  border-radius: 10px;
-  background: var(--accent-soft);
-  color: var(--text);
+  padding: 12px 14px;
+  border-radius: 20px 20px 20px 6px;
+  background: var(--ui-tonal);
+  color: var(--ui-on-tonal);
   line-height: 1.45;
 }
 .toggles {
@@ -339,9 +311,8 @@ button:disabled {
   align-items: center;
 }
 .pieces-card h3 {
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  font-size: 0.85rem;
+  font-weight: 600;
   color: var(--muted);
 }
 .mini-piece {
@@ -356,9 +327,9 @@ button:disabled {
   gap: 8px;
 }
 .counters div {
-  background: var(--bg);
-  border-radius: 10px;
-  padding: 6px 10px;
+  background: var(--ui-surface-high);
+  border-radius: 16px;
+  padding: 8px 12px;
 }
 .counters dt {
   font-size: 0.75rem;
@@ -366,8 +337,8 @@ button:disabled {
 }
 .counters dd {
   margin: 0;
-  font-weight: 700;
-  font-size: 1.15rem;
+  font-weight: 800;
+  font-size: 1.3rem;
   font-variant-numeric: tabular-nums;
 }
 .counters.small {
@@ -436,14 +407,15 @@ button:disabled {
   grid-template-columns: 26px 1fr 110px 54px;
   align-items: center;
   gap: 10px;
-  padding: 6px 8px;
-  border-radius: 8px;
+  padding: 8px 10px;
+  border-radius: 14px;
   font-size: 0.9rem;
   cursor: default;
 }
 .options li:hover,
 .options li.hover {
-  background: var(--accent-soft);
+  background: var(--ui-tonal);
+  color: var(--ui-on-tonal);
 }
 .options li.chosen {
   font-weight: 600;
@@ -490,16 +462,15 @@ button:disabled {
   gap: 28px;
   align-items: center;
   background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  padding: 24px;
-  box-shadow: var(--shadow);
+  border-radius: var(--ui-radius-lg);
+  padding: 28px;
 }
 .step.wide {
   grid-template-columns: 1fr;
 }
 .step-text h3 {
-  font-size: 1.2rem;
+  font-size: 1.35rem;
+  font-weight: 700;
   margin-bottom: 8px;
 }
 .step-text h3::before {
@@ -536,8 +507,10 @@ button:disabled {
 }
 #exampleBoard {
   width: 220px;
+  box-sizing: content-box;
+  padding: 6px; /* keeps the rounded corners off the corner cells */
   height: auto;
-  border-radius: 10px;
+  border-radius: var(--ui-radius-sm);
   background: var(--board-bg);
 }
 .example-features {
@@ -549,9 +522,9 @@ button:disabled {
   display: flex;
   justify-content: space-between;
   gap: 18px;
-  background: var(--bg);
-  padding: 6px 12px;
-  border-radius: 8px;
+  background: var(--ui-surface-high);
+  padding: 8px 14px;
+  border-radius: 14px;
 }
 .example-features b {
   font-variant-numeric: tabular-nums;
@@ -573,13 +546,13 @@ button:disabled {
 .rbar .track {
   height: 18px;
   background: var(--bg);
-  border-radius: 6px;
+  border-radius: 999px;
   overflow: hidden;
 }
 .rbar .fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--accent), var(--good));
-  border-radius: 6px;
+  background: var(--accent);
+  border-radius: 999px;
 }
 .rbar b {
   text-align: right;
@@ -620,11 +593,11 @@ button:disabled {
   justify-content: space-between;
   gap: 10px;
   margin-top: 6px;
-  font-size: 0.86rem;
-  color: var(--muted);
-  background: var(--bg);
-  padding: 6px 10px;
-  border-radius: 8px;
+  font-size: 0.88rem;
+  color: var(--ui-on-tonal);
+  background: var(--ui-tonal);
+  padding: 8px 12px;
+  border-radius: 14px;
 }
 
 .explore {
@@ -632,8 +605,10 @@ button:disabled {
 }
 #exploreBoard {
   width: 140px;
+  box-sizing: content-box;
+  padding: 5px; /* keeps the rounded corners off the corner cells */
   height: auto;
-  border-radius: 10px;
+  border-radius: var(--ui-radius-sm);
   background: var(--board-bg);
 }
 .explore-side {
@@ -738,12 +713,12 @@ button:disabled {
 }
 .badge {
   display: inline-block;
-  font-size: 0.75rem;
+  font-size: 0.78rem;
   font-weight: 700;
-  color: var(--good);
-  border: 1px solid var(--good);
+  color: var(--ui-bg);
+  background: var(--good);
   border-radius: 99px;
-  padding: 0 7px;
+  padding: 1px 9px;
   margin-left: 6px;
   vertical-align: 1px;
 }

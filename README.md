@@ -156,7 +156,7 @@ current piece, a player may put it in the box and take the held piece (or the
 next one, if the box is empty), once per piece. The bot and the network both
 use it, so comparisons stay fair. The network was **not retrained**: it scores
 boards, and hold simply gives it more boards to choose from. The rule they
-share is `decideWithHold` in `src/tetris-core.js`. It compares "place this
+share is `decideWithHold` in `src/tetris-ai.js`. It compares "place this
 piece" with "hold, then place what you get", averaging over all 7 pieces when
 that piece is still unknown.
 
@@ -303,19 +303,26 @@ how we pick the checkpoint, not what we train on.
 
 ```
 index.html  versus.html  how-it-works.html  learning.html     the four pages (GitHub Pages serves the root)
-how-it-works.html        forwards old links to how-it-works.html
+presentation.html        forwards old links to how-it-works.html
 
-assets/css/              style (Play), theme (shared look), nav (top bar),
+src/                     the engine: plain ES modules, no DOM, the same code in Node and the browser
+  tetris-core.js         board, pieces, randomisers, collision, line clears, garbage, playEpisode()
+  tetris-ai.js           the 8 board features, the search bot, the hold decision
+  tetris-dqn.js          the network: inputs, MLP with backprop + Adam, 1/2/3-ply search, choosers
+  tetris-controls.js     how a human moves a piece: kicks, DAS/ARR, gravity, lock delay (both game pages)
+  tetris-players.js      the AI players the website offers, by name (one list for every page)
+
+assets/js/               the website (browser only)
+  play.js, tetris-visual.js     the Play page and its DOM board
+  versus.js                     Play vs Bot
+  how-it-works.js, learning.js  the two explanation pages
+  ai-worker.js                  an AI player thinking in a background thread
+  tetro-bg.js                   the falling pieces in the background
+  lib/                          shared by the pages: models (download), ai-client (worker or here),
+                                canvas (board drawing), piece-style (colours), touch-pad
+assets/css/              style (Play), theme (shared look, loaded last), nav (top bar),
                          base (How it works + base for the others), versus, learning
-assets/js/               versus, versus-ai-worker (opponent in a background thread),
-                         how-it-works, learning, tetro-bg (falling pieces)
-assets/images/           block and background images
-
-src/tetris-core.js       board, pieces, 7-bag, collision, line clears, playEpisode()
-src/tetris-dqn.js        the network: features, MLP with backprop + Adam, chooseDqnAction()
-src/tetris-ai.js         8 features + search bot
-src/tetris-visual.js     the Play page game (you or an agent), the only src file that touches the DOM
-src/tetris-headless.js   fast games for the tests and the genetic algorithm
+assets/fonts/            Outfit, the site's font (self-hosted, OFL licence)
 
 models/dqn-model.json    the trained network (used by every page)
 models/weights.json      the search bot's 8 weights
@@ -323,20 +330,24 @@ models/snapshots/        the network saved at 6 moments of training (Watch it le
 
 scripts/train-dqn.js     trains a network                 -> models/dqn-model.json
 scripts/train-many.js    trains several seeds, keeps the best (runs/ holds each seed, not committed)
-scripts/hardmode.js      bot vs network in harder rule modes
+scripts/hardmode.js      bot vs network in harder rule modes, on every CPU core
+scripts/bench.js         speed of every player
+scripts/lib/             cli (flags), seeds (which games each job plays), replay-memory, stats
 scripts/legacy-ga/       genetic algorithm that tuned the bot -> models/weights.json
 
-tests/bench.js           26 tests for the game core
-tests/test-dqn.js        gradient check + smoke tests for the network
+tests/core.test.js       the game rules and the bot (node:test)
+tests/dqn.test.js        gradient check, save/load, the network plays legal games
+tests/regression.test.js pins every move of 7 fixed games, and a training step, bit for bit
 ```
 
-Run every command from the repo root (that is where `npm` runs them).
+Run every command from the repo root (that is where `npm` runs them). Node 20 or newer.
 
 ## Commands
 
 ```bash
-npm test                          # 26 core tests + the DQN checks
-npm run train:dqn                 # train a new network, about 5 minutes -> models/dqn-model.json
+npm test                          # all tests (node --test), about 8 s
+npm run bench                     # how fast each player is
+npm run train:dqn                 # retrains the shipped network and its 6 snapshots, about 4 minutes
 npm run hard                      # bot vs network, 10 games each
 node scripts/hardmode.js --games 50 --seed 90000 --mode no-preview
 node scripts/hardmode.js --lookahead --games 50 --seed 90000 --mode garbage5
@@ -344,6 +355,9 @@ node scripts/train-many.js --seeds 1,2,3,4   # 4 networks, 2 at a time, about 15
 npm run train:ga                  # the old genetic algorithm -> models/weights.json
 npx serve .                       # then open index.html in the browser
 ```
+
+Every script prints its flags and defaults with `--help`, and stops with a
+clear message on a mistyped flag or a value that is not a number.
 
 Training options (all have defaults): `--epochs 3000 --decay 2000 --batch 512
 --lr 1e-3 --gamma 0.99 --memory 30000 --seed 8 --pieces random --features basic --out models/dqn-model.json`.
@@ -359,6 +373,34 @@ Training writes over `models/dqn-model.json`, so use `--out` to keep the old one
 one run:
 `node scripts/hardmode.js --model models/dqn-model.json,models/dqn-try2.json --games 50 --seed 90000`.
 
+## Code structure
+
+- **Two layers.** `src/` is the engine: pure functions and small classes,
+  no DOM and no global state, so training, tests and the website run the
+  same code. `assets/js/` is the website. `scripts/` are Node command-line
+  tools. Nothing in `src/` imports from the other two.
+- **One place for each rule.** The piece controls (`tetris-controls.js`), the
+  list of AI players (`tetris-players.js`), the hold decision, the reward and
+  the seeds (`scripts/lib/seeds.js`) are each defined once and used everywhere,
+  so Play and Play vs Bot feel the same and every page names a player the same way.
+- **Choosers share one shape:** `(board, piece, next, holdCtx) -> placement | HOLD | null`.
+  `null` always means "no move, the game is lost". The search bot, the
+  network at every depth, and a human-driven test chooser all fit it, so
+  `playEpisode()` plays any of them under any rules.
+- **Fast where it matters.** The search reuses scratch boards and buffers
+  instead of allocating; `predict()` runs hundreds of thousands of times a
+  second. Those scratch buffers are documented where they are declared.
+- **Behaviour is pinned.** `tests/regression.test.js` replays 7 fixed games
+  (bot and network, 1 to 3 pieces ahead, hold, garbage, lost games) and
+  compares a hash of every move, plus a training step to the last bit. A
+  refactor that changes one move fails the test. The 0.33 clean-up was
+  checked this way, and by retraining the network: the model file came out
+  byte for byte identical.
+- **Slow thinking off the main thread.** Play vs Bot's opponent and the Play
+  page's hint run in a Web Worker (`assets/js/ai-worker.js`). If the worker
+  cannot start or cannot load the model, the page answers itself, so the game
+  never waits for an answer that will not come.
+
 ## Play vs Bot page
 
 `versus.html` lets you play against the network (or the search bot) on two
@@ -370,24 +412,42 @@ piece and can hold.
   tops out first loses.
 - **Race:** first to 40 lines wins; topping out loses.
 - **Setup first:** the page opens on one card: pick Mode, Opponent
-  (Network, 3 ahead / 2 ahead / 1 piece, or Search bot) and Speed (Super easy,
+  (Strongest = the network 3 pieces ahead, Strong = 2 ahead, Quick = 1 piece,
+  or Search bot) and Speed (Super easy,
   1 piece every 4 s with about 30% random drops, up to Machine, 5 per second),
   then press the one Start button. The boards appear only after Start.
 - **During a match:** a slim bar keeps opponent and speed changeable at any
   time; Restart and Settings ask before ending the match. The result screen
-  offers Rematch (or Enter) and Change settings. The opponent thinks in a
-  background thread (`assets/js/versus-ai-worker.js`).
+  offers Rematch (or Enter) and Change settings. A small message (snackbar)
+  says when garbage is sent your way, and on wide screens a red meter beside your board shows
+  how much is coming. The opponent thinks in a
+  background thread (`assets/js/ai-worker.js`).
 - **Keys:** ← → move, ↑ or X rotate, Z rotate the other way, ↓ soft drop,
   Space hard drop, C or Shift hold, P or Esc pause. On phones and tablets,
   touch buttons appear under the boards.
 
 ## Shared look
 
-All pages load `assets/css/theme.css` after their own CSS: one dark palette, one page
-background, the main button (`.btn-go`), `<kbd>` keys, and the intro screen
-(`.intro`, `.intro-steps`, `.intro-chips`). `assets/js/tetro-bg.js` adds the slowly
-falling tetrominoes (all 7 kinds) behind every page; tune `OPACITY` and the
-count at the top of that file. It is pure decoration and
+Since v0.34 every page uses one design: a dark tonal palette in the style of
+Material 3 Expressive, with pill buttons and a floating toolbar. Everything
+shared is in `assets/css/theme.css`, loaded after each page's own CSS:
+
+- **Colours** as custom properties (`--ui-bg`, `--ui-surface`, `--ui-accent`,
+  and four coloured containers: `--ui-cyan`, `--ui-yellow`, `--ui-rose`,
+  `--ui-pink`), plus the older names (`--bg`, `--accent`, ...) mapped onto them.
+- **Font:** Outfit, self-hosted in `assets/fonts/` (no request to Google).
+- **Parts:** buttons (`.btn-go` main, `.btn-tonal`, `.btn-text`, `.icon-btn`),
+  the switch (`.switch`), stat tiles (`.stat-tiles`), the blob shape
+  (`.shape-blob`), small piece previews (`.mini`), `<kbd>`, the floating
+  toolbar (`.toolbar`) and the snackbar (`.snackbar`).
+- **Pieces** are flat rounded blocks with a darker bottom edge, in the same
+  colours everywhere (`assets/js/lib/piece-style.js`; the Play page's DOM board
+  repeats them as `.v1`-`.v8` in `style.css`). Canvas boards are drawn by
+  `assets/js/lib/canvas.js` (`drawPlayfield`, `drawBlock`, `outlineCells`).
+  No images are used for blocks any more.
+
+`assets/js/tetro-bg.js` adds the slowly falling tetrominoes behind every page;
+tune `OPACITY` and the count at the top of that file. It is pure decoration and
 turns itself off when the system asks for reduced motion.
 
 ## Presentation page
@@ -420,34 +480,37 @@ training knocked it over).
 
 The copies are in `models/snapshots/`, made with
 `node scripts/train-dqn.js --snapshots 0,1000,1700,2200,2800,2900`. Training is
-repeatable, so `models/snapshots/game-2800.json` is exactly `dqn-model.json`. It only
-reads `src/` and `dqn-model.json`, and has its own `presentation.css`. The
-game page (`index.html`, `style.css`) is not touched.
+repeatable, so `models/snapshots/game-2800.json` is exactly `dqn-model.json`
+(`npm run train:dqn` rebuilds both). The page reads `src/` and the snapshots,
+and has its own `learning.css`.
 
 ## Play page (you, or the network)
 
-`index.html` is the game itself. Since v0.19 you can play it yourself:
+`index.html` is the game itself:
 
 - The page opens on a **Ready to play?** screen: you play.
-- **Turn on ML** switch: off = you play, on = the player chosen under
-  **Who plays** (network looking 3 / 2 / 1 pieces ahead, or the search bot)
-  plays and you watch. A badge shows who is playing right now, and four small
-  cards show lines, pieces, game number and best lines. Picking a player turns ML on. The page
-  remembers which player you picked, but always starts with ML off.
-- Switching hands over **the same game**: board, score, lines and hold carry
-  over. Turning ML off mid-fall gives you the falling piece where it is;
-  turning it on lets the network place the current piece. Changing who plays
-  also keeps the game. If your stack topped out, the network starts a new game.
-- **Keys:** ← → move, ↑ or X rotate, Z rotate back, ↓ soft drop, Space hard
-  drop, C or Shift hold, P or Esc pause, Enter (or Space) after game over to
-  play again. On phones and tablets, touch buttons appear at the bottom.
-- Gravity speeds up every 10 lines, as in the Play vs Bot page.
-- **Show hint** (or press H): outlines where the player chosen under Who plays
-  would put your current piece, or lights up the Hold box when it would hold.
+- **You play / Network plays** (above the board) hands **the same game** over:
+  board, score, lines and hold carry over. Taking over mid-fall gives you the
+  falling piece where it is; handing over lets the network place it. If your
+  stack topped out, the network starts a new game.
+- **Who plays, and gives the hint** (left): Strongest (the network, 3 pieces
+  ahead), Strong (2 ahead), Quick (1 piece) or Search bot (no network). The
+  page remembers the choice. Changing it keeps the game.
+- **Hint** card (or press H): a dashed outline shows where the chosen player
+  would put your piece, or the Hold box lights up when it would hold; a line
+  under the switch says which. The hint is worked out in a background thread,
+  so your piece never stutters while it thinks.
+- **Right:** the score (with the last clear, e.g. "+300 · double"), lines,
+  pieces and best lines, and the game number. **Under the board:** the level
+  (the game speeds up every 10 lines) and a wavy line for how far you are.
+- **Toolbar** at the bottom: pause, restart and the keys. Keys: ← → move, ↑ or
+  X rotate, Z rotate back, ↓ soft drop, Space hard drop, C or Shift hold, P or
+  Esc pause, Enter (or Space) after game over to play again. On phones and
+  tablets, touch buttons replace the toolbar.
 
 Under the hood this is `startVisualGame({ human: true, onState })` in
-`src/tetris-visual.js`, with `setHuman(on)`, `press(action)`, `softDrop(on)`
-and `pause(on)` for the page. `type="module"` scripts do not load over
+`assets/js/tetris-visual.js`, wired to the page by `assets/js/play.js`, with
+`setHuman(on)`, `press(action)`, `softDrop(on)` and `pause(on)`. `type="module"` scripts do not load over
 `file://`; in a Codespace, run `npx serve .` and open the forwarded port.
 
 ## History
@@ -465,4 +528,11 @@ Version 0.14 adds the hold box. Version 0.15 makes tests faster and harder,
 and tests 5-step learning and training with hold (neither helped). Version
 0.17 adds Play vs Bot, 0.18 the deep (3-ply) lookahead, 0.19 lets you
 play the Play page yourself, and 0.20 gives all pages one look (`assets/css/theme.css`), and 0.28 sorts the files into folders.
+Version 0.33 is a clean-code pass with no change to how anyone plays: shared
+modules instead of copies, Node's built-in test runner with move-by-move
+regression tests, checked command-line flags, and fixes for 16 bugs found in
+review (mostly in failure paths: a frozen opponent when the worker failed,
+stuck keys after switching windows, Ctrl+C acting as Hold).
+Version 0.34 gives every page a new look ("B+": Material 3 Expressive colours
+and shapes, self-hosted Outfit font, flat blocks instead of images).
 Version 0.9 adds training with garbage rows. The old code is in git history if you ever want it.

@@ -5,38 +5,42 @@
  *   node scripts/legacy-ga/train.js --generations 60 --workers 4
  *   node scripts/legacy-ga/train.js --population 30 --generations 15 --out quick.json
  *
- * Writes weights.json (the learned weights) and training-log.csv (one row per
- * generation, so you can plot the learning curve - which is a nice first use
- * of the matplotlib/pandas material from your course).
+ * Writes the learned weights (--out, default models/weights.json) and, next to
+ * them, training-log.csv: one row per generation, for plotting the learning curve.
  */
 
 import { writeFileSync } from 'node:fs';
-import os from 'node:os';
-import { runGA, DEFAULTS } from './ga.js';
+import { availableParallelism } from 'node:os';
+import { dirname, join } from 'node:path';
+import { runGA, fitnessOf, DEFAULTS } from './ga.js';
 import { FEATURE_NAMES, PUBLISHED_WEIGHTS } from '../../src/tetris-ai.js';
-import { fitnessOf } from './ga.js';
+import { parseFlags } from '../lib/cli.js';
 
 /* ------------------------------------------------------------------- flags */
 
-const argv = process.argv.slice(2);
-const flag = (name, fallback) => {
-  const i = argv.indexOf(`--${name}`);
-  return i === -1 ? fallback : argv[i + 1];
-};
-
+const opts = parseFlags({
+  population: DEFAULTS.populationSize,
+  generations: DEFAULTS.generations,
+  cap: DEFAULTS.maxPieces,
+  ceiling: DEFAULTS.maxPiecesCeiling,
+  seed: DEFAULTS.randomSeed,
+  workers: Math.max(1, availableParallelism() - 1),
+  out: 'models/weights.json',
+});
 const config = {
-  populationSize: Number(flag('population', DEFAULTS.populationSize)),
-  generations: Number(flag('generations', DEFAULTS.generations)),
-  maxPieces: Number(flag('cap', DEFAULTS.maxPieces)),
-  maxPiecesCeiling: Number(flag('ceiling', DEFAULTS.maxPiecesCeiling)),
-  randomSeed: Number(flag('seed', DEFAULTS.randomSeed)),
-  workers: Number(flag('workers', Math.max(1, os.cpus().length - 1))),
+  populationSize: opts.population,
+  generations: opts.generations,
+  maxPieces: opts.cap,
+  maxPiecesCeiling: opts.ceiling,
+  randomSeed: opts.seed,
+  workers: opts.workers,
 };
-const outFile = flag('out', 'models/weights.json');
+const outFile = opts.out;
+const logFile = join(dirname(outFile), 'training-log.csv');
 
-// Seeds 1..8 train; the high seeds in compare.js are never seen during
-// training. Same discipline as a train/test split - weights that only work on
-// the games they were tuned against have not learned anything general.
+// Seeds 1..8 train; compare.js tests on seeds never seen during training
+// (a train/test split): weights that only work on the games they were tuned
+// against have not learned anything general.
 const TRAIN_SEEDS = DEFAULTS.seeds;
 
 console.log('\ntraining');
@@ -114,10 +118,10 @@ writeFileSync(
 );
 
 writeFileSync(
-  'training-log.csv',
+  logFile,
   'generation,best,median,mean,maxPieces\n' +
     log.map((r) => `${r.generation},${r.best},${r.median},${r.mean},${r.maxPieces}`).join('\n') +
     '\n'
 );
 
-console.log(`\nwrote ${outFile} and training-log.csv\n`);
+console.log(`\nwrote ${outFile} and ${logFile}\n`);

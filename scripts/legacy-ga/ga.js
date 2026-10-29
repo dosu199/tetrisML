@@ -1,9 +1,7 @@
 /**
- * ga.js - the learning loop.
- *
- * This is the file that turns your heuristic into a learned one. Everything
- * else in the project stayed the same; the only thing that changes is where
- * the eight numbers in the weight vector come from.
+ * ga.js - the genetic algorithm that tuned the search bot's 8 weights
+ * (models/weights.json). Kept for the record: the project's learning now
+ * happens in the neural network (scripts/train-dqn.js).
  *
  * The algorithm is a straightforward genetic algorithm:
  *
@@ -38,9 +36,21 @@
  */
 
 import { Worker } from 'node:worker_threads';
-import { NUM_FEATURES, FEATURE_NAMES } from '../../src/tetris-ai.js';
-import { playGame } from '../../src/tetris-headless.js';
-import { mulberry32 } from '../../src/tetris-core.js';
+import { NUM_FEATURES, chooseMove } from '../../src/tetris-ai.js';
+import { mulberry32, playEpisode } from '../../src/tetris-core.js';
+
+/* ------------------------------------------------------------------ games */
+
+/**
+ * One 7-bag game of the search bot with these weights, capped at `maxPieces`.
+ * The cap matters: with decent weights the bot does not lose, so "play until
+ * death" would never end. Fitness is "lines cleared within N pieces".
+ */
+export function playBotGame(weights, seed, { maxPieces = 500, lookahead = true } = {}) {
+  const chooser = (board, current, next) => chooseMove(board, current, next, weights, { lookahead });
+  const r = playEpisode(chooser, seed, { cap: maxPieces });
+  return { lines: r.lines, pieces: r.pieces, toppedOut: r.died };
+}
 
 /* ----------------------------------------------------------------- vectors */
 
@@ -111,7 +121,7 @@ export function fitnessOf(weights, seeds, maxPieces) {
   let lines = 0;
   let deaths = 0;
   for (const seed of seeds) {
-    const r = playGame(weights, seed, { maxPieces, lookahead: false });
+    const r = playBotGame(weights, seed, { maxPieces, lookahead: false });
     lines += r.lines;
     if (r.toppedOut) deaths++;
   }
@@ -130,13 +140,14 @@ export function createEvaluator(size) {
   }
 
   const url = new URL('./ga-worker.js', import.meta.url);
+  let rejectCurrent = null; // rejects the evaluate() call in progress
   const workers = Array.from({ length: size }, () => {
     const w = new Worker(url);
     w.unref();
     // One permanent error listener per worker. Attaching a fresh one inside
     // evaluate() would leak a listener per generation and trip node's
     // MaxListenersExceededWarning after ten of them.
-    w.on('error', (err) => w._reject?.(err));
+    w.on('error', (err) => rejectCurrent?.(err));
     return w;
   });
 
@@ -158,10 +169,8 @@ export function createEvaluator(size) {
           worker.postMessage({ weights: candidates[index].weights, seeds, maxPieces });
         };
 
-        for (const w of workers) {
-          w._reject = reject;
-          dispatch(w);
-        }
+        rejectCurrent = reject;
+        for (const w of workers) dispatch(w);
       });
     },
     async close() {
@@ -223,7 +232,6 @@ export async function runGA(config = {}, onGeneration = () => {}) {
       population = population.slice(0, cfg.populationSize - childCount).concat(children);
       population.sort((a, b) => b.fitness - a.fitness);
 
-      const best = population[0];
       const median = population[population.length >> 1].fitness;
 
       // Saturation check: 0.4 lines per piece is the physical ceiling (four
@@ -260,4 +268,3 @@ export async function runGA(config = {}, onGeneration = () => {}) {
   }
 }
 
-export { FEATURE_NAMES };

@@ -2,125 +2,78 @@
  * how-it-works.js - the live parts of how-it-works.html.
  *
  * Uses the real game code and the real trained network, read-only:
- *   src/tetris-core.js   board, pieces, piece generators
- *   src/tetris-dqn.js    the network and the candidate moves
- *   src/tetris-ai.js     the board numbers (holes, bumpiness, ...)
- *   dqn-model.json       the trained network
- * It draws its own boards on <canvas>, so the game page and style.css are
- * never involved.
+ *   src/tetris-core.js        board, pieces, piece generators
+ *   src/tetris-dqn.js         the network, the candidate moves and the search
+ *   src/tetris-ai.js          the board numbers (holes, bumpiness, ...)
+ *   models/dqn-model.json     the trained network
+ * It draws its own boards on <canvas>.
  */
 
-import { createBoard, PIECES, Bag, MemorylessGen, PLAY_LEFT, PLAY_COLS, PLAY_ROWS, idx, FRAME } from '../../src/tetris-core.js';
-import { loadDqn, nextStates, moveReward, bestFollow } from '../../src/tetris-dqn.js';
-import { extractFeatures } from '../../src/tetris-ai.js';
+import { createBoard, createPieceGenerator, PIECES, Bag, PLAY_LEFT, PLAY_COLS, PLAY_ROWS, idx } from '../../src/tetris-core.js';
+import { loadDqn, nextStates, greedyPick, moveReward, bestFollow, expectedFollow, GAMMA } from '../../src/tetris-dqn.js';
+import { extractFeatures, FEATURE } from '../../src/tetris-ai.js';
+import { setupCanvas, cssVar, drawPlayfield, drawBlock, blockColor, outlineCells } from './lib/canvas.js';
+import { fetchModel } from './lib/models.js';
 
-const GAMMA = 0.99;
 const $ = (id) => document.getElementById(id);
 
-/* ---------------------------------------------------------------- colours */
+/* ---------------------------------------------------------------- helpers */
 
-// piece value -> colour (Z=1, I=2, O=3, S=4, L=5, J=6, T=7, garbage/frame=8)
-const PIECE_COLORS = ['#000', '#ef4444', '#22d3ee', '#facc15', '#22c55e', '#f97316', '#3b82f6', '#a855f7', '#6b7280'];
-const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 // 0 = worst option (red) ... 1 = best option (green)
 const scoreColor = (t, a = 1) => `hsla(${Math.round(t * 125)}, 80%, 52%, ${a})`;
 const fmt = (v, d = 0) => (Number.isFinite(v) ? v.toLocaleString('en-US', { maximumFractionDigits: d, minimumFractionDigits: d }) : '–');
+const piecesPerSecond = (v) => `${v} piece${v === 1 ? '' : 's'}/s`;
 
-/* ---------------------------------------------------------------- canvases */
-
-function setupCanvas(canvas, w, h) {
-  const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
-  canvas.width = Math.round(w * dpr);
-  canvas.height = Math.round(h * dpr);
-  canvas.style.aspectRatio = `${w} / ${h}`;
-  const ctx = canvas.getContext('2d');
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  return ctx;
+/**
+ * Where each option sits between the worst (0) and the best (1) finite score;
+ * options that lose the game (score -Infinity) count as 0.
+ */
+function scoreScale(cands) {
+  const finite = cands.filter((c) => Number.isFinite(c.score));
+  const hi = finite[0]?.score ?? 0;
+  const lo = finite.at(-1)?.score ?? 0;
+  return (c) => (Number.isFinite(c.score) && hi > lo ? (c.score - lo) / (hi - lo) : 0);
 }
 
-function drawCell(ctx, x, y, s, color) {
-  ctx.fillStyle = color;
-  ctx.fillRect(x * s + 1, y * s + 1, s - 2, s - 2);
-  // a soft highlight so blocks read as blocks
-  ctx.fillStyle = 'rgba(255,255,255,0.18)';
-  ctx.fillRect(x * s + 1, y * s + 1, s - 2, Math.max(2, s * 0.18));
-}
-
-/** Draws the playfield of `board` (rows firstRow..PLAY_ROWS-1). */
-function drawBoard(ctx, board, s, firstRow = 0) {
-  const rows = PLAY_ROWS - firstRow;
-  ctx.fillStyle = css('--board-bg');
-  ctx.fillRect(0, 0, PLAY_COLS * s, rows * s);
-  ctx.strokeStyle = css('--board-grid');
-  ctx.lineWidth = 1;
-  for (let c = 1; c < PLAY_COLS; c++) {
-    ctx.beginPath();
-    ctx.moveTo(c * s + 0.5, 0);
-    ctx.lineTo(c * s + 0.5, rows * s);
-    ctx.stroke();
-  }
-  for (let r = 1; r < rows; r++) {
-    ctx.beginPath();
-    ctx.moveTo(0, r * s + 0.5);
-    ctx.lineTo(PLAY_COLS * s, r * s + 0.5);
-    ctx.stroke();
-  }
-  for (let r = firstRow; r < PLAY_ROWS; r++) {
-    for (let c = 0; c < PLAY_COLS; c++) {
-      const v = board[idx(r, c + PLAY_LEFT)];
-      if (v) drawCell(ctx, c, r - firstRow, s, PIECE_COLORS[v === FRAME ? 8 : v] || PIECE_COLORS[8]);
-    }
-  }
-}
+/** Draws the playfield of `board` (rows firstRow..23). */
+const drawBoard = (ctx, board, s, firstRow = 0) => drawPlayfield(ctx, board, { cell: s, firstRow });
 
 /** Board cells covered by a placement, as [x, y] in playfield coordinates. */
 function moveCells(pieceIdx, move) {
   return PIECES[pieceIdx].rotations[move.rotation].cells.map(([r, c]) => [move.col + c - PLAY_LEFT, move.row + r]);
 }
 
-function outlineCells(ctx, cells, s, stroke, width, fill) {
-  for (const [x, y] of cells) {
-    if (fill) {
-      ctx.fillStyle = fill;
-      ctx.fillRect(x * s + 1, y * s + 1, s - 2, s - 2);
-    }
-    ctx.strokeStyle = stroke;
-    ctx.lineWidth = width;
-    ctx.strokeRect(x * s + 1.5, y * s + 1.5, s - 3, s - 3);
-  }
-}
+const MINI = { w: 72, h: 48, cell: 16 }; // the hold / current / next boxes
+const miniContexts = new Map();
 
 function drawMiniPiece(canvas, pieceIdx) {
-  const ctx = setupCanvas(canvas, 72, 48);
-  ctx.clearRect(0, 0, 72, 48);
+  if (!miniContexts.has(canvas)) miniContexts.set(canvas, setupCanvas(canvas, MINI.w, MINI.h));
+  const ctx = miniContexts.get(canvas);
+  ctx.clearRect(0, 0, MINI.w, MINI.h);
   if (pieceIdx == null) return;
-  const cells = PIECES[pieceIdx].rotations[0].cells;
-  const w = Math.max(...cells.map((c) => c[1])) + 1;
-  const h = Math.max(...cells.map((c) => c[0])) + 1;
-  const s = 16;
-  const ox = (72 - w * s) / 2;
-  const oy = (48 - h * s) / 2;
+  const { cells, width, height, value } = PIECES[pieceIdx].rotations[0];
   ctx.save();
-  ctx.translate(ox, oy);
-  for (const [r, c] of cells) drawCell(ctx, c, r, s, PIECE_COLORS[PIECES[pieceIdx].value]);
+  ctx.translate((MINI.w - width * MINI.cell) / 2, (MINI.h - height * MINI.cell) / 2);
+  for (const [r, c] of cells) drawBlock(ctx, c, r, MINI.cell, blockColor(value));
   ctx.restore();
 }
 
 /** Raw board numbers for display: lines, holes, bumpiness, total height. */
 function rawFeatures(board, lines) {
   const f = extractFeatures(board, lines);
-  return { lines: f[1], holes: f[2], bumpiness: f[3], height: f[0] };
+  return { lines: f[FEATURE.linesCleared], holes: f[FEATURE.holes], bumpiness: f[FEATURE.bumpiness], height: f[FEATURE.aggregateHeight] };
 }
 
 /* ======================================================= 1. WATCH IT THINK */
 
 const CELL = 25;
+const NEW_GAME_DELAY_MS = 1600; // the "topped out" message stays this long
 const SPEEDS = [0.5, 1, 2, 5, 15, 60]; // moves per second
 const FEATURE_ROWS = [
   { key: 'lines', label: 'Lines', max: 4, cls: 'f-lines' },
   { key: 'holes', label: 'Holes', max: 30, cls: 'f-holes' },
-  { key: 'bumpiness', label: 'Bumpiness', max: 30, cls: 'f-bump' },
-  { key: 'height', label: 'Height', max: 160, cls: 'f-height' },
+  { key: 'bumpiness', label: 'Bumpiness', max: 30, cls: '' },
+  { key: 'height', label: 'Height', max: 160, cls: '' },
 ];
 
 let net = null;
@@ -138,6 +91,7 @@ const game = {
   best: 0,
   playing: true,
   over: false,
+  overTimer: null, // the pause after a lost game
   hover: -1,
   prevValue: null, // network's value for the board before the current move
   gaps: [],
@@ -161,25 +115,18 @@ function scoreCandidates() {
   const score = (o, follower) => {
     o.value = net.predict(o.state);
     if (!lookahead) return o.value;
-    if (follower == null) {
-      let sum = 0;
-      for (let p = 0; p < PIECES.length; p++) {
-        const f = bestFollow(o.board, p, net, GAMMA);
-        sum += f === -Infinity ? -1e9 : f;
-      }
-      return moveReward(o.lines) + GAMMA * (sum / PIECES.length);
-    }
-    const f = bestFollow(o.board, follower, net, GAMMA);
-    return f === -Infinity ? -Infinity : moveReward(o.lines) + GAMMA * f;
+    if (follower == null) return moveReward(o.lines) + GAMMA * expectedFollow(o.board, net);
+    const f = bestFollow(o.board, follower, net);
+    return f === -Infinity ? -Infinity : moveReward(o.lines) + GAMMA * f; // -Infinity: this option loses the game
   };
   const opts = [];
-  for (const o of nextStates(game.board, game.cur, net.input)) {
+  for (const o of nextStates(game.board, game.cur, net.inputSpec)) {
     opts.push(Object.assign(o, { piece: game.cur, hold: false, score: score(o, game.next) }));
   }
   if (holdOn) {
     const other = game.held ?? game.next;
     const follower = game.held != null ? game.next : null; // after holding from an empty box, the next piece is unknown
-    for (const o of nextStates(game.board, other, net.input)) {
+    for (const o of nextStates(game.board, other, net.inputSpec)) {
       opts.push(Object.assign(o, { piece: other, hold: true, score: score(o, follower) }));
     }
   }
@@ -188,8 +135,9 @@ function scoreCandidates() {
 }
 
 function newGame(keepCounters = true) {
+  clearTimeout(game.overTimer); // a reset during the pause after a lost game must not start a second game
   const seed = (Math.random() * 2 ** 31) >>> 0;
-  game.gen = $('randomPieces').checked ? new MemorylessGen(seed) : new Bag(seed);
+  game.gen = createPieceGenerator($('randomPieces').checked ? 'memoryless' : 'bag', seed);
   game.board = createBoard();
   game.cur = game.gen.next();
   game.next = game.gen.next();
@@ -253,10 +201,10 @@ function gameOver() {
   const overlay = $('gameOver');
   overlay.textContent = `Topped out after ${game.pieces.toLocaleString('en-US')} pieces and ${game.lines.toLocaleString('en-US')} lines. Starting a new game…`;
   overlay.hidden = false;
-  setTimeout(() => {
+  game.overTimer = setTimeout(() => {
     game.games++;
     newGame();
-  }, 1600);
+  }, NEW_GAME_DELAY_MS);
 }
 
 /* ----------------------------------------------------------- rendering */
@@ -267,30 +215,24 @@ function render() {
 
   const cands = game.cands;
   if (cands.length) {
-    const finite = cands.filter((c) => Number.isFinite(c.score));
-    const hi = finite.length ? finite[0].score : 0;
-    const lo = finite.length ? finite[finite.length - 1].score : 0;
-    const t = (c) => (Number.isFinite(c.score) && hi > lo ? (c.score - lo) / (hi - lo) : 0);
+    const t = scoreScale(cands);
 
-    const dash = (c) => boardCtx.setLineDash(c.hold ? [4, 3] : []);
+    // the options for the piece holding would give are dashed
+    const dash = (c) => (c.hold ? [4, 3] : []);
     if (game.hover >= 0) {
       const c = cands[game.hover];
-      dash(c);
-      outlineCells(boardCtx, moveCells(c.piece, c.move), CELL, scoreColor(t(c)), 3, scoreColor(t(c), 0.45));
+      outlineCells(boardCtx, moveCells(c.piece, c.move), CELL, scoreColor(t(c)), 3, scoreColor(t(c), 0.45), dash(c));
     } else {
       if (!fast) {
         // every option, faint; the better it scores, the greener and stronger
         for (let i = cands.length - 1; i >= 1; i--) {
           const k = t(cands[i]);
-          dash(cands[i]);
-          outlineCells(boardCtx, moveCells(cands[i].piece, cands[i].move), CELL, scoreColor(k, 0.25 + 0.5 * k), 1.5);
+          outlineCells(boardCtx, moveCells(cands[i].piece, cands[i].move), CELL, scoreColor(k, 0.25 + 0.5 * k), 1.5, null, dash(cands[i]));
         }
       }
       const c0 = cands[0];
-      dash(c0);
-      outlineCells(boardCtx, moveCells(c0.piece, c0.move), CELL, '#ffffff', 2.5, PIECE_COLORS[PIECES[c0.piece].value] + 'cc');
+      outlineCells(boardCtx, moveCells(c0.piece, c0.move), CELL, '#ffffff', 2.5, blockColor(PIECES[c0.piece].value) + 'cc', dash(c0));
     }
-    boardCtx.setLineDash([]);
   }
 
   $('lines').textContent = game.lines.toLocaleString('en-US');
@@ -362,10 +304,7 @@ function renderOptions() {
     list.innerHTML = '';
     return;
   }
-  const finite = cands.filter((c) => Number.isFinite(c.score));
-  const hi = finite[0]?.score ?? 0;
-  const lo = finite[finite.length - 1]?.score ?? 0;
-  const t = (c) => (Number.isFinite(c.score) && hi > lo ? (c.score - lo) / (hi - lo) : 0);
+  const t = scoreScale(cands);
   const show = [...cands.slice(0, 5).map((c, i) => [c, i])];
   if (cands.length > 6) show.push(null);
   if (cands.length > 5) show.push([cands[cands.length - 1], cands.length - 1]);
@@ -424,8 +363,7 @@ $('stepBtn').addEventListener('click', () => {
 });
 $('resetBtn').addEventListener('click', () => newGame(false));
 $('speed').addEventListener('input', () => {
-  const v = SPEEDS[$('speed').value];
-  $('speedOut').textContent = `${v} move${v === 1 ? '' : 's'}/s`;
+  $('speedOut').textContent = piecesPerSecond(SPEEDS[$('speed').value]);
   schedule();
 });
 $('randomPieces').addEventListener('change', () => newGame(false));
@@ -539,7 +477,6 @@ const EPS = [0, 0.01, 0.1, 0.3, 1];
 const explore = { board: null, gen: null, pieces: 0, games: 0, total: 0, visible: false, timer: null };
 const EX_CELL = 14;
 const exCtx = setupCanvas($('exploreBoard'), PLAY_COLS * EX_CELL, PLAY_ROWS * EX_CELL);
-const exRand = Math.random;
 
 function exploreNewGame() {
   explore.board = createBoard();
@@ -549,24 +486,14 @@ function exploreNewGame() {
 
 function exploreStep() {
   const eps = EPS[$('epsilon').value];
-  const opts = nextStates(explore.board, explore.gen.next(), net.input);
+  const opts = nextStates(explore.board, explore.gen.next(), net.inputSpec);
   if (opts.length === 0) {
     explore.games++;
     explore.total += explore.pieces;
     exploreNewGame();
   } else {
-    let pick;
-    if (exRand() < eps) pick = opts[Math.floor(exRand() * opts.length)];
-    else {
-      let best = -Infinity;
-      for (const o of opts) {
-        const v = net.predict(o.state);
-        if (v > best) {
-          best = v;
-          pick = o;
-        }
-      }
-    }
+    // epsilon-greedy, exactly as in training (scripts/train-dqn.js)
+    const pick = Math.random() < eps ? opts[Math.floor(Math.random() * opts.length)] : greedyPick(opts, net);
     explore.board = pick.board;
     explore.pieces++;
   }
@@ -609,9 +536,9 @@ function drawTrainChart() {
   const yMax = 1500;
   const x = (g) => m.l + (g / 3000) * iw;
   const y = (v) => m.t + ih - ((Math.log(v) - Math.log(yMin)) / (Math.log(yMax) - Math.log(yMin))) * ih;
-  const accent = css('--accent');
-  const good = css('--good');
-  const muted = css('--muted');
+  const accent = cssVar('--accent');
+  const good = cssVar('--good');
+  const muted = cssVar('--muted');
 
   const path = (vals) => vals.map((v, i) => `${i ? 'L' : 'M'}${x(TRAIN.games[i]).toFixed(1)},${y(v).toFixed(1)}`).join('');
   let best = -1;
@@ -764,13 +691,11 @@ async function start() {
   drawExample();
   drawTrainChart();
   drawScoreboard();
-  $('speedOut').textContent = `${SPEEDS[$('speed').value]} pieces/s`;
+  $('speedOut').textContent = piecesPerSecond(SPEEDS[$('speed').value]);
   $('epsOut').textContent = `${EPS[$('epsilon').value] * 100}%`;
 
   try {
-    const res = await fetch('./models/dqn-model.json');
-    if (!res.ok) throw new Error(`dqn-model.json: HTTP ${res.status}`);
-    net = loadDqn(await res.json());
+    net = loadDqn(await fetchModel('dqn-model.json'));
   } catch (e) {
     const o = $('gameOver');
     o.textContent = `Could not load the network (${e.message}). Open this page through a local server (npx serve .).`;
@@ -787,13 +712,6 @@ async function start() {
     explore.visible = entries[0].isIntersecting;
     exploreRun();
   }).observe($('exploreBoard'));
-
-  // redraw theme-dependent pieces if the colour scheme changes
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-    drawExample();
-    drawTrainChart();
-    render();
-  });
 }
 
 start();

@@ -1,19 +1,22 @@
 {
   "name": "tetris-ml",
-  "version": "0.32.0",
+  "version": "0.34.0",
+  "private": true,
   "description": "Tetris with a neural network that learns to play by deep Q-learning, plus a search bot to compare it against",
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
-    "test": "node tests/bench.js --test && node tests/test-dqn.js",
-    "test:dqn": "node tests/test-dqn.js",
-    "bench": "node tests/bench.js",
-    "train:dqn": "node scripts/train-dqn.js",
+    "test": "node --test",
+    "bench": "node scripts/bench.js",
+    "train:dqn": "node scripts/train-dqn.js --snapshots 0,1000,1700,2200,2800,2900",
     "train:many": "node scripts/train-many.js",
-    "hard": "node scripts/hardmode.js --games 10 --cap 2000",
-    "hard:full": "node scripts/hardmode.js --games 50 --seed 90000 --mode no-preview",
+    "hard": "node scripts/hardmode.js",
+    "hard:no-preview": "node scripts/hardmode.js --games 50 --seed 90000 --mode no-preview",
     "hard:hold": "node scripts/hardmode.js --hold --games 50 --seed 90000 --mode memoryless-no-preview",
-    "hard:deep": "node scripts/hardmode.js --hold --lookahead --deep --games 50 --seed 90000 --mode garbage3",
     "hard:lookahead": "node scripts/hardmode.js --lookahead --games 50 --seed 90000 --mode garbage5",
+    "hard:deep": "node scripts/hardmode.js --hold --lookahead --deep --games 50 --seed 90000 --mode garbage3",
     "train:ga": "node scripts/legacy-ga/train.js",
     "compare:ga": "node scripts/legacy-ga/compare.js"
   }

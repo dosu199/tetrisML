@@ -1,15 +1,16 @@
 /**
- * tetris-ai.js - board features, the linear evaluation function, and the
- * placement search. Still no DOM: this runs identically in node and in the
- * browser, which is what lets you train it.
+ * tetris-ai.js - board features and the search bot. No DOM.
  *
- * The evaluation is a plain dot product:
+ * The bot scores a board with a plain weighted sum of 8 features:
  *
- *     score(board) = sum over i of  weights[i] * features[i]
+ *     score(board) = sum over i of  weights[i] x features[i]
  *
- * In Phase 1 you stop hand-picking `weights` and let a genetic algorithm or
- * the cross-entropy method find them. Nothing else in this file has to change
- * for that to happen - that is the whole point of the refactor.
+ * and plays the placement whose resulting board scores highest, optionally
+ * looking one piece ahead (2-ply). The weights in models/weights.json were
+ * tuned by a genetic algorithm (scripts/legacy-ga/).
+ *
+ * The features are also the network's inputs (tetris-dqn.js uses 4 of them),
+ * and decideWithHold() is shared by the bot and the network.
  */
 
 import {
@@ -19,37 +20,38 @@ import {
   PLAY_COLS,
   PLAY_BOTTOM,
   idx,
+  createBoard,
   columnHeights,
-  copyBoard,
-  placePiece,
-  clearLines,
+  playMove,
   placements,
-  decideWithHold,
+  HOLD,
 } from './tetris-core.js';
 
-/* ---------------------------------------------------------------- features */
+/* --------------------------------------------------------------- features */
 
 export const FEATURE_NAMES = [
   'aggregateHeight', // sum of all column heights
   'linesCleared', // rows cleared by the move that produced this board
   'holes', // empty cells with at least one filled cell above them
-  'bumpiness', // sum of |height difference| between adjacent columns
+  'bumpiness', // sum of |height difference| between neighbouring columns
   'maxHeight', // tallest column
-  'rowTransitions', // filled/empty flips scanning each row
-  'colTransitions', // filled/empty flips scanning each column
-  'wells', // summed depth of one-wide gaps
+  'rowTransitions', // filled/empty flips scanning each row (walls count as filled)
+  'colTransitions', // filled/empty flips scanning each column (floor counts as filled)
+  'wells', // for each column lower than both neighbours (a wall counts as
+  //          infinitely high) of depth d: 1 + 2 + ... + d, so deep wells cost more
 ];
 
 export const NUM_FEATURES = FEATURE_NAMES.length;
 
+/** Position of each feature in extractFeatures' output, e.g. FEATURE.holes === 2. */
+export const FEATURE = Object.freeze(Object.fromEntries(FEATURE_NAMES.map((name, i) => [name, i])));
+
 /**
- * The weights you were using. They are the published El-Tetris values, not
- * values you derived - replacing them with learned ones is Phase 1.
- * The four extra features start at 0, so this vector reproduces your current
- * bot's behaviour exactly while leaving the GA room to discover whether the
- * extras earn their keep.
+ * Hand-tuned starting weights, from Yiyuan Lee's 2013 "near perfect" Tetris
+ * bot (4 features); the other four start at 0. Used when models/weights.json
+ * cannot be loaded.
  */
-export const PUBLISHED_WEIGHTS = [
+export const PUBLISHED_WEIGHTS = Object.freeze([
   -0.510066, // aggregateHeight
   0.760666, // linesCleared
   -0.35663, // holes
@@ -58,28 +60,27 @@ export const PUBLISHED_WEIGHTS = [
   0, // rowTransitions
   0, // colTransitions
   0, // wells
-];
+]);
 
+// Scratch buffers. They make these functions non-reentrant, which is fine:
+// nothing here calls itself, and JavaScript runs one call at a time.
 const heightScratch = new Int32Array(PLAY_COLS);
+const featureScratch = new Float64Array(NUM_FEATURES);
 
 /**
- * Extracts the feature vector for a board.
+ * The feature vector of a board, in FEATURE_NAMES order.
  *
- * `linesCleared` is passed in rather than measured, because by the time we see
- * the board the rows are already gone.
- *
- * Note on bumpiness: the original compared the *number of filled cells* per
- * column. Once a column contains a hole, cell count and column height are
- * different numbers, so that measured something other than surface roughness.
- * This uses heights.
+ * `linesCleared` is passed in rather than measured: by the time we see the
+ * board, the cleared rows are already gone. Bumpiness, holes and wells use
+ * column heights (the top block), not the number of filled cells.
  */
 export function extractFeatures(board, linesCleared, out = new Float64Array(NUM_FEATURES)) {
   const heights = columnHeights(board, heightScratch);
 
-  let aggregate = 0;
+  let aggregateHeight = 0;
   let maxHeight = 0;
   for (let i = 0; i < PLAY_COLS; i++) {
-    aggregate += heights[i];
+    aggregateHeight += heights[i];
     if (heights[i] > maxHeight) maxHeight = heights[i];
   }
 
@@ -88,7 +89,6 @@ export function extractFeatures(board, linesCleared, out = new Float64Array(NUM_
     bumpiness += Math.abs(heights[i] - heights[i + 1]);
   }
 
-  // holes: empty cells that sit below the top of their column
   let holes = 0;
   for (let c = PLAY_LEFT; c <= PLAY_RIGHT; c++) {
     const top = PLAY_BOTTOM - heights[c - PLAY_LEFT] + 1;
@@ -97,7 +97,6 @@ export function extractFeatures(board, linesCleared, out = new Float64Array(NUM_
     }
   }
 
-  // transitions: how ragged the board is. Walls count as filled.
   let rowTransitions = 0;
   for (let r = 0; r <= PLAY_BOTTOM; r++) {
     let prev = 1; // left wall
@@ -120,7 +119,6 @@ export function extractFeatures(board, linesCleared, out = new Float64Array(NUM_
     if (prev !== 1) colTransitions++; // floor
   }
 
-  // wells: a column lower than both neighbours, counted by depth
   let wells = 0;
   for (let i = 0; i < PLAY_COLS; i++) {
     const left = i === 0 ? Infinity : heights[i - 1];
@@ -129,18 +127,16 @@ export function extractFeatures(board, linesCleared, out = new Float64Array(NUM_
     if (depth > 0) wells += (depth * (depth + 1)) / 2;
   }
 
-  out[0] = aggregate;
-  out[1] = linesCleared;
-  out[2] = holes;
-  out[3] = bumpiness;
-  out[4] = maxHeight;
-  out[5] = rowTransitions;
-  out[6] = colTransitions;
-  out[7] = wells;
+  out[FEATURE.aggregateHeight] = aggregateHeight;
+  out[FEATURE.linesCleared] = linesCleared;
+  out[FEATURE.holes] = holes;
+  out[FEATURE.bumpiness] = bumpiness;
+  out[FEATURE.maxHeight] = maxHeight;
+  out[FEATURE.rowTransitions] = rowTransitions;
+  out[FEATURE.colTransitions] = colTransitions;
+  out[FEATURE.wells] = wells;
   return out;
 }
-
-const featureScratch = new Float64Array(NUM_FEATURES);
 
 /** score = weights . features. Higher is better. */
 export function evaluate(board, linesCleared, weights) {
@@ -150,89 +146,106 @@ export function evaluate(board, linesCleared, weights) {
   return score;
 }
 
-/* ------------------------------------------------------------------ search */
+/* ----------------------------------------------------------------- search */
 
-/** Best achievable score for `pieceIdx` on `board`, carrying earlier clears. */
+const firstPlyBoard = createBoard();
+const secondPlyBoard = createBoard();
+
+/** Best score `pieceIdx` can reach on `board`, counting `carriedLines` from the move before. */
 function bestScoreFor(board, pieceIdx, carriedLines, weights) {
-  const moves = placements(board, pieceIdx);
-  if (moves.length === 0) return -Infinity; // dead
-
-  let best = -Infinity;
-  const rotations = PIECES[pieceIdx].rotations;
-  for (let i = 0; i < moves.length; i++) {
-    const m = moves[i];
-    const next = copyBoard(board);
-    placePiece(next, rotations[m.rotation], m.row, m.col);
-    const lines = clearLines(next);
-    const score = evaluate(next, carriedLines + lines, weights);
+  let best = -Infinity; // stays -Infinity when the piece has nowhere to go
+  for (const m of placements(board, pieceIdx)) {
+    secondPlyBoard.set(board);
+    const lines = playMove(secondPlyBoard, pieceIdx, m);
+    const score = evaluate(secondPlyBoard, carriedLines + lines, weights);
     if (score > best) best = score;
   }
   return best;
 }
 
 /**
- * Picks where to put the current piece.
+ * The bot's move: { rotation, col, row, score }, or null when the game is
+ * lost (the piece does not fit, or with lookahead, no placement leaves room
+ * for the next piece).
  *
- * Returns { rotation, col, row, score } or null when nothing is legal, which
- * is the game-over condition.
+ * With `next` and lookahead on (the default) it is 2-ply: each placement is
+ * scored by the best board the next piece can then reach, and the line clears
+ * of both moves are added up, so setting up a clear is credited too. About
+ * 40x slower than 1-ply.
  *
- * `nextIdx` enables the 2-ply lookahead you already had. Two important fixes
- * over the original:
- *
- *  1. The simulation runs on a copy. The original passed the live `gameBoard`
- *     into breakeRowsForAi(), so every candidate placement it considered was
- *     deleting rows from the real game and reporting clears from the wrong
- *     board.
- *  2. Line clears from both plies are summed before scoring, so a move that
- *     sets up a clear on the next piece is credited for it.
- *
- * Lookahead costs roughly 40x the search time. Turn it off during training
- * (it barely changes the *ranking* of weight vectors) and back on to play.
+ * Note: with lookahead the bot gives up one piece earlier than the network
+ * would (the network still plays a doomed move); benchmarks undercount the
+ * bot by at most one piece per lost game.
  */
 export function chooseMove(board, pieceIdx, nextIdx, weights, { lookahead = true } = {}) {
-  const moves = placements(board, pieceIdx);
-  if (moves.length === 0) return null;
-
-  const rotations = PIECES[pieceIdx].rotations;
   let best = null;
-  let bestScore = -Infinity;
-
-  for (let i = 0; i < moves.length; i++) {
-    const m = moves[i];
-    const after = copyBoard(board);
-    placePiece(after, rotations[m.rotation], m.row, m.col);
-    const lines = clearLines(after);
-
+  for (const m of placements(board, pieceIdx)) {
+    firstPlyBoard.set(board);
+    const lines = playMove(firstPlyBoard, pieceIdx, m);
     const score =
       lookahead && nextIdx != null
-        ? bestScoreFor(after, nextIdx, lines, weights)
-        : evaluate(after, lines, weights);
-
-    if (score > bestScore) {
-      bestScore = score;
-      best = { rotation: m.rotation, col: m.col, row: m.row, score };
-    }
-  }
-
-  // Every move leads to death; take the first legal one so the game ends
-  // cleanly on the next piece rather than throwing.
-  if (best === null) {
-    const m = moves[0];
-    return { rotation: m.rotation, col: m.col, row: m.row, score: -Infinity };
+        ? bestScoreFor(firstPlyBoard, nextIdx, lines, weights)
+        : evaluate(firstPlyBoard, lines, weights);
+    if (score > (best?.score ?? -Infinity)) best = { rotation: m.rotation, col: m.col, row: m.row, score };
   }
   return best;
 }
 
 /**
- * Like chooseMove, but understands hold: pass the 4th chooser argument
- * ({ held, canHold }) as `holdCtx`. Returns a placement or HOLD. Without
- * holdCtx it plays exactly like chooseMove.
+ * Like chooseMove, but may hold: pass the chooser's 4th argument
+ * ({ held, canHold }) as `holdCtx`. Returns a placement, HOLD or null.
+ * Without holdCtx it is exactly chooseMove.
  */
 export function chooseMoveAction(board, pieceIdx, nextIdx, weights, holdCtx = null, { lookahead = true } = {}) {
   if (!holdCtx) return chooseMove(board, pieceIdx, nextIdx, weights, { lookahead });
   const best = (piece, follower) => {
     const m = chooseMove(board, piece, follower, weights, { lookahead });
-    return m && m.score !== -Infinity ? { move: m, score: m.score } : null;
+    return m && { move: m, score: m.score };
   };
-  return decideWithHold(best, pieceIdx, nextIdx, holdCtx.held, holdCtx.canHold, lookahead);
+  return decideWithHold(best, pieceIdx, nextIdx, holdCtx, lookahead);
+}
+
+/* ------------------------------------------------------------------- hold */
+
+/**
+ * The hold decision, shared by the bot and the network: "place the current
+ * piece" against "hold, then place what you get". Returns a placement, HOLD,
+ * or null when neither is possible.
+ *
+ *   best(piece, follower) -> { move, score } | null
+ *     the chooser's best placement for `piece` on the current board, where
+ *     `follower` is the piece after it (null = unknown). Higher = better.
+ *   usesFollower  whether best() looks at the follower at all (2-ply or more)
+ *
+ * When the piece you would get, or its follower, is still unknown, the hold
+ * side is the average over all 7 pieces (any piece that cannot be placed
+ * makes it -Infinity), so both sides are scored the same way.
+ */
+export function decideWithHold(best, current, next, { held, canHold }, usesFollower = false) {
+  const place = best(current, next);
+  if (!canHold) return place ? place.move : null;
+
+  const averageOverPieces = (scoreOf) => {
+    let sum = 0;
+    for (let p = 0; p < PIECES.length; p++) {
+      const r = scoreOf(p);
+      if (!r) return -Infinity;
+      sum += r.score;
+    }
+    return sum / PIECES.length;
+  };
+  let holdScore;
+  if (held != null) {
+    // the held piece comes back; the next piece is unchanged
+    holdScore = best(held, next)?.score ?? -Infinity;
+  } else if (next != null) {
+    // the next piece comes in; the one after it is not known yet
+    holdScore = usesFollower ? averageOverPieces((f) => best(next, f)) : best(next, null)?.score ?? -Infinity;
+  } else {
+    // no preview and an empty box: the piece we would get is unknown
+    holdScore = averageOverPieces((p) => best(p, null));
+  }
+
+  if (!place) return holdScore > -Infinity ? HOLD : null;
+  return holdScore > place.score ? HOLD : place.move;
 }

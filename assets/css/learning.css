@@ -50,8 +50,10 @@
 }
 .stage-board {
   position: relative;
+  box-sizing: content-box;
   width: 132px;
-  border-radius: 10px;
+  padding: 5px; /* keeps the rounded corners off the corner cells */
+  border-radius: var(--ui-radius-sm);
   overflow: hidden;
   background: var(--board-bg);
   line-height: 0;
@@ -71,21 +73,21 @@
 }
 .chip {
   display: inline-block;
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   font-weight: 600;
-  padding: 2px 8px;
+  padding: 3px 10px;
   border-radius: 999px;
-  background: var(--accent-soft);
-  color: var(--accent);
+  background: var(--ui-tonal);
+  color: var(--ui-on-tonal);
   margin-bottom: 8px;
 }
 .chip.good {
-  background: color-mix(in srgb, var(--good) 16%, transparent);
-  color: var(--good);
+  background: var(--ui-cyan);
+  color: var(--ui-on-cyan);
 }
 .chip.bad {
-  background: color-mix(in srgb, var(--bad) 14%, transparent);
-  color: var(--bad);
+  background: var(--ui-rose);
+  color: var(--ui-on-rose);
 }
 .stage p {
   margin: 0 0 10px;
@@ -100,17 +102,13 @@
   gap: 6px;
 }
 .stage-stats div {
-  background: var(--bg);
-  border-radius: 8px;
-  padding: 4px 8px;
-}
-.stage-stats dt {
-  font-size: 0.7rem;
-  color: var(--muted);
+  background: var(--ui-surface-high);
+  border-radius: 12px;
+  padding: 6px 10px;
 }
 .stage-stats dd {
   margin: 0;
-  font-weight: 700;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
 .stage-stats .wide {
@@ -194,6 +192,7 @@
     padding: 10px;
   }
   .stage-board {
+    box-sizing: border-box;
     width: 100%;
   }
   .stage h3 {

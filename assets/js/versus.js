@@ -1,143 +1,76 @@
 /**
  * versus.js - "Play vs Bot": you against the network (or the search bot).
  *
- * Both boards get exactly the same pieces (same seed), both can see the next
- * piece and use hold. Two modes:
+ * Both boards get exactly the same pieces (same seed); both see the next
+ * piece and may hold. Two modes:
  *   battle  clearing 2 / 3 / 4 lines sends 1 / 2 / 4 garbage rows to the other
  *           board; your own clears cancel garbage coming at you. Top out = lose.
  *   race    first to 40 lines wins; topping out loses.
  *
- * The opponent decides with the real code (src/tetris-dqn.js or
- * src/tetris-ai.js) at the speed you pick. Uses the game code read-only and
- * draws on <canvas>, so the other pages are not affected.
+ * Your piece is moved by src/tetris-controls.js (the same controls as the
+ * Play page). The opponent decides with the real players
+ * (src/tetris-players.js) in a background worker, at the speed you pick.
+ * Both boards are drawn on <canvas>.
  */
 
-import {
-  createBoard,
-  PIECES,
-  Bag,
-  collides,
-  placePiece,
-  clearLines,
-  addGarbageRow,
-  PLAY_LEFT,
-  PLAY_COLS,
-  PLAY_ROWS,
-  idx,
-  FRAME,
-  mulberry32,
-  placements,
-} from '../../src/tetris-core.js';
-import { loadDqn, chooseDqnAction } from '../../src/tetris-dqn.js';
-import { chooseMoveAction, PUBLISHED_WEIGHTS } from '../../src/tetris-ai.js';
+import { createBoard, PIECES, Bag, placePiece, clearLines, addGarbageRow, placements, mulberry32, PLAY_LEFT, PLAY_COLS, PLAY_ROWS } from '../../src/tetris-core.js';
+import { PieceController, TIMING, KEYMAP, LINE_POINTS, actionForKey, gravityMs, landingRow } from '../../src/tetris-controls.js';
+import { PLAYERS } from '../../src/tetris-players.js';
+import { setupCanvas, drawPlayfield, drawBlock, blockColor, outlineCells } from './lib/canvas.js';
+import { loadModels } from './lib/models.js';
+import { AiClient } from './lib/ai-client.js';
+import { bindTouchPad } from './lib/touch-pad.js';
 
 const $ = (id) => document.getElementById(id);
 
 /* ------------------------------------------------------------------ rules */
 
-const ATTACK = [0, 0, 1, 2, 4]; // garbage rows sent for 0..4 lines cleared
-const POINTS = [0, 40, 100, 300, 1200]; // classic scoring, as in the game
+const ATTACK = [0, 0, 1, 2, 4]; // garbage rows sent for clearing 0..4 lines
 const RACE_LINES = 40;
-const LOCK_DELAY = 500; // ms a landed piece can still slide or turn
-const MAX_LOCK_RESETS = 15;
-const DAS = 160; // ms before a held left/right starts repeating
-const ARR = 45; // ms between repeats
-const SOFT_DROP = 35; // ms per row while holding down
+const GARBAGE_SEED_OFFSET = 777; // garbage holes: their own random stream, the same on both boards
+const COUNTDOWN_MS = 3000;
+const AI_FIRST_MOVE_MS = 300; // after the countdown
+const AI_DROP_MS = 220; // the opponent's piece falls into place in this long at most...
+const AI_DROP_SHARE = 0.6; // ...and in at most this share of its turn
+const GARBAGE_BAR_ROWS = 12; // incoming rows that fill the red bar
+const SNACK_MS = 3500; // how long a message at the bottom stays
 
 /* --------------------------------------------------------------- drawing */
 
 const CELL = 26;
-const IMAGES = { 1: 'red', 2: 'skyBlue', 3: 'yellow', 4: 'green', 5: 'orange', 6: 'blue', 7: 'purple' };
-const COLORS = { 1: '#e6483d', 2: '#4ec3e0', 3: '#f2c94c', 4: '#5fc27e', 5: '#f2994a', 6: '#4a7ef2', 7: '#9b51e0', 8: '#6b7280' };
-const sprites = {};
-for (const [v, name] of Object.entries(IMAGES)) {
-  const img = new Image();
-  img.src = `assets/images/${name}.png`;
-  sprites[v] = img;
-}
-const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const MINI = { w: 64, h: 40, cell: 14 }; // the hold and next boxes
 
-function setupCanvas(canvas, w, h) {
-  const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
-  canvas.width = Math.round(w * dpr);
-  canvas.height = Math.round(h * dpr);
-  canvas.style.aspectRatio = `${w} / ${h}`;
-  const ctx = canvas.getContext('2d');
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  return ctx;
-}
+/** The cells of piece `piece` in rotation `r` at (row, col), as [x, y] on the playfield. */
+const pieceCells = (piece, r, row, col) => PIECES[piece].rotations[r].cells.map(([dr, dc]) => [col + dc - PLAY_LEFT, row + dr]);
 
-function drawCell(ctx, x, y, s, v, alpha = 1) {
-  ctx.globalAlpha = alpha;
-  const img = sprites[v];
-  if (v !== FRAME && img && img.complete && img.naturalWidth) {
-    ctx.drawImage(img, x * s, y * s, s, s);
-  } else {
-    ctx.fillStyle = COLORS[v] || COLORS[8];
-    ctx.fillRect(x * s + 1, y * s + 1, s - 2, s - 2);
-  }
-  ctx.globalAlpha = 1;
-}
-
-function drawBoard(ctx, board) {
-  const s = CELL;
-  ctx.fillStyle = css('--board-bg') || '#0a0e1a';
-  ctx.fillRect(0, 0, PLAY_COLS * s, PLAY_ROWS * s);
-  ctx.strokeStyle = css('--board-grid') || '#161c30';
-  ctx.lineWidth = 1;
-  for (let c = 1; c < PLAY_COLS; c++) {
-    ctx.beginPath();
-    ctx.moveTo(c * s + 0.5, 0);
-    ctx.lineTo(c * s + 0.5, PLAY_ROWS * s);
-    ctx.stroke();
-  }
-  for (let r = 1; r < PLAY_ROWS; r++) {
-    ctx.beginPath();
-    ctx.moveTo(0, r * s + 0.5);
-    ctx.lineTo(PLAY_COLS * s, r * s + 0.5);
-    ctx.stroke();
-  }
-  for (let r = 0; r < PLAY_ROWS; r++) {
-    for (let c = 0; c < PLAY_COLS; c++) {
-      const v = board[idx(r, c + PLAY_LEFT)];
-      if (v) drawCell(ctx, c, r, s, v);
-    }
-  }
-}
-
-function drawPiece(ctx, piece, r, row, col, alpha = 1) {
-  const rot = PIECES[piece].rotations[r];
-  for (const [dr, dc] of rot.cells) drawCell(ctx, col + dc - PLAY_LEFT, row + dr, CELL, rot.value, alpha);
+function drawPiece(ctx, piece, r, row, col) {
+  const color = blockColor(PIECES[piece].value);
+  for (const [x, y] of pieceCells(piece, r, row, col)) drawBlock(ctx, x, y, CELL, color);
 }
 
 function drawGhost(ctx, piece, r, row, col) {
-  const rot = PIECES[piece].rotations[r];
-  ctx.strokeStyle = 'rgba(255,255,255,0.55)';
-  ctx.lineWidth = 2;
-  for (const [dr, dc] of rot.cells) {
-    ctx.strokeRect((col + dc - PLAY_LEFT) * CELL + 2, (row + dr) * CELL + 2, CELL - 4, CELL - 4);
-  }
+  outlineCells(ctx, pieceCells(piece, r, row, col), CELL, 'rgba(230, 224, 233, 0.4)', 2);
 }
 
-const miniCtx = {};
+const miniContexts = {};
 function drawMini(id, piece) {
-  const w = 64;
-  const h = 40;
-  miniCtx[id] ??= setupCanvas($(id), w, h);
-  const ctx = miniCtx[id];
-  ctx.clearRect(0, 0, w, h);
+  miniContexts[id] ??= setupCanvas($(id), MINI.w, MINI.h);
+  const ctx = miniContexts[id];
+  ctx.clearRect(0, 0, MINI.w, MINI.h);
   if (piece == null) return;
   const rot = PIECES[piece].rotations[0];
-  const s = 14;
-  const ox = (w - rot.width * s) / 2;
-  const oy = (h - rot.height * s) / 2;
   ctx.save();
-  ctx.translate(ox, oy);
-  for (const [r, c] of rot.cells) drawCell(ctx, c, r, s, rot.value);
+  ctx.translate((MINI.w - rot.width * MINI.cell) / 2, (MINI.h - rot.height * MINI.cell) / 2);
+  for (const [r, c] of rot.cells) drawBlock(ctx, c, r, MINI.cell, blockColor(rot.value));
   ctx.restore();
 }
 
-/* --------------------------------------------------------------- players */
+const boardContexts = {
+  you: setupCanvas($('youBoard'), PLAY_COLS * CELL, PLAY_ROWS * CELL),
+  ai: setupCanvas($('aiBoard'), PLAY_COLS * CELL, PLAY_ROWS * CELL),
+};
+
+/* ---------------------------------------------------------------- players */
 
 function newPlayer(seed) {
   const bag = new Bag(seed);
@@ -148,7 +81,6 @@ function newPlayer(seed) {
     next: bag.next(),
     held: null,
     canHold: true,
-    active: null, // { r, row, col } for you; the AI uses aiAnim
     lines: 0,
     score: 0,
     pieces: 0,
@@ -156,17 +88,8 @@ function newPlayer(seed) {
     sent: 0,
     pending: 0, // garbage rows on their way to this board
     dead: false,
-    holeRand: mulberry32(seed + 777), // same garbage holes on both boards
+    holeRand: mulberry32(seed + GARBAGE_SEED_OFFSET),
   };
-}
-
-const rotOf = (p, r) => PIECES[p.cur].rotations[r];
-
-function spawn(p) {
-  const rot = rotOf(p, 0);
-  const col = PLAY_LEFT + Math.floor((PLAY_COLS - rot.width) / 2);
-  p.active = { r: 0, row: 0, col };
-  if (collides(p.board, rot, 0, col)) p.dead = true;
 }
 
 function swapHold(p) {
@@ -180,275 +103,175 @@ function swapHold(p) {
   p.canHold = false;
 }
 
-/** Locks a piece in place, scores it, and handles garbage both ways. */
-function lock(p, r, row, col) {
-  placePiece(p.board, rotOf(p, r), row, col);
+/**
+ * Battle garbage after `p` cleared `cleared` lines: the clear first cancels
+ * garbage coming at p, the rest goes to the other board. A piece that clears
+ * nothing lets the waiting garbage in (all rows with the same hole).
+ */
+function exchangeGarbage(p, other, cleared) {
+  let attack = ATTACK[cleared];
+  const cancel = Math.min(attack, p.pending);
+  p.pending -= cancel;
+  attack -= cancel;
+  if (attack > 0) {
+    other.pending += attack;
+    p.sent += attack;
+    if (other === match.you) showSnack(`${opponentTitle()} sent you ${rows(attack)}. Clear lines to cancel them.`);
+  }
+  if (cleared === 0 && p.pending > 0) {
+    const hole = Math.floor(p.holeRand() * PLAY_COLS);
+    for (let i = 0; i < p.pending && !p.dead; i++) if (!addGarbageRow(p.board, hole)) p.dead = true;
+    p.pending = 0;
+  }
+}
+
+/** Places p's piece for good, scores it, sends and receives garbage, and moves on to the next piece. */
+function lockPiece(p, r, row, col) {
+  placePiece(p.board, PIECES[p.cur].rotations[r], row, col);
   const cleared = clearLines(p.board);
   p.pieces++;
   p.lines += cleared;
-  p.score += POINTS[cleared];
+  p.score += LINE_POINTS[cleared];
   if (cleared === 4) p.tetrises++;
-
-  if (mode === 'battle') {
-    let attack = ATTACK[cleared];
-    const cancel = Math.min(attack, p.pending); // your clears cancel incoming garbage first
-    p.pending -= cancel;
-    attack -= cancel;
-    if (attack > 0) {
-      other(p).pending += attack;
-      p.sent += attack;
-    }
-    if (cleared === 0 && p.pending > 0) {
-      // garbage arrives when you place a piece without clearing a line
-      const hole = Math.floor(p.holeRand() * PLAY_COLS);
-      for (let i = 0; i < p.pending && !p.dead; i++) if (!addGarbageRow(p.board, hole)) p.dead = true;
-      p.pending = 0;
-    }
-  }
-
+  if (match.mode === 'battle') exchangeGarbage(p, p === match.you ? match.ai : match.you, cleared);
   p.cur = p.next;
   p.next = p.bag.next();
   p.canHold = true;
-  p.active = null;
+}
+
+/** "1 row", "3 rows". */
+const rows = (n) => `${n} row${n === 1 ? '' : 's'}`;
+
+let snackTimer = null;
+/** A short message at the bottom of the screen, gone after a few seconds. */
+function showSnack(text) {
+  const snack = $('snack');
+  snack.textContent = text;
+  snack.classList.remove('is-hidden');
+  clearTimeout(snackTimer);
+  snackTimer = setTimeout(() => snack.classList.add('is-hidden'), SNACK_MS);
+}
+
+function hideSnack() {
+  clearTimeout(snackTimer);
+  $('snack').classList.add('is-hidden');
 }
 
 /* ------------------------------------------------------------------ state */
 
-let you = null;
-let ai = null;
-const other = (p) => (p === you ? ai : you);
-let mode = 'battle';
 let state = 'loading'; // loading | idle | countdown | playing | paused | over
-let chooser = null;
-let aiPps = 1;
-let aiMistakes = 0; // chance that the opponent drops a piece somewhere random (Super easy)
-let aiAnim = null; // { r, row, col, target, start, dur }
-let aiNextAt = 0;
-let elapsed = 0;
-let countdownLeft = 0;
-let gravityAcc = 0;
-let lockStart = null;
-let lockResets = 0;
-let last = 0;
-const keys = { left: null, right: null, down: false };
+let matchId = 0; // bumps on every new match, so a late answer from the opponent is dropped
+let models = null;
+let aiClient = null; // asks the opponent for its moves (lib/ai-client.js)
 
-let net = null;
-let weights = PUBLISHED_WEIGHTS;
+/** The opponent: can change at any time, even mid-match. */
+const opponent = { player: 'dqn3', pps: 1, mistakes: 0 }; // mistakes: chance of a random drop (Super easy)
 
-const youCtx = setupCanvas($('youBoard'), PLAY_COLS * CELL, PLAY_ROWS * CELL);
-const aiCtx = setupCanvas($('aiBoard'), PLAY_COLS * CELL, PLAY_ROWS * CELL);
-
-function makeChooser(kind) {
-  if (kind === 'bot') return (b, c, n, h) => chooseMoveAction(b, c, n, weights, h, { lookahead: true });
-  if (kind === 'dqn') return (b, c, n, h) => chooseDqnAction(b, c, net, n, h);
-  if (kind === 'dqn2') return (b, c, n, h) => chooseDqnAction(b, c, net, n, h, { lookahead: true });
-  return (b, c, n, h) => chooseDqnAction(b, c, net, n, h, { deep: true });
-}
-
-/* The opponent thinks in a background worker (versus-ai-worker.js), so even
-   the slow 3-ply search never makes your own piece stutter. If workers are
-   not available, it falls back to thinking here. */
-let aiWorker = null;
-try {
-  aiWorker = new Worker(new URL('./versus-ai-worker.js', import.meta.url), { type: 'module' });
-  aiWorker.onerror = () => {
-    aiWorker = null;
-  };
-} catch {
-  aiWorker = null;
-}
-let aiKind = 'dqn3';
-let aiThinking = false;
-let matchId = 0;
-let aiReqId = 0;
-const aiWaiting = new Map();
-if (aiWorker) {
-  aiWorker.onmessage = (e) => {
-    const done = aiWaiting.get(e.data.id);
-    aiWaiting.delete(e.data.id);
-    done?.(e.data);
-  };
-}
-
-function askWorker(p, canHold) {
-  return new Promise((resolve) => {
-    const id = ++aiReqId;
-    aiWaiting.set(id, resolve);
-    aiWorker.postMessage({ id, kind: aiKind, board: p.board, cur: p.cur, next: p.next, held: p.held, canHold });
-  });
-}
-
-/** The opponent's decision: a placement, or null when it has no legal move. */
-async function aiDecideAsync(p, match) {
-  if (!aiWorker) return aiDecide();
-  let r = await askWorker(p, true);
-  if (match !== matchId) return null;
-  if (r.hold) {
-    swapHold(p);
-    r = await askWorker(p, false);
-    if (r.hold) return null;
-  }
-  return r.move;
-}
-
-/* ------------------------------------------------------------- your moves */
-
-function grounded() {
-  const a = you.active;
-  return collides(you.board, rotOf(you, a.r), a.row + 1, a.col);
-}
-
-function afterMoveOnGround() {
-  // sliding or turning a landed piece gives it a little more time
-  if (lockStart != null && lockResets < MAX_LOCK_RESETS) {
-    lockStart = performance.now();
-    lockResets++;
-  }
-}
-
-function tryMove(dc, dr) {
-  const a = you.active;
-  if (!a || collides(you.board, rotOf(you, a.r), a.row + dr, a.col + dc)) return false;
-  a.row += dr;
-  a.col += dc;
-  if (dc) afterMoveOnGround();
-  return true;
-}
-
-function tryRotate(dir) {
-  const a = you.active;
-  if (!a) return;
-  const n = PIECES[you.cur].rotations.length;
-  if (n === 1) return;
-  const r = (a.r + dir + n) % n;
-  const rot = rotOf(you, r);
-  // simple wall kicks: try the spot, then a little left/right/up
-  for (const [dr, dc] of [[0, 0], [0, -1], [0, 1], [0, -2], [0, 2], [-1, 0], [-1, -1], [-1, 1]]) {
-    if (!collides(you.board, rot, a.row + dr, a.col + dc)) {
-      a.r = r;
-      a.row += dr;
-      a.col += dc;
-      afterMoveOnGround();
-      return;
-    }
-  }
-}
-
-function lockYou() {
-  const a = you.active;
-  lock(you, a.r, a.row, a.col);
-  lockStart = null;
-  lockResets = 0;
-  gravityAcc = 0;
-  if (!you.dead) spawn(you);
-  checkEnd();
-}
-
-function hardDrop() {
-  const a = you.active;
-  if (!a) return;
-  while (!collides(you.board, rotOf(you, a.r), a.row + 1, a.col)) a.row++;
-  lockYou();
-}
-
-function holdYou() {
-  if (!you.canHold) return;
-  swapHold(you);
-  spawn(you);
-  lockStart = null;
-  lockResets = 0;
-  gravityAcc = 0;
-  checkEnd();
-}
-
-const ACTIONS = {
-  left: () => tryMove(-1, 0),
-  right: () => tryMove(1, 0),
-  down: () => tryMove(0, 1),
-  cw: () => tryRotate(1),
-  ccw: () => tryRotate(-1),
-  drop: hardDrop,
-  hold: holdYou,
+/**
+ * The match in progress (or the last one). Times are on the game clock
+ * (`elapsed`, ms of play), which stops while paused.
+ */
+let match = {
+  mode: 'battle',
+  you: newPlayer(1),
+  ai: newPlayer(1),
+  elapsed: 0,
+  countdownLeft: 0,
+  aiAnim: null, // the opponent's piece falling into place: { r, col, target, start, dur }
+  aiNextAt: 0, // when the opponent may place its next piece
+  aiThinking: false,
 };
 
-/* -------------------------------------------------------- the opponent */
+const controller = new PieceController({
+  board: () => match.you.board,
+  piece: () => match.you.cur,
+  lock: (r, row, col) => {
+    lockPiece(match.you, r, row, col);
+    if (!match.you.dead) spawnYourPiece();
+    checkEnd();
+  },
+  hold: () => {
+    if (!match.you.canHold) return;
+    swapHold(match.you);
+    spawnYourPiece();
+    checkEnd();
+  },
+});
 
-function aiDecide() {
-  let m = chooser(ai.board, ai.cur, ai.next, { held: ai.held, canHold: true });
-  if (m && m.hold) {
-    swapHold(ai);
-    m = chooser(ai.board, ai.cur, ai.next, { held: ai.held, canHold: false });
-  }
-  if (!m || m.hold || m.score === -Infinity) return null;
-  return m;
+function spawnYourPiece() {
+  if (!controller.spawn()) match.you.dead = true;
 }
 
-function aiStep(t) {
-  if (ai.dead) return;
-  if (aiAnim) {
-    if (t - aiAnim.start >= aiAnim.dur) {
-      lock(ai, aiAnim.r, aiAnim.target, aiAnim.col);
-      aiAnim = null;
+/* ------------------------------------------------------------ the opponent */
+
+const positionOf = (p, canHold) => ({ board: p.board, cur: p.cur, next: p.next, held: p.held, canHold });
+
+/** The opponent's placement, or null when it has no legal move. May hold first. */
+async function opponentMove(p, id) {
+  let reply = await aiClient.decide(opponent.player, positionOf(p, true));
+  if (id !== matchId) return null;
+  if (reply.hold) {
+    swapHold(p);
+    reply = await aiClient.decide(opponent.player, positionOf(p, false));
+    if (reply.hold) return null;
+  }
+  return reply.move;
+}
+
+function opponentStep() {
+  const m = match;
+  if (m.ai.dead) return;
+  if (m.aiAnim) {
+    if (m.elapsed - m.aiAnim.start >= m.aiAnim.dur) {
+      lockPiece(m.ai, m.aiAnim.r, m.aiAnim.target, m.aiAnim.col);
+      m.aiAnim = null;
       checkEnd();
     }
     return;
   }
-  if (aiThinking || t < aiNextAt) return;
-  aiThinking = true;
-  const match = matchId;
-  aiDecideAsync(ai, match).then((move) => {
-    let m = move;
-    if (match !== matchId) return; // a new match started meanwhile
-    aiThinking = false;
+  if (m.aiThinking || m.elapsed < m.aiNextAt) return;
+  m.aiThinking = true;
+  const id = matchId;
+  const askedAt = m.elapsed; // thinking time counts towards its turn
+  opponentMove(m.ai, id).then((move) => {
+    if (id !== matchId) return; // a new match started meanwhile
+    m.aiThinking = false;
     if (state === 'over') return;
-    if (!m) {
-      ai.dead = true;
+    if (!move) {
+      m.ai.dead = true;
       checkEnd();
       return;
     }
-    if (aiMistakes && Math.random() < aiMistakes) {
+    let chosen = move;
+    if (opponent.mistakes && Math.random() < opponent.mistakes) {
       // Super easy: now and then it drops the piece in a random spot
-      const all = placements(ai.board, ai.cur);
-      if (all.length) m = all[Math.floor(Math.random() * all.length)];
+      const all = placements(m.ai.board, m.ai.cur);
+      if (all.length) chosen = all[Math.floor(Math.random() * all.length)];
     }
-    const interval = 1000 / aiPps;
-    aiAnim = { r: m.rotation, col: m.col, target: m.row, start: performance.now(), dur: Math.min(220, interval * 0.6) };
-    aiNextAt = t + interval; // thinking time counts towards its turn
+    const interval = 1000 / opponent.pps;
+    m.aiAnim = { r: chosen.rotation, col: chosen.col, target: chosen.row, start: m.elapsed, dur: Math.min(AI_DROP_MS, interval * AI_DROP_SHARE) };
+    m.aiNextAt = askedAt + interval;
   });
 }
 
-/* ------------------------------------------------------------ the match */
+/* --------------------------------------------------------------- settings */
 
-function setOverlay(title, html) {
-  $('overlay').classList.remove('intro-screen');
-  $('overlayTitle').innerHTML = title;
-  $('overlayText').innerHTML = html;
-  $('overlay').hidden = false;
-}
-
-/* One name per opponent, the same on every page. */
-const OPPONENTS = {
-  dqn3: { name: 'Network, 3 ahead', short: 'Network 3' },
-  dqn2: { name: 'Network, 2 ahead', short: 'Network 2' },
-  dqn: { name: 'Network, 1 piece', short: 'Network 1' },
-  bot: { name: 'Search bot', short: 'Bot' },
-};
-const checked = (name) => document.querySelector(`input[name=${name}]:checked`).value;
+const checkedValue = (name) => document.querySelector(`input[name=${name}]:checked`).value;
 
 /* Opponent and speed can change at any time, even mid-match (the bar above
    the boards): the next piece it places uses the new settings. The mode is
    chosen on the setup card and changes only with a new match. */
 function applyOpponent() {
-  aiPps = Number($('speed').value);
-  aiMistakes = Number($('speed').selectedOptions[0].dataset.mistakes || 0);
-  aiKind = $('opponent').value;
-  chooser = makeChooser(aiKind);
-  aiNextAt = Math.min(aiNextAt, performance.now() + 1000 / aiPps); // a faster speed kicks in at once
-  const o = OPPONENTS[aiKind];
-  $('aiName').innerHTML = `<span class="long">${o.name}</span><span class="short">${o.short}</span>`;
+  const speed = $('speed');
+  opponent.pps = Number(speed.value);
+  opponent.mistakes = Number(speed.selectedOptions[0].dataset.mistakes || 0);
+  opponent.player = $('opponent').value;
+  match.aiNextAt = Math.min(match.aiNextAt, match.elapsed + 1000 / opponent.pps); // a faster speed kicks in at once
+  const { name, short } = PLAYERS[opponent.player];
+  $('aiName').innerHTML = `<span class="long">${name}</span><span class="short">${short}</span>`;
 }
 
-/* the setup card's choices and the bar's dropdowns always agree */
+/* the setup card's radio buttons and the bar's dropdowns always agree */
 for (const name of ['opponent', 'speed']) {
   for (const radio of document.querySelectorAll(`input[name=${name}]`)) {
     radio.addEventListener('change', () => {
@@ -463,6 +286,60 @@ for (const name of ['opponent', 'speed']) {
   });
 }
 
+/* ---------------------------------------------------------------- overlay */
+
+const OVERLAY_ACTIONS = {
+  rematch: () => start(),
+  restart: () => start(),
+  settings: () => backToSetup(),
+  resume: () => setPaused(false),
+};
+
+const button = (action, label, primary = false) =>
+  `<button type="button" data-action="${action}"${primary ? ' class="btn-go"' : ''}>${label}</button>`;
+
+/** The message on your board: a title (may contain markup) and its content. */
+function setOverlay(titleHtml, html) {
+  $('overlay').classList.remove('intro-screen');
+  $('overlayTitle').innerHTML = titleHtml;
+  $('overlayText').innerHTML = html;
+  $('overlay').hidden = false;
+}
+
+function syncPauseButton() {
+  $('pauseBtn').textContent = state === 'paused' ? 'Resume' : 'Pause';
+  $('pauseBtn').disabled = state === 'over' || state === 'idle';
+}
+
+/** Asks on your board before a running match is thrown away (restart, or back to the settings). */
+function confirmOnBoard(title, yesLabel, yesAction) {
+  if (state === 'playing' || state === 'countdown') {
+    state = 'paused';
+    controller.releaseAll();
+  }
+  setOverlay(
+    title,
+    '<p class="intro-sub">The current match will be lost.</p>' +
+      `<div class="vs-confirm">${button(yesAction, yesLabel, true)}${button('resume', 'Keep playing')}</div>`
+  );
+  syncPauseButton();
+  $('overlay').querySelector('[data-action=resume]').focus();
+}
+
+let shownCountdown = 0; // the number on the overlay, so it is rewritten only when it changes
+function showCountdown() {
+  const seconds = Math.ceil(match.countdownLeft / 1000);
+  if (seconds === shownCountdown && !$('overlay').hidden) return;
+  shownCountdown = seconds;
+  setOverlay(
+    `<span class="big">${seconds}</span>`,
+    '<p class="intro-sub">Get ready…</p>' +
+      (match.mode === 'battle' ? '<p class="vs-tip">The red bar beside a board shows garbage on its way.</p>' : '')
+  );
+}
+
+/* -------------------------------------------------------------- the match */
+
 /* the two screens: the setup card before a match, the boards during one */
 function showMatchView(on) {
   $('lobby').hidden = on;
@@ -471,83 +348,73 @@ function showMatchView(on) {
 
 function backToSetup() {
   matchId++; // drops any answer the opponent is still thinking about
-  aiThinking = false;
-  aiAnim = null;
   state = 'idle';
+  controller.releaseAll();
   $('overlay').hidden = true;
   showMatchView(false);
   $('startBtn').focus();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-/** A question on your board with two buttons (restart or leave a match). */
-function confirmOnBoard(title, yesLabel, yesId) {
-  if (state === 'playing' || state === 'countdown') state = 'paused';
-  setOverlay(
-    title,
-    `<p class="intro-sub">The current match will be lost.</p>` +
-      `<div class="vs-confirm"><button type="button" class="btn-go" id="${yesId}">${yesLabel}</button>` +
-      `<button type="button" id="keepPlaying">Keep playing</button></div>`
-  );
-  $('pauseBtn').textContent = 'Resume';
-  $('keepPlaying').focus();
-}
-
 const matchRunning = () => state === 'countdown' || state === 'playing' || state === 'paused';
 
 function start() {
   if (state === 'loading') return;
-  mode = checked('mode');
-  applyOpponent();
   matchId++;
-  aiThinking = false;
-  showMatchView(true);
-  $('barMode').textContent = mode === 'race' ? `Race to ${RACE_LINES} lines` : 'Battle';
-  $('goal').textContent = mode === 'race' ? `Race to ${RACE_LINES} lines` : 'Battle';
   const seed = (Math.random() * 2 ** 31) >>> 0;
-  you = newPlayer(seed);
-  ai = newPlayer(seed); // same pieces for both
-  spawn(you);
-  aiAnim = null;
-  elapsed = 0;
-  gravityAcc = 0;
-  lockStart = null;
-  lockResets = 0;
-  countdownLeft = 3000;
+  match = {
+    mode: checkedValue('mode'),
+    you: newPlayer(seed),
+    ai: newPlayer(seed), // the same pieces for both
+    elapsed: 0,
+    countdownLeft: COUNTDOWN_MS,
+    aiAnim: null,
+    aiNextAt: 0,
+    aiThinking: false,
+  };
+  applyOpponent();
+  controller.releaseAll();
+  spawnYourPiece();
   state = 'countdown';
+  shownCountdown = 0;
+  showMatchView(true);
+  const modeName = match.mode === 'race' ? `Race to ${RACE_LINES} lines` : 'Battle';
+  $('barMode').textContent = modeName;
+  $('goal').textContent = match.mode === 'race' ? `First to ${RACE_LINES} lines wins. Topping out loses.` : 'Clear 2 or more lines at once to send garbage.';
+  hideSnack();
   for (const id of ['youBadge', 'aiBadge']) {
     $(id).textContent = '';
     $(id).className = 'vs-badge';
   }
   $('aiOverlay').hidden = true;
-  $('pauseBtn').disabled = false;
-  $('pauseBtn').textContent = 'Pause';
+  syncPauseButton();
   // bring the boards (and on phones the touch buttons) into view
   $('matchView').scrollIntoView({ block: 'start', behavior: 'smooth' });
 }
 
 function setPaused(on) {
-  if (on && state === 'countdown') {
+  if (on && (state === 'countdown' || state === 'playing')) {
+    const wasCounting = state === 'countdown';
     state = 'paused';
-    setOverlay('Paused', '<p class="intro-sub">Tap <b>Resume</b> to continue.</p>');
-    $('pauseBtn').textContent = 'Resume';
-  } else if (on && state === 'playing') {
-    countdownLeft = 0;
-    state = 'paused';
-    setOverlay('Paused', '<p class="intro-sub"><span class="keys-only">Press <kbd>P</kbd> or </span>Tap <b>Resume</b> to continue.</p>');
-    $('pauseBtn').textContent = 'Resume';
-  } else if (!on && state === 'paused' && countdownLeft > 0) {
-    state = 'countdown'; // paused during the countdown: carry on counting
-    $('pauseBtn').textContent = 'Pause';
+    controller.releaseAll();
+    setOverlay(
+      'Paused',
+      wasCounting
+        ? '<p class="intro-sub">Tap <b>Resume</b> to continue.</p>'
+        : '<p class="intro-sub"><span class="keys-only">Press <kbd>P</kbd> or </span>Tap <b>Resume</b> to continue.</p>'
+    );
   } else if (!on && state === 'paused') {
-    state = 'playing';
-    $('overlay').hidden = true;
-    $('pauseBtn').textContent = 'Pause';
+    // paused during the countdown: carry on counting
+    state = match.countdownLeft > 0 ? 'countdown' : 'playing';
+    if (state === 'playing') $('overlay').hidden = true;
+    else shownCountdown = 0; // redraw the countdown over the pause message
   }
+  syncPauseButton();
 }
 
 function checkEnd() {
   if (state !== 'playing' && state !== 'countdown') return;
+  const { you, ai, mode } = match;
   let winner = null;
   if (you.dead && ai.dead) winner = 'draw';
   else if (you.dead) winner = 'ai';
@@ -559,160 +426,135 @@ function checkEnd() {
   if (winner) endMatch(winner);
 }
 
-function fmtTime(ms) {
+function formatTime(ms) {
   const s = Math.floor(ms / 1000);
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
+/** "The network" or "The bot": who you are playing against. */
+const opponentTitle = () => (PLAYERS[opponent.player].bot ? 'The bot' : 'The network');
+
+/** The result's title, and what decided it: a full stack, or the race finish line. */
+function resultText(winner) {
+  const { you, ai } = match;
+  if (winner === 'you') return { title: 'You win! 🎉', why: ai.dead ? 'Its stack reached the top.' : `You reached ${RACE_LINES} lines first.` };
+  if (winner === 'ai') {
+    return {
+      title: `${opponentTitle()} wins`,
+      why: you.dead ? 'Your stack reached the top.' : `It reached ${RACE_LINES} lines first.`,
+    };
+  }
+  return { title: 'Draw', why: 'Both stacks reached the top.' };
+}
+
 function endMatch(winner) {
   state = 'over';
-  const title = winner === 'you' ? 'You win! 🎉' : winner === 'ai' ? (aiKind === 'bot' ? 'The bot wins' : 'The network wins') : 'Draw';
-  // say what actually decided it: a full stack, or the race finish line
-  const why =
-    winner === 'you'
-      ? ai.dead
-        ? 'Its stack reached the top.'
-        : `You reached ${RACE_LINES} lines first.`
-      : winner === 'ai'
-        ? you.dead
-          ? 'Your stack reached the top.'
-          : `It reached ${RACE_LINES} lines first.`
-        : 'Both stacks reached the top.';
+  controller.releaseAll();
+  const { you, ai, mode, elapsed } = match;
+  const { title, why } = resultText(winner);
   const pps = (p) => (elapsed > 0 ? (p.pieces / (elapsed / 1000)).toFixed(2) : '0');
   setOverlay(
     title,
     `${why}<br />` +
-      `Time ${fmtTime(elapsed)} · you ${you.lines} lines, ${pps(you)} pieces/s` +
+      `Time ${formatTime(elapsed)} · you ${you.lines} lines, ${pps(you)} pieces/s` +
       (mode === 'battle' ? `, ${you.sent} garbage sent` : '') +
-      `<div class="vs-confirm"><button type="button" class="btn-go" id="rematchBtn">Rematch</button>` +
-      `<button type="button" id="settingsFromEnd">Change settings</button></div>` +
-      `<span class="vs-rematch-hint keys-only">or press <kbd>Enter</kbd> for a rematch</span>`
+      `<div class="vs-confirm">${button('rematch', 'Rematch', true)}${button('settings', 'Change settings')}</div>` +
+      '<span class="vs-rematch-hint keys-only">or press <kbd>Enter</kbd> for a rematch</span>'
   );
   if (winner !== 'draw') {
-    $(winner === 'you' ? 'youBadge' : 'aiBadge').textContent = 'Winner';
-    $(winner === 'you' ? 'youBadge' : 'aiBadge').className = 'vs-badge win';
-    $(winner === 'you' ? 'aiBadge' : 'youBadge').textContent = 'Topped out';
-    $(winner === 'you' ? 'aiBadge' : 'youBadge').className = 'vs-badge lose';
-    if (mode === 'race' && !you.dead && !ai.dead) $(winner === 'you' ? 'aiBadge' : 'youBadge').textContent = 'Second';
+    const winnerBadge = $(winner === 'you' ? 'youBadge' : 'aiBadge');
+    const loserBadge = $(winner === 'you' ? 'aiBadge' : 'youBadge');
+    winnerBadge.textContent = 'Winner';
+    winnerBadge.className = 'vs-badge win';
+    loserBadge.textContent = mode === 'race' && !you.dead && !ai.dead ? 'Second' : 'Topped out';
+    loserBadge.className = 'vs-badge lose';
   }
   if (winner === 'you' && ai.dead) {
     $('aiOverlayTitle').textContent = 'Topped out';
     $('aiOverlay').hidden = false;
   }
-  $('pauseBtn').disabled = true;
+  syncPauseButton();
 }
 
 /* -------------------------------------------------------------- the loop */
 
-function gravityMs() {
-  const level = Math.floor(you.lines / 10);
-  return Math.max(70, 800 * 0.85 ** level);
-}
+let lastFrame = 0;
 
-function handleRepeat(t) {
-  for (const dir of ['left', 'right']) {
-    const k = keys[dir];
-    if (k && t - k.since >= DAS && t - k.last >= ARR) {
-      ACTIONS[dir]();
-      k.last = t;
-    }
-  }
-}
-
-function frame(t) {
-  const dt = last ? Math.min(100, t - last) : 0;
-  last = t;
+function frame(now) {
+  const dt = lastFrame ? Math.min(TIMING.maxFrame, now - lastFrame) : 0;
+  lastFrame = now;
 
   if (state === 'countdown') {
-    countdownLeft -= dt;
-    if (countdownLeft <= 0) {
+    match.countdownLeft -= dt;
+    if (match.countdownLeft <= 0) {
       state = 'playing';
       $('overlay').hidden = true;
-      aiNextAt = t + 300;
+      match.aiNextAt = match.elapsed + AI_FIRST_MOVE_MS;
     } else {
-      setOverlay(
-        `<span class="big">${Math.ceil(countdownLeft / 1000)}</span>`,
-        `<p class="intro-sub">Get ready…</p>` +
-          (mode === 'battle' ? '<p class="vs-tip">The red bar beside a board shows garbage on its way.</p>' : '')
-      );
+      showCountdown();
     }
   } else if (state === 'playing') {
-    elapsed += dt;
-    handleRepeat(t);
-    if (you.active) {
-      gravityAcc += dt;
-      const g = keys.down ? SOFT_DROP : gravityMs();
-      while (gravityAcc >= g) {
-        gravityAcc -= g;
-        if (!tryMove(0, 1)) break;
-        lockStart = null;
-      }
-      if (grounded()) {
-        if (lockStart == null) lockStart = t;
-        else if (t - lockStart >= LOCK_DELAY) lockYou();
-      } else {
-        lockStart = null;
-      }
-    }
-    if (state === 'playing') aiStep(t);
+    match.elapsed += dt;
+    controller.step(now, dt, gravityMs(match.you.lines));
+    if (state === 'playing') opponentStep();
   }
 
-  render(t);
+  if (!$('matchView').hidden) render();
   requestAnimationFrame(frame);
 }
 
-function render(t) {
-  if (!you) return;
+/** Draws both boards and their numbers. */
+function render() {
+  const { you, ai, aiAnim, elapsed } = match;
+  const drawBoard = (ctx, board) => drawPlayfield(ctx, board, { cell: CELL });
+
   // your board: stack, ghost, piece
-  drawBoard(youCtx, you.board);
-  const a = you.active;
+  drawBoard(boardContexts.you, you.board);
+  const a = controller.active;
   if (a && !you.dead && state !== 'over') {
-    let g = a.row;
-    while (!collides(you.board, rotOf(you, a.r), g + 1, a.col)) g++;
-    drawGhost(youCtx, you.cur, a.r, g, a.col);
-    drawPiece(youCtx, you.cur, a.r, a.row, a.col);
+    const rotation = PIECES[you.cur].rotations[a.r];
+    drawGhost(boardContexts.you, you.cur, a.r, landingRow(you.board, rotation, a.row, a.col), a.col);
+    drawPiece(boardContexts.you, you.cur, a.r, a.row, a.col);
   }
   // the opponent's board, with its piece falling into place
-  drawBoard(aiCtx, ai.board);
+  drawBoard(boardContexts.ai, ai.board);
   if (aiAnim && state !== 'over') {
-    const k = Math.min(1, (t - aiAnim.start) / aiAnim.dur);
-    drawPiece(aiCtx, ai.cur, aiAnim.r, Math.round(aiAnim.target * k), aiAnim.col);
+    const k = Math.min(1, (elapsed - aiAnim.start) / aiAnim.dur);
+    drawPiece(boardContexts.ai, ai.cur, aiAnim.r, Math.round(aiAnim.target * k), aiAnim.col);
   }
 
-  for (const [p, pre] of [
+  for (const [p, prefix] of [
     [you, 'you'],
     [ai, 'ai'],
   ]) {
-    drawMini(`${pre}Hold`, p.held);
-    drawMini(`${pre}Next`, p.next);
-    $(`${pre}Lines`).textContent = p.lines;
-    $(`${pre}Score`).textContent = p.score.toLocaleString('en-US');
-    $(`${pre}Pps`).textContent = elapsed > 1000 ? (p.pieces / (elapsed / 1000)).toFixed(1) : '0.0';
-    $(`${pre}Garbage`).style.height = `${Math.min(100, (p.pending / 12) * 100)}%`;
+    drawMini(`${prefix}Hold`, p.held);
+    drawMini(`${prefix}Next`, p.next);
+    setText(`${prefix}Lines`, p.lines);
+    setText(`${prefix}Score`, p.score.toLocaleString('en-US'));
+    setText(`${prefix}Pps`, elapsed > 1000 ? (p.pieces / (elapsed / 1000)).toFixed(1) : '0.0');
+    $(`${prefix}Garbage`).style.height = `${Math.min(100, (p.pending / GARBAGE_BAR_ROWS) * 100)}%`;
+    setText(`${prefix}Sent`, rows(p.sent));
   }
-  $('timer').textContent = fmtTime(elapsed);
+  const incoming = $('youIncoming');
+  incoming.hidden = you.pending === 0 || state === 'over';
+  setText('youIncoming', `${rows(you.pending)} incoming`);
+  setText('timer', formatTime(elapsed));
+}
+
+/** Writes text only when it changed (no DOM work for numbers that stay the same). */
+function setText(id, value) {
+  const el = $(id);
+  const text = String(value);
+  if (el.textContent !== text) el.textContent = text;
 }
 
 /* ---------------------------------------------------------------- input */
-
-const KEYMAP = {
-  ArrowLeft: 'left',
-  ArrowRight: 'right',
-  ArrowDown: 'down',
-  ArrowUp: 'cw',
-  KeyX: 'cw',
-  KeyZ: 'ccw',
-  Space: 'drop',
-  KeyC: 'hold',
-  ShiftLeft: 'hold',
-  ShiftRight: 'hold',
-};
 
 window.addEventListener('keydown', (e) => {
   if (e.target.closest?.('select')) return;
   if (e.code === 'Enter' && state === 'over' && !e.target.closest?.('button')) {
     e.preventDefault();
-    start(); // rematch with the current settings
+    start(); // rematch with the same settings
     return;
   }
   if (e.code === 'KeyP' || e.code === 'Escape') {
@@ -720,61 +562,28 @@ window.addEventListener('keydown', (e) => {
     else if (state === 'paused') setPaused(false);
     return;
   }
-  const action = KEYMAP[e.code];
+  const action = actionForKey(e);
   if (!action || state !== 'playing') return;
   e.preventDefault(); // no page scrolling while playing
-  if (e.repeat) return; // we do our own repeat for left/right/down
-  if (action === 'left' || action === 'right') {
-    ACTIONS[action]();
-    const t = performance.now();
-    keys[action] = { since: t, last: t };
-    keys[action === 'left' ? 'right' : 'left'] = null;
-  } else if (action === 'down') {
-    keys.down = true;
-  } else {
-    ACTIONS[action]();
-  }
+  if (e.repeat) return; // the controller repeats left/right itself
+  controller.keyDown(action);
 });
 
 window.addEventListener('keyup', (e) => {
-  const action = KEYMAP[e.code];
-  if (action === 'left' || action === 'right') keys[action] = null;
-  if (action === 'down') keys.down = false;
+  const action = KEYMAP[e.code]; // not actionForKey: a key released while Ctrl is down must still let go
+  if (action) controller.keyUp(action);
+});
+window.addEventListener('blur', () => controller.releaseAll()); // keyup never arrives in a background window
+
+bindTouchPad($('touch'), {
+  press: (action) => controller.run(action),
+  setSoftDrop: (on) => controller.setSoftDrop(on),
+  isEnabled: () => state === 'playing',
 });
 
-// touch buttons: tap to act; hold left/right/down to repeat
-for (const btn of document.querySelectorAll('#touch button')) {
-  const action = btn.dataset.key;
-  let timer = null;
-  const stop = () => {
-    clearInterval(timer);
-    timer = null;
-    if (action === 'down') keys.down = false;
-  };
-  btn.addEventListener('pointerdown', (e) => {
-    e.preventDefault();
-    if (state !== 'playing') return;
-    if (action === 'down') {
-      keys.down = true;
-      return;
-    }
-    ACTIONS[action]();
-    if (action === 'left' || action === 'right') {
-      const t0 = performance.now();
-      timer = setInterval(() => {
-        if (performance.now() - t0 >= DAS && state === 'playing') ACTIONS[action]();
-      }, ARR);
-    }
-  });
-  for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) btn.addEventListener(ev, stop);
-}
-
-// buttons inside the board's message (results, confirmations)
 $('overlay').addEventListener('click', (e) => {
-  const id = e.target.closest?.('button')?.id;
-  if (id === 'rematchBtn' || id === 'confirmRestart') start();
-  else if (id === 'settingsFromEnd' || id === 'confirmLeave') backToSetup();
-  else if (id === 'keepPlaying') setPaused(false);
+  const action = e.target.closest?.('button[data-action]')?.dataset.action;
+  OVERLAY_ACTIONS[action]?.();
 });
 
 $('startBtn').addEventListener('click', (e) => {
@@ -783,17 +592,17 @@ $('startBtn').addEventListener('click', (e) => {
 });
 $('restartBtn').addEventListener('click', (e) => {
   e.currentTarget.blur();
-  if (matchRunning()) confirmOnBoard('Restart this match?', 'Restart', 'confirmRestart');
+  if (matchRunning()) confirmOnBoard('Restart this match?', 'Restart', 'restart');
   else start();
 });
 $('settingsBtn').addEventListener('click', (e) => {
   e.currentTarget.blur();
-  if (matchRunning()) confirmOnBoard('Leave this match?', 'Change settings', 'confirmLeave');
+  if (matchRunning()) confirmOnBoard('Leave this match?', 'Change settings', 'settings');
   else backToSetup();
 });
 $('pauseBtn').addEventListener('click', (e) => {
   e.currentTarget.blur();
-  setPaused(state === 'playing');
+  setPaused(state === 'playing' || state === 'countdown');
 });
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) setPaused(true);
@@ -802,22 +611,11 @@ document.addEventListener('visibilitychange', () => {
 /* ---------------------------------------------------------------- start */
 
 async function init() {
-  you = newPlayer(1);
-  ai = newPlayer(1);
   applyOpponent();
   requestAnimationFrame(frame);
   try {
-    const [model, w] = await Promise.all([
-      fetch('./models/dqn-model.json').then((r) => {
-        if (!r.ok) throw new Error(`dqn-model.json: HTTP ${r.status}`);
-        return r.json();
-      }),
-      fetch('./models/weights.json')
-        .then((r) => (r.ok ? r.json() : null))
-        .catch(() => null),
-    ]);
-    net = loadDqn(model);
-    if (w?.weights) weights = w.weights;
+    models = await loadModels();
+    aiClient = new AiClient(models);
     state = 'idle';
     $('startBtn').disabled = false;
     $('startBtn').textContent = 'Start';

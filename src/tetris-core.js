@@ -1,9 +1,10 @@
 /**
- * tetris-core.js - pure game logic. No DOM, no timers, no globals.
+ * tetris-core.js - the game rules. No DOM, no timers, no global state, so the
+ * same code runs in Node (training, benchmarks, tests) and in the browser.
  *
- * Board layout is unchanged from your original: a 16x27 grid with a 3-cell
- * frame down the left, down the right, and across the bottom. The frame is
- * why collision checks need no bounds tests.
+ * The board is a 16 x 27 grid: a 10 x 24 playfield inside a 3-cell frame down
+ * the left, down the right and across the bottom. Because the frame counts as
+ * filled, collision checks never need bounds tests.
  *
  *        col 0 1 2 | 3 ......... 12 | 13 14 15
  *   row 0        # # #  playfield    #  #  #
@@ -11,17 +12,21 @@
  *   row 23       # # #  playfield    #  #  #
  *   row 24-26    # # # # # # # # # # #  #  #   <- floor
  *
- * The board is a flat Uint8Array instead of an array of arrays. Cell (r, c)
- * lives at index r * WIDTH + c. This matters: copying the board is the single
- * hottest operation in the AI search (thousands of copies per piece) and
- * `board.slice()` on a typed array is roughly 30x faster than the nested
- * loops in the old copyBoard().
+ * The board is one flat Uint8Array; cell (r, c) lives at index r * WIDTH + c.
+ * Copying the board is the hottest operation in the search (thousands of
+ * copies per piece), and `slice()` on a typed array is a single memcpy.
+ *
+ * Contents, top to bottom: board, pieces, randomness, mechanics, garbage,
+ * hold, and playEpisode (one full game with any chooser).
  */
+
+/* ------------------------------------------------------------------ board */
 
 export const WIDTH = 16;
 export const HEIGHT = 27;
 
-export const FRAME = 8; // the value your original used for wall/floor cells
+/** Cell value of the frame. Garbage rows use it too, so they render grey. */
+export const FRAME = 8;
 
 export const PLAY_LEFT = 3; // first playfield column
 export const PLAY_RIGHT = 12; // last playfield column, inclusive
@@ -29,31 +34,27 @@ export const PLAY_COLS = PLAY_RIGHT - PLAY_LEFT + 1; // 10
 export const PLAY_BOTTOM = HEIGHT - 4; // 23, last playfield row, inclusive
 export const PLAY_ROWS = PLAY_BOTTOM + 1; // 24
 
+/** Index of cell (row, col) in the flat board. */
 export const idx = (r, c) => r * WIDTH + c;
 
-/* ------------------------------------------------------------------ board */
-
+/** An empty playfield inside its frame. */
 export function createBoard() {
   const board = new Uint8Array(WIDTH * HEIGHT);
-  // left and right walls
   for (let r = 0; r < HEIGHT; r++) {
-    for (let c = 0; c < PLAY_LEFT; c++) board[idx(r, c)] = FRAME;
-    for (let c = PLAY_RIGHT + 1; c < WIDTH; c++) board[idx(r, c)] = FRAME;
+    for (let c = 0; c < PLAY_LEFT; c++) board[idx(r, c)] = FRAME; // left wall
+    for (let c = PLAY_RIGHT + 1; c < WIDTH; c++) board[idx(r, c)] = FRAME; // right wall
   }
-  // floor
   for (let r = PLAY_BOTTOM + 1; r < HEIGHT; r++) {
-    for (let c = 0; c < WIDTH; c++) board[idx(r, c)] = FRAME;
+    for (let c = 0; c < WIDTH; c++) board[idx(r, c)] = FRAME; // floor
   }
   return board;
 }
 
-/** Fast copy. Replaces the old copyBoard(). */
 export const copyBoard = (board) => board.slice();
 
-/* ------------------------------------------------------------------ pieces */
+/* ----------------------------------------------------------------- pieces */
 
-// Colour values kept identical to your original so the images still map:
-// Z=1, I=2, O=3, S=4, L=5, J=6, T=7
+// Cell values double as colour/sprite ids: Z=1, I=2, O=3, S=4, L=5, J=6, T=7.
 const SHAPES = {
   Z: {
     value: 1,
@@ -169,11 +170,10 @@ const SHAPES = {
 };
 
 /**
- * Turns a 4x4 grid into a normalised rotation: a list of the four occupied
- * cells, shifted so the topmost row is 0 and the leftmost column is 0.
- * Normalising means an anchor of (row 0, col PLAY_LEFT) always sits flush in
- * the top-left of the playfield, which makes the column loop trivial and
- * removes the empty-padding-column bugs the original 4x4 layout invited.
+ * Turns a 4x4 grid into a normalised rotation: the four occupied cells,
+ * shifted so the topmost row and the leftmost column are 0. An anchor of
+ * (row 0, col PLAY_LEFT) then always sits flush in the top-left corner of the
+ * playfield, so the legal columns are simply PLAY_LEFT .. PLAY_RIGHT - width + 1.
  */
 function makeRotation(grid, value) {
   const raw = [];
@@ -185,14 +185,10 @@ function makeRotation(grid, value) {
   const cells = raw.map(([r, c]) => [r - minRow, c - minCol]);
   const height = Math.max(...cells.map((p) => p[0])) + 1;
   const width = Math.max(...cells.map((p) => p[1])) + 1;
-
-  // 4x4 grid in normalised position, for drawing the "next piece" preview
-  const preview = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]];
-  for (const [r, c] of cells) preview[r][c] = value;
-
-  return { cells, width, height, value, preview };
+  return { cells, width, height, value };
 }
 
+/** The 7 pieces, in the order Z I O S L J T; a piece is referred to by its index. */
 export const PIECES = Object.entries(SHAPES).map(([name, { value, grids }]) => ({
   name,
   value,
@@ -201,9 +197,9 @@ export const PIECES = Object.entries(SHAPES).map(([name, { value, grids }]) => (
 
 export const PIECE_INDEX = Object.fromEntries(PIECES.map((p, i) => [p.name, i]));
 
-/* --------------------------------------------------------------- randomness */
+/* ------------------------------------------------------------- randomness */
 
-/** Small, fast, seedable PRNG. Same seed always gives the same game. */
+/** Small, fast, seedable PRNG (returns floats in [0, 1)). Same seed, same game. */
 export function mulberry32(seed) {
   let a = seed >>> 0;
   return function next() {
@@ -215,10 +211,8 @@ export function mulberry32(seed) {
 }
 
 /**
- * Standard 7-bag randomiser: shuffle all seven pieces, deal them out, repeat.
- * This replaces the 5-array sack in the original, which could deal the same
- * piece many times in a row. 7-bag is what modern Tetris uses and it makes
- * fitness comparisons between weight vectors much less noisy.
+ * The 7-bag randomiser of modern Tetris: shuffle all seven pieces, deal them
+ * out, repeat. Never more than 12 pieces between two of the same kind.
  */
 export class Bag {
   constructor(seed) {
@@ -239,7 +233,34 @@ export class Bag {
   }
 }
 
-/* --------------------------------------------------------------- mechanics */
+/**
+ * The classic (NES-style) randomiser: every piece drawn uniformly and
+ * independently. No guarantees: four S pieces in a row, or 30 pieces without
+ * an I, are both possible. Harder than the 7-bag.
+ */
+export class MemorylessGen {
+  constructor(seed) {
+    this.rand = mulberry32(seed);
+  }
+  next() {
+    return Math.floor(this.rand() * PIECES.length);
+  }
+}
+
+/** 'bag' (7-bag) or 'memoryless': a piece generator with .next(). */
+export function createPieceGenerator(randomizer, seed) {
+  if (randomizer === 'bag') return new Bag(seed);
+  if (randomizer === 'memoryless') return new MemorylessGen(seed);
+  throw new Error(`unknown randomizer: ${randomizer} (use 'bag' or 'memoryless')`);
+}
+
+/**
+ * Seed of the random stream that places garbage holes in the game with this
+ * seed. Separate from the piece stream, so garbage never changes the pieces.
+ */
+export const garbageSeed = (seed) => seed * 7 + 12345;
+
+/* -------------------------------------------------------------- mechanics */
 
 /** True if this rotation overlaps anything (stack or frame) at (row, col). */
 export function collides(board, rotation, row, col) {
@@ -251,9 +272,8 @@ export function collides(board, rotation, row, col) {
 }
 
 /**
- * Lowest row this rotation can reach in this column, dropping straight down
- * from the top. Returns -1 if the column is blocked at spawn height, which is
- * how a topped-out board reports "no legal placement here".
+ * Lowest row this rotation reaches in this column, dropping straight down
+ * from the top. -1 if it already collides at the top: no legal placement.
  */
 export function dropRow(board, rotation, col) {
   if (collides(board, rotation, 0, col)) return -1;
@@ -271,12 +291,9 @@ export function placePiece(board, rotation, row, col) {
 }
 
 /**
- * Removes every full row and drops what's above it down. Mutates, returns the
- * number of rows cleared.
- *
- * The original scanned with a `counter` that was never reset per row and
- * mutated the loop variable while iterating; this is a straightforward
- * read-pointer/write-pointer compaction instead.
+ * Removes every full row and drops what is above it. Mutates; returns the
+ * number of rows cleared. One bottom-up pass: a read pointer scans every row
+ * and a write pointer copies down each row that is not full.
  */
 export function clearLines(board) {
   let write = PLAY_BOTTOM;
@@ -301,21 +318,17 @@ export function clearLines(board) {
     }
     write--;
   }
-  // blank out whatever is left at the top
   for (; write >= 0; write--) {
-    for (let c = PLAY_LEFT; c <= PLAY_RIGHT; c++) board[idx(write, c)] = 0;
+    for (let c = PLAY_LEFT; c <= PLAY_RIGHT; c++) board[idx(write, c)] = 0; // blank the top
   }
   return cleared;
 }
 
 /**
- * Every placement reachable by "rotate, slide, drop" - the standard Tetris AI
- * action space. Returns [{ rotation, col, row }, ...].
- *
- * The original walked the piece to the right wall and then stepped left,
- * carrying `x` over from the previous column so later columns started their
- * drop buried inside the stack and were silently skipped. This enumerates
- * columns directly, so every legal placement is always considered.
+ * Every placement reachable by "rotate, slide, drop": the standard action
+ * space of a Tetris AI. Returns [{ rotation, col, row }, ...], rotation by
+ * rotation, columns left to right. Search code relies on this order: on equal
+ * scores the first placement wins.
  */
 export function placements(board, pieceIdx) {
   const out = [];
@@ -329,6 +342,12 @@ export function placements(board, pieceIdx) {
     }
   }
   return out;
+}
+
+/** Plays `move` ({ rotation, col, row }) with this piece on `board`. Mutates; returns the lines cleared. */
+export function playMove(board, pieceIdx, move) {
+  placePiece(board, PIECES[pieceIdx].rotations[move.rotation], move.row, move.col);
+  return clearLines(board);
 }
 
 /** Column heights, measured from the floor. Empty column = 0. */
@@ -346,23 +365,20 @@ export function columnHeights(board, out = new Int32Array(PLAY_COLS)) {
   return out;
 }
 
-/* ------------------------------------------------------------- hard mode */
+/* ---------------------------------------------------------------- garbage */
 
 /**
- * Pushes a "garbage" row in from the bottom: a full row with one hole, the
- * way multiplayer Tetris punishes you for your opponent's clears. Everything
- * on the board moves up one row.
+ * Pushes a garbage row in from the bottom: a full row with one hole, the way
+ * multiplayer Tetris punishes you for your opponent's clears. Everything
+ * moves up one row. `holeCol` counts playfield columns, 0..9.
  *
- * Why it exists: on a normal 7-bag game both the search bot and the CNN
- * survive 5,000+ pieces every time, so they cannot be told apart, and a
- * learner has no failures to learn from. Garbage makes every game end
- * eventually, and makes how LONG you last a real, measurable skill.
+ * Why it exists: in a normal 7-bag game both the search bot and the network
+ * survive 5,000+ pieces every time, so they cannot be told apart. Garbage
+ * makes every game end eventually, so how long you last becomes measurable.
  *
- * The row is stored as FRAME (8): it counts as filled everywhere (collision,
- * features, the networks' inputs) and renders grey.
- *
- * Returns false if a block was already in the top row - pushing it off the
- * board is a top-out.
+ * The row is stored as FRAME: it counts as filled everywhere (collision,
+ * features, the network's inputs). Returns false if a block was already in
+ * the top row: pushing it off the board is a top-out.
  */
 export function addGarbageRow(board, holeCol) {
   let overflow = false;
@@ -376,94 +392,40 @@ export function addGarbageRow(board, holeCol) {
   return !overflow;
 }
 
-/**
- * Memoryless piece generator: every piece is drawn uniformly and independently.
- * This is the classic NES-style randomiser. Unlike the 7-bag it gives NO
- * guarantees - you can get four S pieces in a row, or wait 30 pieces for an I.
- */
-export class MemorylessGen {
-  constructor(seed) {
-    this.rand = mulberry32(seed);
-  }
-  next() {
-    return Math.floor(this.rand() * PIECES.length);
-  }
-}
-
-/**
- * One full game with any chooser, under a chosen rule set. The hard-mode
- * benchmark and the RL trainer both use this, so they measure the same game.
- *
- *   chooser(board, current, next) -> { rotation, col, row } | null
- *   opts:
- *     cap           stop after this many pieces
- *     randomizer    'bag' (7-bag, default) or 'memoryless'
- *     preview       true = the chooser sees the next piece; false = it gets
- *                   null and has to decide on the current piece alone
- *     garbageEvery  0 = off; N = a garbage row rises every N pieces
- *
- * Every random stream is derived from the seed, so two agents on the same
- * seed face exactly the same pieces and the same garbage.
- */
 /* ------------------------------------------------------------------- hold */
 
 /**
  * HOLD (modern Tetris rule): instead of placing the current piece, put it in
- * the hold box. If the box was empty, the next piece comes in; otherwise the
- * held piece comes back. You can hold once per piece, so after a hold the
- * player must place what it got.
+ * the hold box. If the box was empty the next piece comes in, otherwise the
+ * held piece comes back. Once per piece: after a hold, the player must place
+ * what it got.
  *
  * A chooser that supports hold gets a 4th argument { held, canHold } and may
  * return HOLD instead of a placement. Choosers that ignore the 4th argument
- * simply never hold, so every existing chooser keeps working unchanged.
+ * simply never hold.
  */
 export const HOLD = Object.freeze({ hold: true });
 
-/**
- * The hold decision, shared by the bot and the network.
- *
- *   best(piece, follower) -> { move, score } | null
- *     the chooser's best placement for `piece`; `follower` is the piece that
- *     comes after it, or null when unknown. Higher score = better.
- *   usesFollower: whether best() looks at the follower at all (2-ply).
- *
- * Compares "place the current piece" with "hold, then place what you get".
- * When that piece or its follower is still unknown (empty hold box), it
- * averages over all 7 pieces, so both sides are scored the same way.
- */
-export function decideWithHold(best, current, next, held, canHold, usesFollower = false) {
-  const place = best(current, next);
-  if (!canHold) return place ? place.move : null;
-
-  const avg = (fn) => {
-    let sum = 0;
-    for (let p = 0; p < PIECES.length; p++) {
-      const r = fn(p);
-      if (!r) return -Infinity;
-      sum += r.score;
-    }
-    return sum / PIECES.length;
-  };
-  let holdScore;
-  if (held != null) {
-    // the held piece comes back; the next piece is unchanged
-    holdScore = best(held, next)?.score ?? -Infinity;
-  } else if (next != null) {
-    // the next piece comes in; the one after it is not known yet
-    holdScore = usesFollower ? avg((f) => best(next, f)) : best(next, null)?.score ?? -Infinity;
-  } else {
-    // no preview and an empty box: the piece we'd get is unknown
-    holdScore = avg((p) => best(p, null));
-  }
-
-  if (!place) return holdScore > -Infinity ? HOLD : null;
-  return holdScore > place.score ? HOLD : place.move;
-}
+/* ------------------------------------------------------------ one episode */
 
 /**
- * One full game with any chooser, under a chosen rule set. The hard-mode
- * benchmark and the RL trainer both use this, so they measure the same game.
- * With hold: true the chooser may hold (see HOLD above).
+ * One full game with any chooser, under a chosen rule set. Training, the
+ * benchmarks and the tests all use this, so they all play the same game.
+ *
+ *   chooser(board, current, next, holdCtx) -> { rotation, col, row } | HOLD | null
+ *     next     the next piece, or null when preview is off
+ *     holdCtx  { held, canHold } when hold is on, otherwise undefined
+ *     null     no move: the game is lost
+ *
+ * @param {Function} chooser
+ * @param {number} seed  fixes the pieces and the garbage holes
+ * @param {object} [rules]
+ * @param {number} [rules.cap=500]           stop after this many pieces
+ * @param {number} [rules.garbageEvery=0]    0 = off; N = a garbage row every N pieces
+ * @param {'bag'|'memoryless'} [rules.randomizer='bag']
+ * @param {boolean} [rules.preview=true]     whether the chooser sees the next piece
+ * @param {boolean} [rules.hold=false]       whether the chooser may hold
+ * @returns {{ lines: number, pieces: number, died: boolean, holds: number, tetrises: number }}
  */
 export function playEpisode(
   chooser,
@@ -471,8 +433,8 @@ export function playEpisode(
   { cap = 500, garbageEvery = 0, randomizer = 'bag', preview = true, hold = false } = {}
 ) {
   const board = createBoard();
-  const gen = randomizer === 'memoryless' ? new MemorylessGen(seed) : new Bag(seed);
-  const holes = mulberry32(seed * 7 + 12345);
+  const gen = createPieceGenerator(randomizer, seed);
+  const holeRand = mulberry32(garbageSeed(seed));
   let current = gen.next();
   let next = gen.next();
   let held = null;
@@ -495,17 +457,16 @@ export function playEpisode(
       }
       move = chooser(board, current, preview ? next : null, { held, canHold: false });
     }
-    if (move === null || move.hold || move.score === -Infinity) {
+    if (move == null || move.hold) {
       died = true;
       break;
     }
-    placePiece(board, PIECES[current].rotations[move.rotation], move.row, move.col);
-    const cleared = clearLines(board);
+    const cleared = playMove(board, current, move);
     lines += cleared;
     if (cleared === 4) tetrises++;
     pieces++;
     if (garbageEvery > 0 && pieces % garbageEvery === 0) {
-      if (!addGarbageRow(board, Math.floor(holes() * PLAY_COLS))) {
+      if (!addGarbageRow(board, Math.floor(holeRand() * PLAY_COLS))) {
         died = true;
         break;
       }

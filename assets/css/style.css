@@ -1,74 +1,336 @@
 /*
- * style.css - the Tetris game page.
+ * style.css - the Play page (index.html).
  *
- * Same element ids and class names as before (#gameContainer, .row, .block,
- * #nextTetromino, #score, #name, #scoreBoard, .agent-panel, #agent,
- * #agentStats), so no HTML or JavaScript has to change.
+ *   left    the hint card, and who plays (a list of players)
+ *   centre  You play / Network plays, the board with Hold and Next beside it,
+ *           and the level progress
+ *   right   the score and three numbers
+ *   bottom  a floating toolbar (pause, new game, keys); on touch screens the
+ *           touch buttons instead
+ *
+ * The board (#gameContainer: .row > .block, one block per cell, built by
+ * assets/js/tetris-visual.js) is sized by --cell, as big as the window allows.
+ * Colours, type and the shared components come from theme.css.
  */
 
 :root {
-  /* one cell of the board: as big as fits the window, never above 34px */
-  --cell: clamp(14px, min(calc((100vh - 100px - var(--topnav-h, 0px)) / 24), calc((100vw - 48px) / 10)), 34px);
-  --page: #0b0f1d;
-  --panel: rgba(23, 29, 51, 0.82);
-  --panel-line: rgba(255, 255, 255, 0.09);
-  --text: #e8ebf3;
-  --muted: #98a2bb;
-  --accent: #8b85ff;
-  --accent-2: #4ec3e0;
-  --radius: 16px;
+  --gap: 3px; /* between cells */
+  /* one cell: the board's 24 rows fit the window under the bar, the buttons
+     above it, the level line and the toolbar; never bigger than 32 px */
+  --cell: clamp(14px, calc((100vh - var(--topnav-h, 72px) - 300px) / 24 - var(--gap)), 32px);
 }
 
 html,
 body {
   margin: 0;
-  min-height: 100%;
+}
+body {
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding-top: var(--topnav-h, 72px);
 }
 
-body {
+.play {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 40px;
+  padding: 16px 24px 120px; /* room for the floating toolbar */
+}
+
+/* ------------------------------------------------------------ the sides */
+
+.play-side {
+  width: 300px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 66px; /* level with the top of the board */
+}
+
+.hint-card,
+.ml-card {
+  padding: 18px 20px;
+  border-radius: 24px 24px 24px 6px; /* a speech bubble: it talks about the board */
+  background: var(--ui-tonal);
+  color: var(--ui-on-tonal);
+}
+.ml-card {
+  background: var(--ui-accent-box);
+  color: var(--ui-on-accent-box);
+}
+.hint-card h2,
+.ml-card h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+.hint-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.hint-note,
+.ml-card p {
+  margin: 6px 0 0;
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+.hint-card kbd {
+  background: rgba(0, 0, 0, 0.25);
+}
+body.human .ml-card,
+body:not(.human) .hint-card {
+  display: none;
+}
+
+/* who plays: one row per player, with how strong it is */
+.players {
+  margin: 0;
+  padding: 8px;
+  border: 0;
+  border-radius: 28px;
+  background: var(--ui-surface);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.players legend {
+  float: left; /* inside the box, like a heading */
+  width: 100%;
+  padding: 6px 12px 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ui-muted);
+}
+.player {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 0 14px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 500;
+  transition: background 0.15s;
+}
+.player:hover {
+  background: var(--ui-line-soft);
+}
+.player input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+.player .radio {
+  flex: none;
+  width: 20px;
+  height: 20px;
   box-sizing: border-box;
-  min-height: 100vh;
-  padding: calc(var(--topnav-h, 0px) + 24px) 16px 24px;
+  border-radius: 999px;
+  border: 2px solid var(--ui-faint);
+  display: grid;
+  place-items: center;
+}
+.player .radio::after {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--ui-accent);
+  transform: scale(0);
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.player-name {
+  flex: 1;
+}
+.player-name span {
+  color: var(--ui-muted);
+  font-weight: 400;
+}
+.meter {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+}
+.meter i {
+  width: 5px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--ui-surface-top);
+}
+.meter i:nth-child(2) {
+  height: 12px;
+}
+.meter i:nth-child(3) {
+  height: 16px;
+}
+.meter i.on {
+  background: var(--ui-faint);
+}
+.player:has(input:checked) {
+  background: var(--ui-tonal);
+  color: var(--ui-on-tonal);
+  font-weight: 600;
+}
+.player:has(input:checked) .radio {
+  border-color: var(--ui-accent);
+}
+.player:has(input:checked) .radio::after {
+  transform: scale(1);
+}
+.player:has(input:checked) .meter i.on {
+  background: var(--ui-accent);
+}
+.player:has(input:focus-visible) {
+  outline: 2px solid var(--ui-text);
+  outline-offset: 2px;
+}
+
+/* the score, and the numbers under it */
+.score-blob {
+  align-self: center;
+  width: 250px;
+  height: 196px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 16px;
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  color: var(--text);
-  background:
-    radial-gradient(900px 500px at 15% 10%, rgba(139, 133, 255, 0.16), transparent 60%),
-    radial-gradient(800px 500px at 90% 90%, rgba(78, 195, 224, 0.12), transparent 60%),
-    var(--page);
+  background: var(--ui-accent-box);
+  color: var(--ui-on-accent-box);
+}
+.score-blob .tile-label {
+  color: inherit;
+}
+#scoreBoard {
+  font-size: 3.6rem;
+  line-height: 1.05;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.score-note {
+  min-height: 1.3em;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ui-accent);
+}
+.game-line {
+  margin: 0;
+  text-align: center;
+  font-size: 0.92rem;
+  color: var(--ui-muted);
 }
 
-#wrapper {
+/* ----------------------------------------------------------- the centre */
+
+.play-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+/* You play | Network plays: two connected buttons, the chosen one filled */
+.mode-group {
+  display: flex;
+  gap: 4px;
+}
+.mode-group button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 52px;
+  padding: 0 24px;
+  border: 0;
+  font: inherit;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--ui-text);
+  background: var(--ui-surface-high);
+  cursor: pointer;
+  transition:
+    border-radius 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+    background 0.15s;
+}
+#youBtn {
+  border-radius: 999px 12px 12px 999px;
+}
+#netBtn {
+  border-radius: 12px 999px 999px 12px;
+}
+.mode-group button[aria-pressed='true'] {
+  border-radius: 999px;
+  color: var(--ui-on-accent);
+  background: var(--ui-accent);
+  font-weight: 700;
+}
+.mode-group button:not([aria-pressed='true']):hover {
+  background: var(--ui-surface-top);
+}
+.mode-group svg {
+  display: none;
+}
+.mode-group button[aria-pressed='true'] svg {
+  display: block;
+}
+.mode-group button:focus-visible {
+  outline: 2px solid var(--ui-text);
+  outline-offset: 3px;
+}
+
+/* the board with Hold and Next beside it, in one rounded panel */
+.console {
   display: flex;
   align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 36px;
+  background: var(--ui-surface);
+}
+.piece-tile {
+  width: 84px;
+  height: 92px;
+  box-sizing: border-box;
+  border-radius: 24px;
+  background: var(--ui-surface-high);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
-  gap: 28px;
-  flex-wrap: wrap;
+  gap: 10px;
+  transition: box-shadow 0.2s;
+}
+.piece-tile .tile-label {
+  font-size: 0.8rem;
+}
+/* the hint says "hold this piece": the Hold box lights up */
+body.human #holdTetromino.hint-hold {
+  box-shadow:
+    0 0 0 3px var(--ui-accent),
+    0 0 24px rgba(208, 188, 255, 0.45);
 }
 
-/* ------------------------------------------------------------ the board */
+.board-wrap {
+  position: relative;
+}
 
 #gameContainer {
   /* the board is built by JavaScript; reserve its size so nothing jumps */
-  min-width: calc(var(--cell) * 10);
-  min-height: calc(var(--cell) * 24);
+  min-width: calc(var(--cell) * 10 + var(--gap) * 9 + 20px);
+  min-height: calc(var(--cell) * 24 + var(--gap) * 23 + 20px);
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
+  gap: var(--gap);
   padding: 10px;
-  border-radius: var(--radius);
-  border: 1px solid var(--panel-line);
-  background:
-    linear-gradient(rgba(8, 11, 24, 0.6), rgba(8, 11, 24, 0.6)),
-    url('../images/background.png') center / cover no-repeat,
-    #080b18;
-  box-shadow:
-    0 0 0 1px rgba(139, 133, 255, 0.15),
-    0 20px 60px rgba(0, 0, 0, 0.55),
-    0 0 80px rgba(139, 133, 255, 0.12);
+  border-radius: 26px;
+  background: var(--ui-board);
 }
 
 /* The game keeps a 3-cell frame round the playfield (walls and floor). It is
@@ -83,179 +345,59 @@ body {
 
 .row {
   display: flex;
-  box-sizing: border-box;
+  gap: var(--gap);
 }
 
+/* one cell: empty, a piece (v1-v7), where your piece will land (ghost) or
+   where the network would put it (hint) */
 .block {
   width: var(--cell);
   height: var(--cell);
   box-sizing: border-box;
-  border-radius: 3px;
-  background-size: 100% 100%;
-  /* faint grid on empty cells; filled cells get their image and colour */
-  background-color: rgba(255, 255, 255, 0.025);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+  border-radius: calc(var(--cell) * 0.27);
+  background: var(--ui-slot);
 }
-
-.border {
-  border: 1px solid white;
+.block.v1,
+.block.v2,
+.block.v3,
+.block.v4,
+.block.v5,
+.block.v6,
+.block.v7,
+.block.v8 {
+  box-shadow: inset 0 calc(var(--cell) * -0.15) 0 rgba(0, 0, 0, 0.22);
 }
-
-/* ------------------------------------------------------------ side panel */
-
-#gameStuff {
-  width: 230px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
+.v1 {
+  background: #e6483d;
 }
-
-#gameStuff::before {
-  content: 'TETRIS';
-  font-size: 2rem;
-  font-weight: 800;
-  letter-spacing: 0.32em;
-  line-height: 1;
-  padding: 4px 0 6px;
-  color: var(--text);
+.v2 {
+  background: #4ec3e0;
 }
-
-#holdTetromino,
-#nextTetromino,
-#score,
-.agent-panel {
-  box-sizing: border-box;
-  background-color: var(--panel);
-  border: 1px solid var(--panel-line);
-  border-radius: var(--radius);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
+.v3 {
+  background: #f2c94c;
 }
-
-#holdTetromino,
-#nextTetromino {
-  position: relative;
-  width: 100%;
-  height: 150px;
-  background-position: 50% 58%;
-  background-repeat: no-repeat;
+.v4 {
+  background: #5fc27e;
 }
-
-/* hold and next side by side, a little shorter */
-#holdTetromino,
-#holdTetromino + #nextTetromino {
-  width: calc(50% - 7px);
-  height: 130px;
-  /* the piece image is fitted inside the box, below the label */
-  padding: 36px 14px 14px;
-  background-origin: content-box;
-  background-position: center;
-  background-size: contain;
+.v5 {
+  background: #f2994a;
 }
-#gameStuff:has(#holdTetromino) {
-  flex-direction: row;
-  flex-wrap: wrap;
+.v6 {
+  background: #4a7ef2;
 }
-#gameStuff:has(#holdTetromino) > #score,
-#gameStuff:has(#holdTetromino) > .agent-panel,
-#gameStuff:has(#holdTetromino)::before {
-  width: 100%;
+.v7 {
+  background: #9b51e0;
 }
-
-#holdTetromino::before,
-#nextTetromino::before {
-  content: 'NEXT';
-  position: absolute;
-  top: 12px;
-  left: 16px;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  color: var(--muted);
+.v8 {
+  background: #6b7280;
 }
-
-#holdTetromino::before {
-  content: 'HOLD';
+.block.ghost {
+  background: transparent;
+  border: 2px solid rgba(230, 224, 233, 0.35);
 }
-
-#score {
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  text-align: left;
-}
-
-#name {
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
-#scoreBoard {
-  margin-top: 4px;
-  font-size: 2.6rem;
-  font-weight: 800;
-  line-height: 1.1;
-  font-variant-numeric: tabular-nums;
-  color: var(--text);
-}
-
-.agent-panel {
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.agent-panel label {
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
-select {
-  width: 100%;
-  max-width: 320px;
-  font: inherit;
-  font-size: 0.92rem;
-  color: var(--text);
-  background-color: var(--page);
-  border: 1px solid var(--panel-line);
-  border-radius: 10px;
-  padding: 9px 10px;
-  cursor: pointer;
-}
-
-select:hover,
-select:focus {
-  border-color: var(--accent);
-}
-select:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-#agentStats {
-  font-size: 0.85rem;
-  line-height: 1.5;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-}
-
-#agentStats:empty {
-  display: none;
-}
-
-/* ------------------------------------------- playing it yourself (v0.19) */
-
-.board-wrap {
-  position: relative;
+.block.hint {
+  background: rgba(208, 188, 255, 0.14);
+  border: 2px dashed var(--ui-accent);
 }
 
 .play-overlay {
@@ -266,9 +408,9 @@ select:focus-visible {
   place-items: center;
   padding: 20px;
   text-align: center;
-  border-radius: var(--radius);
-  background: rgba(10, 13, 26, 0.84);
-  color: var(--text);
+  border-radius: 26px;
+  background: rgba(20, 18, 24, 0.88);
+  color: var(--ui-text);
   line-height: 1.5;
 }
 .play-overlay[hidden] {
@@ -284,159 +426,63 @@ select:focus-visible {
   color: #fff;
 }
 
-/* the "Turn on ML" switch */
-.agent-panel .ml-switch {
+/* level progress: a wavy line, as far as you have come in this level */
+.level {
+  width: 100%;
+  max-width: 420px;
   display: flex;
-  align-items: center;
-  gap: 12px;
-  cursor: pointer;
-  font-size: 1rem;
-  letter-spacing: 0;
-  text-transform: none;
-  color: var(--text);
+  flex-direction: column;
+  gap: 6px;
 }
-.ml-switch input {
-  position: absolute;
-  opacity: 0;
-  width: 1px;
-  height: 1px;
-}
-.ml-track {
-  position: relative;
-  flex: none;
-  width: 50px;
-  height: 28px;
-  border-radius: 999px;
-  background: #2a3150;
-  border: 1px solid var(--panel-line);
-  transition: background 0.2s;
-}
-.ml-thumb {
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-  transition: transform 0.2s;
-}
-.ml-switch input:checked + .ml-track {
-  background: var(--accent);
-  border-color: var(--accent);
-}
-.ml-switch input:checked + .ml-track .ml-thumb {
-  transform: translateX(22px);
-}
-.ml-switch input:focus-visible + .ml-track {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-.ml-text {
-  font-weight: 700;
-}
-.ml-hint {
-  margin: -2px 0 6px;
-  font-size: 0.82rem;
-  color: var(--muted);
-}
-
-
-/* "Show hint" (only while you play) */
-.hint-row {
+.level-text {
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  margin: 0 0 4px;
-}
-.agent-panel .ml-switch.small {
   font-size: 0.9rem;
-  gap: 10px;
+  font-weight: 600;
+  color: var(--ui-muted);
 }
-.ml-switch.small .ml-track {
-  width: 38px;
-  height: 22px;
+.level-wave {
+  width: 100%;
+  height: 14px;
+  overflow: visible;
 }
-.ml-switch.small .ml-thumb {
-  width: 16px;
-  height: 16px;
+.level-wave path {
+  fill: none;
+  stroke-width: 4.5;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
 }
-.ml-switch.small input:checked + .ml-track .ml-thumb {
-  transform: translateX(16px);
+.wave-done {
+  stroke: var(--ui-accent);
 }
-.hint-note {
-  margin: -2px 0 6px;
-  font-size: 0.8rem;
-  line-height: 1.4;
-  color: var(--accent);
+.wave-rest {
+  stroke: var(--ui-line);
 }
-.hint-note[hidden],
-body:not(.human) .hint-row,
-body:not(.human) .hint-note {
+
+/* -------------------------------------------------------------- toolbar */
+
+.play-toolbar .i-play,
+body.paused .play-toolbar .i-pause {
   display: none;
 }
-/* the outline on the board where the network would put your piece */
-#gameContainer .block.hint {
-  outline: 2px solid rgba(139, 133, 255, 0.95);
-  outline-offset: -2px;
-  background-color: rgba(139, 133, 255, 0.18);
-  border-radius: 4px;
+body.paused .play-toolbar .i-play {
+  display: block;
+}
+body:not(.human) #pauseBtn {
+  display: none;
 }
 
-/* hint says "hold this piece": the Hold box lights up */
-#holdTetromino.hint-hold {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent), 0 0 24px rgba(139, 133, 255, 0.45);
-}
-body:not(.human) #holdTetromino.hint-hold {
-  border-color: var(--panel-line);
-  box-shadow: none;
-}
+/* ---------------------------------------------------------------- touch */
 
-/* the four numbers under the agent picker */
-.play-stats {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin: 6px 0 0;
-}
-.play-stats div {
-  padding: 8px 10px;
-  border-radius: 10px;
-  background: var(--page);
-  border: 1px solid var(--panel-line);
-}
-.play-stats dt {
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-.play-stats dd {
-  margin: 2px 0 0;
-  font-size: 1.25rem;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-  color: var(--text);
-}
-
-/* touch buttons: only on touch screens, only while you play */
 .touch-pad {
   display: none;
 }
 @media (pointer: coarse) {
-  body.human {
-    /* leave room for the buttons under the board */
-    --cell: clamp(12px, min(calc((100vh - 330px - var(--topnav-h, 0px)) / 24), calc((100vw - 48px) / 10)), 30px);
-    padding-top: calc(var(--topnav-h, 0px) + 10px);
-    padding-bottom: 160px;
-    justify-content: flex-start;
+  .toolbar.play-toolbar {
+    display: none;
   }
-  body.human #gameContainer {
-    scroll-margin-bottom: 150px;
+  body.human {
+    padding-bottom: 150px; /* room for the buttons */
   }
   body.human .touch-pad {
     position: fixed;
@@ -445,156 +491,176 @@ body:not(.human) #holdTetromino.hint-hold {
     bottom: 0;
     z-index: 5;
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 8px;
-    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
-    background: rgba(11, 15, 29, 0.92);
-    border-top: 1px solid var(--panel-line);
-    -webkit-backdrop-filter: blur(8px);
-    backdrop-filter: blur(8px);
+    padding: 10px 16px calc(12px + env(safe-area-inset-bottom));
+    background: rgba(20, 18, 24, 0.94);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
   }
   .touch-pad button {
     font: inherit;
     font-size: 1.15rem;
     font-weight: 700;
-    height: 52px;
-    border-radius: 12px;
-    border: 1px solid var(--panel-line);
-    background: var(--panel);
-    color: var(--text);
+    height: 54px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--ui-surface-top);
+    color: var(--ui-text);
     touch-action: none;
     user-select: none;
     -webkit-user-select: none;
+    transition: border-radius 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .touch-pad .tp-tonal {
+    border-radius: 18px;
+    background: var(--ui-tonal);
+    color: var(--ui-on-tonal);
+  }
+  .touch-pad .tp-accent {
+    background: var(--ui-accent);
+    color: var(--ui-on-accent);
+    font-weight: 800;
   }
   .touch-pad button:active {
-    background: var(--accent);
-    color: #0b0e1d;
+    border-radius: 12px;
   }
 }
 
-/* ------------------------------------------------ small screens: stack */
+/* -------------------------------------------------------- smaller screens */
 
-@media (max-width: 720px) {
-  #wrapper {
-    flex-direction: column;
-    align-items: center;
+@media (max-width: 1240px) {
+  .play {
+    gap: 24px;
   }
+  .play-side {
+    width: 250px;
+  }
+  #scoreBoard {
+    font-size: 3rem;
+  }
+}
 
-  #gameStuff {
+/* tablets: the board first, the two sides next to each other below it */
+@media (max-width: 1060px) {
+  .play {
+    flex-wrap: wrap;
+  }
+  .play-center {
     order: -1;
     width: 100%;
-    max-width: calc(var(--cell) * 10 + 22px);
-    display: grid;
-    grid-template-columns: 1fr 1fr;
   }
-
-  #gameStuff::before {
-    grid-column: 1 / -1;
-    font-size: 1.5rem;
-  }
-
-  #nextTetromino {
-    height: 110px;
-    background-size: auto 52%;
-  }
-
-  #holdTetromino,
-  #holdTetromino + #nextTetromino {
-    width: auto;
-    height: 110px;
-  }
-
-  #gameStuff:has(#holdTetromino) > #score {
-    grid-column: 1 / -1;
-  }
-
-  .agent-panel {
-    grid-column: 1 / -1;
+  .play-side {
+    width: min(340px, 100%);
+    padding-top: 0;
   }
 }
 
-/* small screens while you play: hold, next and score in one row above the
-   board, the ML switch below it, so the board and buttons fit one screen */
+/* phones: Hold, the score and Next in one row above the board; the hint and
+   the player list below it */
 @media (max-width: 720px) {
-  body.human #wrapper {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 8px;
-    width: 100%;
-    max-width: 380px;
+  :root {
+    --cell: clamp(
+      12px,
+      min(calc((100vw - 52px) / 10 - var(--gap)), calc((100vh - var(--topnav-h, 60px) - 330px) / 24 - var(--gap))),
+      28px
+    );
   }
-  body.human #gameStuff {
+  @supports (height: 100svh) {
+    :root {
+      --cell: clamp(
+        12px,
+        min(calc((100vw - 52px) / 10 - var(--gap)), calc((100svh - var(--topnav-h, 60px) - 330px) / 24 - var(--gap))),
+        28px
+      );
+    }
+  }
+  .play {
+    display: grid;
+    grid-template-columns: 68px minmax(0, 1fr) 68px;
+    grid-template-areas:
+      'mode mode mode'
+      'hold score next'
+      'board board board'
+      'level level level'
+      'tiles tiles tiles'
+      'game game game'
+      'hint hint hint'
+      'ml ml ml'
+      'players players players';
+    gap: 10px;
+    max-width: 420px;
+    margin: 0 auto;
+    padding: 8px 16px 24px;
+  }
+  .play-side,
+  .play-center,
+  .console {
     display: contents;
   }
-  body.human #gameStuff::before {
-    display: none;
-  }
-  body.human #holdTetromino,
-  body.human #holdTetromino + #nextTetromino,
-  body.human #score {
-    order: 1;
-    width: auto;
-    height: 70px;
-    padding: 24px 10px 6px;
-  }
-  body.human #holdTetromino::before,
-  body.human #nextTetromino::before {
-    top: 7px;
-    left: 10px;
-  }
-  body.human #wrapper #gameStuff > #score {
-    grid-column: auto;
-    padding: 7px 10px;
-  }
-  body.human #scoreBoard {
-    font-size: 1.6rem;
-  }
-  body.human .board-wrap {
-    order: 2;
-    grid-column: 1 / -1;
+  .mode-group {
+    grid-area: mode;
     justify-self: center;
   }
-  body.human .agent-panel {
-    order: 3;
-    grid-column: 1 / -1;
+  .mode-group button {
+    min-height: 48px;
+    padding: 0 18px;
+    font-size: 1rem;
   }
-}
-
-/* ----------------------------- leaderboard (kept from the original page) */
-
-#content {
-  width: 80%;
-  height: 736px;
-  background-image: url('../images/background.png');
-  background-position: center;
-  background-repeat: no-repeat;
-}
-
-.orderNode {
-  color: white;
-  margin-right: 100px;
-  margin-left: 10px;
-  font-size: 20px;
-}
-
-.nameNode {
-  color: white;
-  display: flex;
-  flex: 1;
-  font-size: 20px;
-  align-items: center;
-}
-
-.scoreNode {
-  color: white;
-  display: flex;
-  font-size: 20px;
-  flex: 1;
-  justify-content: flex-end;
-  margin-right: 20px;
-}
-
-.rowLeaderboard {
-  display: flex;
-  margin-bottom: 48px;
+  #holdTetromino {
+    grid-area: hold;
+  }
+  #nextTetromino {
+    grid-area: next;
+  }
+  .piece-tile {
+    width: 68px;
+    height: 68px;
+    border-radius: 22px;
+    gap: 6px;
+    --mini-cell: 9px;
+  }
+  .score-blob.shape-blob {
+    grid-area: score;
+    align-self: stretch;
+    width: auto;
+    height: 68px;
+    flex-direction: row;
+    justify-content: space-between;
+    padding: 0 18px;
+    border-radius: 34px 34px 34px 12px;
+  }
+  .score-note {
+    display: none;
+  }
+  #scoreBoard {
+    font-size: 2rem;
+  }
+  .board-wrap {
+    grid-area: board;
+    justify-self: center;
+  }
+  #gameContainer,
+  .play-overlay {
+    border-radius: 22px;
+  }
+  .level {
+    grid-area: level;
+    justify-self: center;
+  }
+  .stat-tiles {
+    grid-area: tiles;
+  }
+  .game-line {
+    grid-area: game;
+  }
+  .hint-card {
+    grid-area: hint;
+  }
+  .ml-card {
+    grid-area: ml;
+  }
+  .players {
+    grid-area: players;
+  }
 }

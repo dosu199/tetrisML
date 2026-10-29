@@ -1,6 +1,6 @@
 # Plan — Tetris ML
 
-Last updated: 27 October 2026 (v0.31).
+Last updated: 28 October 2026 (v0.33).
 
 **Goal:** a neural network that plays Tetris well and learns by itself.
 
@@ -144,6 +144,35 @@ keyboard hints hidden on touch, Watch it learn in a 2-column grid. One label
 style, no text under 12 px, honest How it works intro, two-column intros on
 wide screens. Lighthouse: accessibility 100 on every page.
 
+v0.33 (clean code, no change to how anyone plays): three independent reviews
+of every module, then refactored in small steps, each checked against frozen
+outputs (every move of 70 fixed games, training runs, benchmarks, pixel
+screenshots of every page). Shared modules instead of copies: piece controls
+(`src/tetris-controls.js`, Play and Play vs Bot had ~110 duplicated lines),
+the AI player list (`src/tetris-players.js`, was in 7 places), browser helpers
+(`assets/js/lib/`), script helpers (`scripts/lib/`: checked flags, seeds,
+replay memory, stats). Play's inline script became `assets/js/play.js`;
+`tetris-visual.js` moved to `assets/js/` (src/ is now DOM-free);
+`tetris-headless.js` was removed (a copy of `playEpisode`). Tests moved to
+`node:test` with a move-by-move regression test; the benchmark is
+`scripts/bench.js`. 16 bugs fixed, mostly failure paths (frozen opponent when
+the worker fails, stuck keys after alt-tab, Ctrl+C acting as Hold, opponent
+clock running while paused, `--out` without .json overwriting the best model,
+a test that could never fail). The Play hint now runs in the worker: the page
+used to freeze up to 0.5 s per piece with hints on, now under 35 ms. Retrained
+with `npm run train:dqn`: model and snapshots byte-identical.
+
+v0.34 (new look, "B+", no change to how anyone plays): picked from two design
+directions after looking at the 5 most visited sites (Google, YouTube,
+Facebook, Instagram, Wikipedia). Material 3 Expressive dark palette, pills,
+blob shapes, a floating toolbar, self-hosted Outfit font. Play page rebuilt:
+You play / Network plays, a player list with strength bars, a Hint card,
+coloured stat tiles, the score blob, a level line. Play vs Bot: avatars,
+coloured tiles, a garbage meter, rows sent, a snackbar when garbage arrives.
+All boards share one drawing style (`lib/canvas.js`); block images are no
+longer used. Checked: 42/42 tests, ESLint, axe (WCAG 2 AA) with no
+violations on all four pages, no sideways scroll at 360 px.
+
 ## ▶ NEXT: options
 
 1. ~~Deeper lookahead with hold~~ done in v0.18. Possible follow-ups: a wider
@@ -199,6 +228,9 @@ No network has beaten the shipped one yet (14/50 on the selection games).
 - **Raw board as input (a CNN):** the biggest remaining step, but hours of
   training.
 - **Speed up the 2-ply search** (about 30x slower than 1-ply).
+- Version the module URLs (or an import map) so a deploy never mixes a new
+  page script with a cached old module. GitHub Pages caches for 10 minutes,
+  so today this can only last that long.
 
 ## Rules we work by
 

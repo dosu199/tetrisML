@@ -5,55 +5,46 @@
  *   node scripts/legacy-ga/compare.js --games 50 --cap 2000
  *   node scripts/legacy-ga/compare.js --weights quick.json
  *
- * The seeds here start at 10,000 and were never used during training. This is
- * the same idea as the train/test split in your course: a model scored on the
- * data it was fitted to will always flatter itself. The number that counts is
- * the one from games neither set of weights has ever seen.
+ * The seeds here start at 10,000 and were never used during training: a model
+ * scored on the games it was fitted to will always flatter itself. The number
+ * that counts is the one from games neither set of weights has ever seen.
  */
 
 import { readFileSync } from 'node:fs';
-import { playGame } from '../../src/tetris-headless.js';
+import { playBotGame } from './ga.js';
 import { PUBLISHED_WEIGHTS, FEATURE_NAMES } from '../../src/tetris-ai.js';
+import { parseFlags, fail } from '../lib/cli.js';
+import { SEED_BASE } from '../lib/seeds.js';
+import { mean, median } from '../lib/stats.js';
 
-const argv = process.argv.slice(2);
-const flag = (name, fallback) => {
-  const i = argv.indexOf(`--${name}`);
-  return i === -1 ? fallback : argv[i + 1];
-};
-
-const games = Number(flag('games', 30));
-const cap = Number(flag('cap', 2000));
-const lookahead = argv.includes('--lookahead');
-const weightsFile = flag('weights', 'models/weights.json');
+const { games, cap, lookahead, weights: weightsFile } = parseFlags({
+  games: 30,
+  cap: 2000,
+  lookahead: false,
+  weights: 'models/weights.json',
+});
 
 let learned;
 try {
   learned = JSON.parse(readFileSync(weightsFile, 'utf8')).weights;
 } catch {
-  console.error(`\nCould not read ${weightsFile}. Run "node scripts/legacy-ga/train.js" first.\n`);
-  process.exit(1);
+  fail(`Could not read ${weightsFile}. Run "node scripts/legacy-ga/train.js" first.`);
 }
 
-const HELD_OUT = Array.from({ length: games }, (_, i) => 10000 + i);
-
-const median = (xs) => {
-  const s = [...xs].sort((a, b) => a - b);
-  const m = s.length >> 1;
-  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
-};
+const HELD_OUT = Array.from({ length: games }, (_, i) => SEED_BASE.gaHeldOut + i);
 
 function run(weights) {
   const lines = [];
   let deaths = 0;
   const t0 = performance.now();
   for (const seed of HELD_OUT) {
-    const r = playGame(weights, seed, { maxPieces: cap, lookahead });
+    const r = playBotGame(weights, seed, { maxPieces: cap, lookahead });
     lines.push(r.lines);
     if (r.toppedOut) deaths++;
   }
   return {
     median: median(lines),
-    mean: lines.reduce((a, b) => a + b, 0) / lines.length,
+    mean: mean(lines),
     worst: Math.min(...lines),
     best: Math.max(...lines),
     deaths,
@@ -63,7 +54,7 @@ function run(weights) {
 
 console.log(`\nhead to head`);
 console.log(`------------`);
-console.log(`${games} games on seeds 10000-${10000 + games - 1} (never trained on)`);
+console.log(`${games} games on seeds ${HELD_OUT[0]}-${HELD_OUT.at(-1)} (never trained on)`);
 console.log(`${cap}-piece cap, ${lookahead ? '2-ply lookahead' : '1-ply'}\n`);
 
 const a = run(PUBLISHED_WEIGHTS);

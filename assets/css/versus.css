@@ -1,14 +1,12 @@
-/* versus.css - the "Play vs Bot" page (it also uses base.css and nav.css). */
-
-body {
-  background:
-    radial-gradient(900px 500px at 15% 10%, rgba(139, 133, 255, 0.14), transparent 60%),
-    radial-gradient(800px 500px at 90% 90%, rgba(78, 195, 224, 0.1), transparent 60%),
-    var(--bg);
-}
+/*
+ * versus.css - the "Play vs Bot" page (it also uses base.css, theme.css and
+ * nav.css). Two screens: the setup card before a match, and the match:
+ * a bar of settings, your board and the opponent's, each in a rounded panel
+ * with Hold, Next and a garbage meter, and the timer and "VS" between them.
+ */
 
 .vs-main {
-  max-width: 1080px;
+  max-width: 1240px;
   margin: 0 auto;
   padding: 20px 16px 40px;
   display: grid;
@@ -16,22 +14,28 @@ body {
 }
 
 /* ------------------------------------------- before the match: setup card */
-.vs-lobby {
+.vs-lobby.card {
   max-width: 760px;
   width: 100%;
   margin: 8px auto 0;
-  padding: 28px;
+  padding: 32px;
   display: grid;
-  gap: 20px;
+  gap: 22px;
+  border: 0;
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface);
 }
 .vs-lobby h1 {
   margin: 0;
-  font-size: 2rem;
-  line-height: 1.15;
+  font-size: 2.6rem;
+  line-height: 1.05;
+  font-weight: 800;
+  letter-spacing: -0.03em;
 }
 .vs-lobby-sub {
-  margin: -8px 0 0;
-  color: var(--muted);
+  margin: -10px 0 0;
+  font-size: 1.05rem;
+  color: var(--ui-muted);
 }
 .vs-choice {
   margin: 0;
@@ -43,12 +47,10 @@ body {
 }
 .vs-choice legend {
   padding: 0;
-  margin-bottom: 8px;
-  font-size: 0.8rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--muted);
+  margin-bottom: 10px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--ui-muted);
 }
 .vs-choice-pills {
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -67,41 +69,45 @@ body {
 .vs-choice label > span {
   display: grid;
   gap: 2px;
-  min-height: 48px;
+  min-height: 56px;
   box-sizing: border-box;
-  padding: 10px 14px;
-  border-radius: 12px;
-  border: 1px solid var(--line);
-  background: var(--bg);
+  padding: 12px 16px;
+  border-radius: 20px;
+  background: var(--ui-surface-high);
   transition:
-    border-color 0.15s,
-    background 0.15s;
+    background 0.15s,
+    border-radius 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 .vs-choice b {
-  font-size: 0.98rem;
+  font-size: 1.02rem;
+  font-weight: 700;
 }
 .vs-choice small {
-  font-size: 0.82rem;
+  font-size: 0.86rem;
   line-height: 1.35;
-  color: var(--muted);
+  color: var(--ui-muted);
 }
 .vs-choice label:hover > span {
-  border-color: var(--accent);
+  background: var(--ui-surface-top);
 }
 .vs-choice input:checked + span {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  box-shadow: inset 0 0 0 1px var(--accent);
+  border-radius: 28px;
+  background: var(--ui-tonal);
+  color: var(--ui-on-tonal);
+  box-shadow: inset 0 0 0 2px var(--ui-accent);
+}
+.vs-choice input:checked + span small {
+  color: var(--ui-on-tonal);
 }
 .vs-choice input:focus-visible + span {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--ui-text);
   outline-offset: 2px;
 }
 .vs-start {
   justify-self: center;
-  min-width: 220px;
-  min-height: 52px;
-  font-size: 1.1rem;
+  min-width: 240px;
+  min-height: 56px;
+  font-size: 1.15rem;
 }
 .vs-start:disabled {
   opacity: 0.6;
@@ -111,86 +117,110 @@ body {
 .vs-lobby-error {
   margin: -8px 0 0;
   text-align: center;
-  color: var(--bad);
+  color: var(--ui-danger);
 }
 .vs-howto {
-  border-top: 1px solid var(--line);
-  padding-top: 14px;
-  color: var(--muted);
-  font-size: 0.92rem;
+  padding-top: 16px;
+  border-top: 1px solid var(--ui-line);
+  color: var(--ui-muted);
+  font-size: 0.95rem;
   line-height: 1.55;
 }
 .vs-howto summary {
   cursor: pointer;
   font-weight: 700;
-  color: var(--text);
+  color: var(--ui-text);
   min-height: 32px;
 }
 .vs-howto p {
   margin: 8px 0 0;
+}
+.vs-keys {
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
 }
 
 /* ------------------------------------------------ during the match: the bar */
 .vs-match {
   display: grid;
   gap: 16px;
-  scroll-margin-top: calc(var(--topnav-h, 56px) + 8px);
+  scroll-margin-top: calc(var(--topnav-h, 72px) + 8px);
 }
 .vs-match[hidden],
 .vs-lobby[hidden] {
   display: none;
 }
 .vs-bar {
+  justify-self: center;
   display: flex;
   flex-wrap: wrap;
-  align-items: end;
-  gap: 12px;
-  padding: 12px 16px;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  border-radius: 999px;
+  background: var(--ui-surface);
 }
-.vs-bar-mode {
-  margin: 0 8px 0 0;
-  align-self: center;
+.vs-mode-chip {
+  margin: 0;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: var(--ui-pink);
+  color: var(--ui-on-pink);
   font-weight: 700;
 }
-.vs-bar .vs-field {
-  min-width: 170px;
-  flex: 1;
+.vs-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 4px 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--ui-line);
+}
+.vs-field select {
+  appearance: none;
+  -webkit-appearance: none;
+  min-height: 38px;
+  padding: 0 28px 0 2px;
+  border: 0;
+  border-radius: 999px;
+  font: inherit;
+  font-weight: 700;
+  color: var(--ui-text);
+  background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none' stroke='%23cac4d0' stroke-width='1.8' stroke-linecap='round'%3E%3Cpath d='M3 4.5l3 3 3-3'/%3E%3C/svg%3E") no-repeat right 10px center;
+  cursor: pointer;
+}
+.vs-field select option {
+  background: var(--ui-surface-high);
+  color: var(--ui-text);
+}
+.vs-field:focus-within {
+  outline: 2px solid var(--ui-text);
+  outline-offset: 2px;
+}
+.vs-field select:focus-visible {
+  outline: none;
+}
+.vs-bar-sep {
+  width: 1px;
+  height: 24px;
+  margin: 0 4px;
+  background: var(--ui-line);
 }
 .vs-bar-buttons {
   display: flex;
-  gap: 8px;
-  margin-left: auto;
+  gap: 4px;
 }
 .vs-bar-buttons button {
-  min-width: 88px;
   min-height: 40px;
-}
-.vs-field {
-  display: grid;
-  gap: 4px;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-.vs-field select {
-  font: inherit;
-  font-size: 0.92rem;
-  font-weight: 500;
-  letter-spacing: 0;
-  text-transform: none;
-  color: var(--text);
-  background: var(--bg);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 8px 10px;
-  min-height: 40px;
-  width: 100%;
-}
-.vs-field select:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
+  flex: none;
 }
 
 /* two buttons in the board's message (Rematch / Change settings, confirmations) */
@@ -204,112 +234,128 @@ body {
 .vs-confirm button:not(.btn-go) {
   flex: none;
   min-height: 44px;
-  padding: 0 16px;
+  padding: 0 18px;
+  border: 0;
   border-radius: 999px;
+  font: inherit;
+  font-weight: 700;
+  color: var(--ui-on-tonal);
+  background: var(--ui-tonal);
+  cursor: pointer;
 }
 .vs-tip {
   max-width: 220px;
   margin: 8px auto 0;
-  font-size: 0.85rem;
-  color: #ffb4b4;
+  font-size: 0.88rem;
+  color: var(--ui-danger);
 }
 
 /* --------------------------------------------------------------- arena */
 .vs-arena {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  gap: 16px;
+  grid-template-columns: auto 180px auto;
+  justify-content: center;
+  gap: 28px;
   align-items: start;
 }
 .vs-player {
   display: grid;
-  gap: 8px;
+  gap: 10px;
+  align-content: start;
 }
 .vs-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 10px;
+  min-height: 44px;
 }
 .vs-head h2 {
   margin: 0;
-  font-size: 1.1rem;
+  font-size: 1.35rem;
+  font-weight: 800;
 }
 .vs-head .short {
   display: none;
 }
-.vs-badge {
-  font-size: 0.78rem;
+.vs-avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  background: var(--ui-accent-box);
+  color: var(--ui-on-accent-box);
+}
+.vs-ai .vs-avatar {
+  border-radius: 999px;
+  background: var(--ui-cyan);
+  color: var(--ui-on-cyan);
+}
+.vs-chip {
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--ui-yellow);
+  color: var(--ui-on-yellow);
+  font-size: 0.85rem;
   font-weight: 700;
-  padding: 2px 10px;
+  white-space: nowrap;
+}
+.vs-chip[hidden] {
+  display: none;
+}
+.vs-badge {
+  margin-left: auto;
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 4px 12px;
   border-radius: 999px;
 }
+.vs-badge:empty {
+  display: none;
+}
 .vs-badge.win {
-  background: color-mix(in srgb, var(--good) 20%, transparent);
-  color: var(--good);
+  background: color-mix(in srgb, var(--ui-good) 22%, transparent);
+  color: var(--ui-good);
 }
 .vs-badge.lose {
-  background: color-mix(in srgb, var(--bad) 18%, transparent);
-  color: var(--bad);
+  background: var(--ui-rose);
+  color: var(--ui-on-rose);
 }
-.vs-body {
+
+/* a board with Hold and Next beside it and the garbage meter between */
+.vs-console {
   display: flex;
+  align-items: stretch;
   gap: 10px;
-  align-items: flex-start;
+  padding: 12px;
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface);
 }
-.vs-ai .vs-body {
-  justify-content: flex-start;
-}
-.vs-player:not(.vs-ai) .vs-body {
-  justify-content: flex-end;
-}
-/* wide screens: "You" sits right above your board, like the opponent's name */
-@media (min-width: 861px) {
-  .vs-player:not(.vs-ai) {
-    grid-template-columns: minmax(0, 1fr) auto auto;
-    column-gap: 10px;
-  }
-  .vs-player:not(.vs-ai) .vs-body {
-    display: contents;
-  }
-  .vs-player:not(.vs-ai) .vs-head {
-    grid-column: 3;
-    grid-row: 1;
-  }
-  .vs-player:not(.vs-ai) .vs-side {
-    grid-column: 2;
-    grid-row: 2;
-    align-self: start;
-  }
-  .vs-player:not(.vs-ai) .vs-boardwrap {
-    grid-column: 3;
-    grid-row: 2;
-  }
-}
-.vs-boardwrap {
+.vs-side {
   display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 76px;
+}
+.vs-mini {
+  display: grid;
+  justify-items: center;
   gap: 4px;
+  padding: 10px 6px;
+  border-radius: 20px;
+  background: var(--ui-surface-high);
 }
-.vs-board {
-  position: relative;
-  border-radius: 10px;
-  overflow: hidden;
-  background: var(--board-bg);
-  box-shadow: var(--shadow), 0 0 0 1px var(--line);
-  line-height: 0;
-}
-.vs-board canvas {
-  aspect-ratio: 10 / 24; /* known before the script sizes it: no jump on load */
+.vs-mini canvas {
+  width: 100%;
+  height: auto;
   display: block;
-  height: min(calc(100vh - 230px), 600px);
-  width: auto;
-  min-height: 360px;
 }
 .vs-garbage {
-  width: 7px;
-  border-radius: 4px;
-  background: var(--bg-alt);
   position: relative;
+  width: 10px;
+  border-radius: 999px;
+  background: var(--ui-surface-high);
   overflow: hidden;
 }
 .vs-garbage i {
@@ -318,54 +364,23 @@ body {
   right: 0;
   bottom: 0;
   height: 0;
-  background: var(--bad);
-  transition: height 0.15s ease;
+  border-radius: 999px;
+  background: var(--ui-danger);
+  transition: height 0.2s ease;
 }
-.vs-side {
-  display: grid;
-  gap: 8px;
-  width: 104px;
+.vs-board {
+  position: relative;
+  padding: 8px; /* keeps the rounded corners off the corner cells */
+  border-radius: var(--ui-radius);
+  overflow: hidden;
+  background: var(--ui-board);
+  line-height: 0;
 }
-.vs-mini {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 6px 8px 8px;
-  display: grid;
-  gap: 2px;
-}
-.vs-mini span {
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-.vs-mini canvas {
-  width: 100%;
-  height: auto;
+.vs-board canvas {
+  aspect-ratio: 10 / 24; /* known before the script sizes it: no jump on load */
   display: block;
-}
-.vs-stats {
-  margin: 0;
-  display: grid;
-  gap: 6px;
-}
-.vs-stats div {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 4px 8px;
-}
-.vs-stats dt {
-  font-size: 0.7rem;
-  color: var(--muted);
-}
-.vs-stats dd {
-  margin: 0;
-  font-weight: 800;
-  font-size: 1.1rem;
-  font-variant-numeric: tabular-nums;
+  height: max(360px, min(calc(100vh - var(--topnav-h, 72px) - 330px), 600px));
+  width: auto;
 }
 
 .vs-overlay {
@@ -376,10 +391,10 @@ body {
   place-items: center;
   padding: 16px;
   text-align: center;
-  background: rgba(8, 11, 24, 0.78);
+  background: rgba(20, 18, 24, 0.86);
   color: #fff;
   line-height: 1.45;
-  font-size: 0.92rem;
+  font-size: 0.95rem;
 }
 .vs-overlay[hidden] {
   display: none;
@@ -388,46 +403,74 @@ body {
   margin: 0 0 8px;
 }
 .vs-overlay-title {
-  font-size: 1.5rem;
+  font-size: 1.6rem;
   font-weight: 800;
 }
-
-
+.vs-overlay .big {
+  font-size: 4.5rem;
+  font-weight: 800;
+}
 .vs-rematch-hint {
   display: block;
   margin-top: 10px;
-  font-size: 0.78rem;
-  color: var(--muted);
+  font-size: 0.85rem;
+  color: var(--ui-muted);
 }
 
-.vs-overlay .big {
-  font-size: 4rem;
-  font-weight: 800;
-}
-
+/* the middle: time, "VS", the garbage each side sent */
 .vs-center {
   display: grid;
   justify-items: center;
-  gap: 6px;
-  padding-top: 40px;
-  min-width: 64px;
+  gap: 18px;
+  padding-top: 110px;
 }
 .vs-timer {
-  font-size: 1.4rem;
+  padding: 6px 22px;
+  border-radius: 999px;
+  background: var(--ui-surface-high);
+  font-size: 2.1rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.vs-vs {
+  display: grid;
+  place-items: center;
+  width: 112px;
+  height: 104px;
+  background: var(--ui-accent);
+  color: var(--ui-on-accent);
+  font-size: 2.2rem;
+  font-weight: 800;
+}
+.vs-sent {
+  width: 100%;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+.vs-sent div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface);
+  font-size: 0.92rem;
+}
+.vs-sent dt {
+  color: var(--ui-muted);
+}
+.vs-sent dd {
+  margin: 0;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
 .vs-goal {
-  font-size: 0.78rem;
-  color: var(--muted);
+  margin: 0;
   text-align: center;
-}
-.vs-vs {
-  margin-top: 16px;
-  font-size: 1.5rem;
-  font-weight: 900;
-  letter-spacing: 0.08em;
-  color: var(--accent);
+  font-size: 0.92rem;
+  line-height: 1.4;
+  color: var(--ui-muted);
 }
 
 /* --------------------------------------------------------------- touch */
@@ -437,11 +480,37 @@ body {
   gap: 8px;
 }
 .vs-touch button {
-  height: 52px;
+  height: 54px;
+  border: 0;
+  border-radius: 999px;
+  font: inherit;
   font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--ui-text);
+  background: var(--ui-surface-top);
   touch-action: manipulation;
   user-select: none;
   -webkit-user-select: none;
+  transition: border-radius 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.vs-touch button:nth-child(-n + 3) {
+  grid-column: span 2;
+}
+.vs-touch button:nth-child(n + 4):nth-child(-n + 6) {
+  grid-column: span 2;
+}
+.vs-touch .tp-tonal {
+  border-radius: 18px;
+  background: var(--ui-tonal);
+  color: var(--ui-on-tonal);
+}
+.vs-touch .tp-accent {
+  background: var(--ui-accent);
+  color: var(--ui-on-accent);
+  font-weight: 800;
+}
+.vs-touch button:active {
+  border-radius: 12px;
 }
 .vs-touch .wide {
   grid-column: 1 / -1;
@@ -450,117 +519,76 @@ body {
   .vs-touch {
     display: grid;
   }
-}
-
-/* ---------------------------------------------------------------- help */
-.vs-keys {
-  margin: 0 0 8px;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 18px;
-  font-size: 0.92rem;
-}
-kbd {
-  display: inline-block;
-  min-width: 22px;
-  padding: 1px 6px;
-  border-radius: 6px;
-  border: 1px solid var(--line);
-  border-bottom-width: 2px;
-  background: var(--bg);
-  font: 600 0.8rem ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  text-align: center;
+  .snackbar {
+    bottom: 210px; /* above the touch buttons */
+  }
 }
 
 /* ---------------------------------------------------------- small screens */
-@media (max-width: 860px) {
-  .vs-lobby {
-    padding: 20px 16px;
-    gap: 16px;
-  }
-  .vs-lobby h1 {
-    font-size: 1.6rem;
-  }
-  .vs-choice,
-  .vs-choice-pills {
-    grid-template-columns: 1fr 1fr;
-  }
-  .vs-bar {
-    padding: 10px 12px;
-    gap: 8px;
-  }
-  .vs-bar-mode {
-    width: 100%;
-  }
-  .vs-bar .vs-field {
-    min-width: 0;
-  }
-  .vs-bar .vs-field select {
-    font-size: 0.85rem;
-    padding: 8px 6px;
-  }
-  .vs-bar-buttons {
-    width: 100%;
-    margin-left: 0;
-  }
-  .vs-bar-buttons button {
-    flex: 1;
-    min-height: 44px;
-  }
+@media (max-width: 980px) {
   .vs-arena {
     grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
-    gap: 10px;
+    gap: 12px;
   }
   .vs-center {
     grid-column: 1 / -1;
     grid-row: 1;
     display: flex;
+    flex-wrap: wrap;
     justify-content: center;
-    gap: 14px;
+    align-items: center;
+    gap: 10px;
     padding-top: 0;
   }
-  .vs-vs {
+  .vs-vs,
+  .vs-goal {
     display: none;
   }
-  .vs-body {
-    flex-direction: column;
-    align-items: stretch;
+  .vs-timer {
+    font-size: 1.4rem;
+    padding: 4px 16px;
   }
-  .vs-player:not(.vs-ai) .vs-body,
-  .vs-ai .vs-body {
-    justify-content: flex-start;
+  .vs-sent {
+    width: auto;
+    display: flex;
+  }
+  .vs-sent div {
+    padding: 6px 12px;
+  }
+  .vs-console {
+    flex-wrap: wrap;
+    padding: 8px;
+    gap: 8px;
+    border-radius: var(--ui-radius);
   }
   .vs-side {
-    width: 100%;
-    grid-template-columns: 1fr 1fr;
     order: -1;
+    width: 100%;
+    flex-direction: row;
   }
-  .vs-stats {
-    grid-column: 1 / -1;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+  .vs-mini {
+    flex: 1;
+    padding: 6px;
+    border-radius: 14px;
   }
-  .vs-stats div {
-    padding: 3px 6px;
+  .vs-mini canvas {
+    max-width: 56px;
   }
-  .vs-stats dd {
-    font-size: 0.95rem;
+  .vs-garbage {
+    display: none; /* the "rows incoming" chip says it instead */
   }
-  /* boards short enough that board + touch buttons fit on one screen */
+  .vs-board {
+    margin: 0 auto;
+  }
   .vs-board canvas {
-    height: 48vh;
-    width: auto;
+    height: 46vh;
     min-height: 0;
   }
   .vs-ai .vs-board canvas {
-    height: 32vh;
-  }
-  .vs-boardwrap {
-    justify-content: center;
+    height: 30vh;
   }
   .vs-head h2 {
-    font-size: 0.95rem;
+    font-size: 1.05rem;
   }
   .vs-head .long {
     display: none;
@@ -568,10 +596,87 @@ kbd {
   .vs-head .short {
     display: inline;
   }
+  .vs-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 11px;
+  }
+  .vs-avatar svg {
+    width: 16px;
+    height: 16px;
+  }
+  .stat-tiles.compact dd {
+    font-size: 1.05rem;
+  }
+  .stat-tiles.compact dt {
+    font-size: 0.75rem;
+  }
   .vs-overlay {
-    font-size: 0.8rem;
+    font-size: 0.82rem;
   }
   .vs-overlay-title {
+    font-size: 1.15rem;
+  }
+}
+@media (max-width: 860px) {
+  .vs-lobby.card {
+    padding: 22px 16px;
+    gap: 18px;
+  }
+  .vs-lobby h1 {
+    font-size: 1.9rem;
+  }
+  .vs-choice,
+  .vs-choice-pills {
+    grid-template-columns: 1fr 1fr;
+  }
+  .vs-bar {
+    width: 100%;
+    box-sizing: border-box;
+    border-radius: var(--ui-radius);
+  }
+  .vs-field {
+    flex: 1;
+    min-width: 0;
+  }
+  .vs-field select {
+    min-width: 0;
+    width: 100%;
+    font-size: 0.9rem;
+  }
+  .vs-bar-sep {
+    display: none;
+  }
+  .vs-bar-buttons {
+    width: 100%;
+  }
+  .vs-bar-buttons button {
+    flex: 1;
+    min-height: 44px;
+  }
+}
+/* phone: three rows - mode and speed / opponent / buttons - so no choice is cut off */
+@media (max-width: 560px) {
+  .vs-field-speed {
+    order: 1;
+  }
+  .vs-field-opponent {
+    order: 2;
+    flex-basis: 100%;
+  }
+  .vs-bar-buttons {
+    order: 3;
+  }
+}
+/* the network's side is narrow on a phone: smaller tile text so "Pieces/s" fits */
+@media (max-width: 980px) {
+  .vs-ai .stat-tiles.compact {
+    gap: 4px;
+  }
+  .vs-ai .stat-tiles.compact dt {
+    font-size: 0.7rem;
+  }
+  .vs-ai .stat-tiles.compact dd {
     font-size: 1.1rem;
   }
 }

@@ -1,45 +1,51 @@
 /**
- * tetris-dqn.js - the neural network that plays, and the code to run it.
- *
- * Plain JavaScript, so it needs no PyTorch and runs in the browser:
+ * tetris-dqn.js - the neural network that plays, and the search around it.
+ * No DOM: the same code trains in Node (scripts/train-dqn.js) and plays in
+ * the browser.
  *
  *   1. For the current piece, try every rotation x column.
- *   2. For each resulting board, compute 4 numbers:
- *        lines cleared, holes, bumpiness, total height
- *   3. A small neural network (4 -> 64 -> 64 -> 1) turns those 4 numbers into
- *      one score: "how good is this board for the rest of the game".
- *   4. Play the move with the highest score.
+ *   2. Describe each resulting board with a few numbers (the shipped model
+ *      uses 4: lines cleared, holes, bumpiness, total height).
+ *   3. A small network (4 -> 64 -> 64 -> 1) turns those numbers into one
+ *      score V(board): "how much reward is still to come from this board".
+ *   4. Play the move with the best score (1-ply), or look 1 or 2 pieces
+ *      further ahead with the same network (2-ply, 3-ply).
  *
- * The network learns that score by itself, from the game's reward - see
- * train-dqn.js. Nobody tells it what a good board looks like.
+ * The network learns V from the game's reward alone (see moveReward); nobody
+ * tells it what a good board looks like.
  *
- * No DOM access in this file, so the same code trains in node and plays in
- * the browser.
+ * Contents: inputs (which features the network sees), the MLP itself, and
+ * the choosers: chooseDqnMove (placement only) and chooseDqnAction (may hold).
  */
 
-import { PIECES, copyBoard, createBoard, placePiece, clearLines, placements, decideWithHold, HOLD } from './tetris-core.js';
-import { extractFeatures, FEATURE_NAMES, NUM_FEATURES } from './tetris-ai.js';
+import { PIECES, createBoard, copyBoard, playMove, placements, HOLD } from './tetris-core.js';
+import { extractFeatures, decideWithHold, FEATURE_NAMES, NUM_FEATURES } from './tetris-ai.js';
 
-/* ----------------------------------------------------------------- state */
+/* ---------------------------------------------------------------- inputs */
 
-// Which board numbers the network sees. Names come from FEATURE_NAMES in
-// tetris-ai.js; a trained model stores its list, so old models keep working.
-export const FEATURE_SETS = {
-  // the 4 from the reference implementation
-  basic: ['linesCleared', 'holes', 'bumpiness', 'aggregateHeight'],
+const HELD_PREFIX = 'held:';
+
+/**
+ * Which numbers a network sees, by name (FEATURE_NAMES in tetris-ai.js). A
+ * trained model stores its own list, so models trained on any set keep working.
+ */
+export const FEATURE_SETS = Object.freeze({
+  // the 4 classic afterstate features; the shipped model uses these
+  basic: Object.freeze(['linesCleared', 'holes', 'bumpiness', 'aggregateHeight']),
   // all 8 the search bot uses: the 4 above plus the shape of the surface
-  full: ['linesCleared', 'holes', 'bumpiness', 'aggregateHeight', 'maxHeight', 'rowTransitions', 'colTransitions', 'wells'],
-};
-// the 4 basic numbers plus 7 inputs saying which piece is in the hold box
-FEATURE_SETS.hold = [...FEATURE_SETS.basic, ...PIECES.map((p) => `held:${p.name}`)];
-export const DEFAULT_FEATURES = FEATURE_SETS.full;
+  full: Object.freeze(['linesCleared', 'holes', 'bumpiness', 'aggregateHeight', 'maxHeight', 'rowTransitions', 'colTransitions', 'wells']),
+  // the basic 4 plus 7 inputs saying which piece is in the hold box
+  hold: Object.freeze(['linesCleared', 'holes', 'bumpiness', 'aggregateHeight', ...PIECES.map((p) => HELD_PREFIX + p.name)]),
+});
 
-const ALIASES = { totalHeight: 'aggregateHeight' }; // name used by v0.4 models
+const ALIASES = Object.freeze({ totalHeight: 'aggregateHeight' }); // name used by older models
 
-// Feature scaling: divide each feature by roughly its largest value, so every
-// input lands around 0-1. Without this, big inputs (total height up to 240)
-// drown out small ones (lines 0-4) and training barely moves.
-export const FEATURE_SCALE = {
+/**
+ * Optional input scaling: each feature divided by roughly its largest value,
+ * so every input lands around 0-1. The 'full' set needs it to learn at all;
+ * the shipped 'basic' model learned best without it (scaled: false).
+ */
+const FEATURE_SCALE = Object.freeze({
   linesCleared: 4,
   holes: 100,
   bumpiness: 30,
@@ -48,102 +54,130 @@ export const FEATURE_SCALE = {
   rowTransitions: 120,
   colTransitions: 60,
   wells: 50,
-};
+});
 
-/** Positions in extractFeatures' output for a list of feature names. */
-export function featureIndex(names) {
-  return names.map((n) => {
-    const i = FEATURE_NAMES.indexOf(ALIASES[n] ?? n);
-    if (i === -1) throw new Error(`unknown feature: ${n}`);
-    return i;
-  });
+function featureIndexOf(name) {
+  const i = FEATURE_NAMES.indexOf(ALIASES[name] ?? name);
+  if (i === -1) throw new Error(`unknown feature: ${name}`);
+  return i;
 }
-
-const scratch = new Float64Array(NUM_FEATURES);
 
 /**
- * How a network reads a board: which features (idx) and what to divide each
- * one by (scale). Models from v0.4 were trained unscaled, so scale is 1 there.
+ * How a network reads a board, worked out once per network:
+ *   board[]  { pos, fi, scale }: input `pos` = feature `fi` / scale
+ *   held[]   { pos, piece }:     input `pos` = 1 if `piece` is in the hold box
  */
-export function makeInput(names, scaled = true) {
-  const input = { n: names.length, board: [], held: [] };
+function makeInputSpec(names, scaled) {
+  const spec = { n: names.length, board: [], held: [] };
   names.forEach((name, pos) => {
-    if (name.startsWith('held:')) {
-      // one input per piece type: 1 if that piece is in the hold box, else 0
-      input.held.push({ pos, piece: PIECES.findIndex((p) => p.name === name.slice(5)) });
+    if (name.startsWith(HELD_PREFIX)) {
+      const piece = PIECES.findIndex((p) => p.name === name.slice(HELD_PREFIX.length));
+      if (piece < 0) throw new Error(`unknown piece in input: ${name}`);
+      spec.held.push({ pos, piece });
     } else {
-      const [fi] = featureIndex([name]);
-      input.board.push({ pos, fi, scale: scaled ? FEATURE_SCALE[ALIASES[name] ?? name] : 1 });
+      const scale = scaled ? FEATURE_SCALE[ALIASES[name] ?? name] : 1;
+      spec.board.push({ pos, fi: featureIndexOf(name), scale });
     }
   });
-  if (input.held.some((h) => h.piece < 0)) throw new Error(`unknown piece in ${names.join(', ')}`);
-  return input;
+  return spec;
 }
 
-/** The numbers the network sees for a board after a move (and, for a network
- * with hold inputs, the piece left in the hold box). */
-export function boardState(board, linesCleared, input, out = new Float64Array(input.n), held = null) {
-  const f = extractFeatures(board, linesCleared, scratch);
-  for (const b of input.board) out[b.pos] = f[b.fi] / b.scale;
-  for (const h of input.held) out[h.pos] = held === h.piece ? 1 : 0;
+const featureScratch = new Float64Array(NUM_FEATURES);
+
+/**
+ * The network's input for a board after a move: `spec` is net.inputSpec;
+ * `held` is the piece left in the hold box (only read by hold networks).
+ */
+export function boardState(board, linesCleared, spec, held = null, out = new Float64Array(spec.n)) {
+  const f = extractFeatures(board, linesCleared, featureScratch);
+  for (const b of spec.board) out[b.pos] = f[b.fi] / b.scale;
+  for (const h of spec.held) out[h.pos] = held === h.piece ? 1 : 0;
   return out;
 }
 
-/** Every legal move for a piece, with the board it produces and its state. */
-export function nextStates(board, pieceIdx, input, held = null) {
+/** Every legal move for a piece: [{ move, board, lines, state }], in placements() order. */
+export function nextStates(board, pieceIdx, spec, held = null) {
   const out = [];
   for (const move of placements(board, pieceIdx)) {
     const after = copyBoard(board);
-    placePiece(after, PIECES[pieceIdx].rotations[move.rotation], move.row, move.col);
-    const lines = clearLines(after);
-    out.push({ move, board: after, lines, state: boardState(after, lines, input, undefined, held) });
+    const lines = playMove(after, pieceIdx, move);
+    out.push({ move, board: after, lines, state: boardState(after, lines, spec, held) });
   }
   return out;
 }
 
-/* ---------------------------------------------------------------- network */
+/**
+ * The option ({ state, ... } from nextStates) the network values most, i.e.
+ * the 1-ply choice; the first one on a tie. Undefined if there are none.
+ */
+export function greedyPick(options, net) {
+  let pick;
+  let best = -Infinity;
+  for (const o of options) {
+    const v = net.predict(o.state);
+    if (v > best) {
+      best = v;
+      pick = o;
+    }
+  }
+  return pick;
+}
+
+/* --------------------------------------------------------------- network */
+
+const ADAM_BETA1 = 0.9;
+const ADAM_BETA2 = 0.999;
+const ADAM_EPSILON = 1e-8;
 
 /**
- * A plain multi-layer perceptron with ReLU between layers, plus the backward
- * pass and Adam optimiser needed to train it. Small enough to read in one go:
- * a forward pass is "multiply by a matrix, add a bias, ReLU, repeat".
+ * A plain multi-layer perceptron with ReLU between layers and one output,
+ * plus the backward pass and the Adam optimiser needed to train it. A forward
+ * pass is "multiply by a matrix, add a bias, ReLU, repeat".
  */
 export class MLP {
-  constructor(sizes, rand = Math.random, features = DEFAULT_FEATURES, scaled = true) {
-    this.sizes = sizes;
-    this.features = features; // names of the inputs, in order
-    this.scaled = scaled;
-    this.input = makeInput(features, scaled);
+  /**
+   * @param {number[]} sizes  layer sizes, e.g. [4, 64, 64, 1]
+   * @param {object} [opts]
+   * @param {() => number} [opts.rand=Math.random]  for the initial weights
+   * @param {readonly string[]} [opts.features=FEATURE_SETS.basic]  input names, in order
+   * @param {boolean} [opts.scaled=false]  divide inputs by FEATURE_SCALE
+   */
+  constructor(sizes, { rand = Math.random, features = FEATURE_SETS.basic, scaled = false } = {}) {
     if (features.length !== sizes[0]) throw new Error(`${features.length} features but ${sizes[0]} inputs`);
+    if (sizes.at(-1) !== 1) throw new Error('the network must have exactly one output');
+    this.sizes = sizes;
+    this.features = features;
+    this.scaled = scaled;
+    this.inputSpec = makeInputSpec(features, scaled);
     this.W = []; // W[l] is sizes[l] x sizes[l+1], row-major
     this.b = [];
     for (let l = 0; l < sizes.length - 1; l++) {
       const nIn = sizes[l];
       const nOut = sizes[l + 1];
-      // Xavier-uniform initialisation, same as the reference implementation
-      const limit = Math.sqrt(6 / (nIn + nOut));
+      const limit = Math.sqrt(6 / (nIn + nOut)); // Xavier-uniform initialisation
       const w = new Float64Array(nIn * nOut);
       for (let i = 0; i < w.length; i++) w[i] = (rand() * 2 - 1) * limit;
       this.W.push(w);
       this.b.push(new Float64Array(nOut));
     }
+    // Adam state: step count and running moments of every weight and bias
     this.t = 0;
     this.mW = this.W.map((w) => new Float64Array(w.length));
     this.vW = this.W.map((w) => new Float64Array(w.length));
     this.mb = this.b.map((b) => new Float64Array(b.length));
     this.vb = this.b.map((b) => new Float64Array(b.length));
+    // Reused buffers: predict() runs hundreds of thousands of times a second.
+    this.layerBuffers = sizes.slice(1).map((n) => new Float64Array(n));
+    this.stateScratch = new Float64Array(sizes[0]);
   }
 
-  /** Score one input vector. */
+  /** V(input): the network's score for one input vector. */
   predict(x) {
-    // Reuses one buffer per layer instead of allocating new arrays on every
-    // call; predict runs hundreds of thousands of times per second.
-    if (!this._bufs) this._bufs = this.sizes.slice(1).map((n) => new Float64Array(n));
     let a = x;
     for (let l = 0; l < this.W.length; l++) {
       const nIn = this.sizes[l];
       const nOut = this.sizes[l + 1];
-      const out = this._bufs[l];
+      const out = this.layerBuffers[l];
       const W = this.W[l];
       const bias = this.b[l];
       for (let j = 0; j < nOut; j++) out[j] = bias[j];
@@ -153,17 +187,16 @@ export class MLP {
         const row = i * nOut;
         for (let j = 0; j < nOut; j++) out[j] += xi * W[row + j];
       }
-      if (l < this.W.length - 1) for (let j = 0; j < nOut; j++) if (out[j] < 0) out[j] = 0;
+      if (l < this.W.length - 1) for (let j = 0; j < nOut; j++) if (out[j] < 0) out[j] = 0; // ReLU
       a = out;
     }
     return a[0];
   }
 
-
   /**
-   * One gradient step on a batch, minimising mean squared error between the
-   * network's outputs and `targets`. X is a flat array of batch x inputs.
-   * Returns the loss before the step.
+   * One Adam step on a batch, minimising the mean squared error between the
+   * outputs and `targets`. X is a flat array of batch x inputs. Returns the
+   * loss before the step.
    */
   trainStep(X, targets, lr) {
     const B = targets.length;
@@ -175,11 +208,12 @@ export class MLP {
       const nIn = this.sizes[l];
       const nOut = this.sizes[l + 1];
       const W = this.W[l];
+      const bias = this.b[l];
       const prev = acts[l];
       const out = new Float64Array(B * nOut);
       for (let n = 0; n < B; n++) {
         const o = n * nOut;
-        for (let j = 0; j < nOut; j++) out[o + j] = this.b[l][j];
+        for (let j = 0; j < nOut; j++) out[o + j] = bias[j];
         for (let i = 0; i < nIn; i++) {
           const xi = prev[n * nIn + i];
           if (xi === 0) continue;
@@ -191,7 +225,7 @@ export class MLP {
       acts.push(out);
     }
 
-    // loss and its gradient with respect to the output
+    // loss, and its gradient with respect to the output
     const pred = acts[L];
     let loss = 0;
     let grad = new Float64Array(B);
@@ -224,34 +258,34 @@ export class MLP {
           }
         }
       }
-      // ReLU of the layer below lets gradient through only where it was > 0
+      // the ReLU below lets gradient through only where its output was > 0
       if (l > 0) for (let k = 0; k < dPrev.length; k++) if (prev[k] <= 0) dPrev[k] = 0;
       gW[l] = dW;
       gb[l] = db;
       grad = dPrev;
     }
 
-    // Adam
+    // Adam: per-weight step sizes from running averages of the gradient (m)
+    // and of its square (v), with bias correction for the first steps
     this.t++;
-    const b1 = 0.9;
-    const b2 = 0.999;
-    const c1 = 1 - b1 ** this.t;
-    const c2 = 1 - b2 ** this.t;
+    const c1 = 1 - ADAM_BETA1 ** this.t;
+    const c2 = 1 - ADAM_BETA2 ** this.t;
     for (let l = 0; l < L; l++) {
       for (const [p, g, m, v] of [
         [this.W[l], gW[l], this.mW[l], this.vW[l]],
         [this.b[l], gb[l], this.mb[l], this.vb[l]],
       ]) {
         for (let k = 0; k < p.length; k++) {
-          m[k] = b1 * m[k] + (1 - b1) * g[k];
-          v[k] = b2 * v[k] + (1 - b2) * g[k] * g[k];
-          p[k] -= (lr * (m[k] / c1)) / (Math.sqrt(v[k] / c2) + 1e-8);
+          m[k] = ADAM_BETA1 * m[k] + (1 - ADAM_BETA1) * g[k];
+          v[k] = ADAM_BETA2 * v[k] + (1 - ADAM_BETA2) * g[k] * g[k];
+          p[k] -= (lr * (m[k] / c1)) / (Math.sqrt(v[k] / c2) + ADAM_EPSILON);
         }
       }
     }
     return loss;
   }
 
+  /** The model file format. The input names are stored under `state`. */
   toJSON() {
     return {
       kind: 'dqn',
@@ -264,148 +298,112 @@ export class MLP {
   }
 
   static fromJSON(json) {
-    const net = new MLP(json.sizes, () => 0.5, json.state, json.scaled === true);
+    // the initial weights are thrown away, so any rand will do
+    const net = new MLP(json.sizes, { rand: () => 0.5, features: json.state, scaled: json.scaled === true });
     net.W = json.W.map((w) => Float64Array.from(w));
     net.b = json.b.map((b) => Float64Array.from(b));
     return net;
   }
 }
 
-/* ------------------------------------------------------------------ play */
-
-/** Load a trained model (dqn-model.json). */
+/** Loads a trained model (models/dqn-model.json). */
 export function loadDqn(json) {
   if (json.kind !== 'dqn') throw new Error(`not a DQN model (kind: ${json.kind})`);
   return MLP.fromJSON(json);
 }
 
-const GAMMA_DEFAULT = 0.99;
+/* ---------------------------------------------------------------- search */
 
-const followBoard = createBoard();
-const followState = new Float64Array(NUM_FEATURES);
+/** Reward for one move. Training uses exactly this, so search and learning agree. */
+export const moveReward = (lines) => 1 + 10 * lines * lines;
+
+/** Discount per move: a reward one move later is worth 0.99 of one now. */
+export const GAMMA = 0.99;
 
 /**
- * The best the follower piece can do on `board`:
- *   max over its placements of  reward + gamma x V(board after it),
- * or -Infinity if it has nowhere to go. Same result as looping over
- * nextStates(), but reuses one scratch board instead of allocating a board
- * and an object per placement, which makes the 2-ply search much faster.
+ * Score of a move after which the next piece has nowhere to go. Finite (not
+ * -Infinity) so that averages over the 7 possible pieces stay comparable:
+ * a move that loses to one piece in seven still beats one that loses to two.
  */
-export function bestFollow(board, piece, net, gamma = GAMMA_DEFAULT) {
+export const LOST_GAME_SCORE = -1e9;
+
+/** How many candidates get the expensive deeper look in 3-ply search, per level. */
+const DEEP_BEAM = Object.freeze({ first: 6, second: 4 });
+
+// Scratch board for bestFollow. Its input buffer lives on the network
+// (net.stateScratch), sized for that network's inputs.
+const followBoard = createBoard();
+
+/**
+ * The best the `piece` can do on `board`:
+ *   max over its placements of  reward + gamma x V(board after it),
+ * or -Infinity if it has nowhere to go. Same as looping over nextStates(),
+ * but with one scratch board instead of a new board per placement.
+ */
+export function bestFollow(board, piece, net, gamma = GAMMA) {
   let best = -Infinity;
-  const rotations = PIECES[piece].rotations;
   for (const m of placements(board, piece)) {
     followBoard.set(board);
-    placePiece(followBoard, rotations[m.rotation], m.row, m.col);
-    const lines = clearLines(followBoard);
-    const v = moveReward(lines) + gamma * net.predict(boardState(followBoard, lines, net.input, followState));
+    const lines = playMove(followBoard, piece, m);
+    const v = moveReward(lines) + gamma * net.predict(boardState(followBoard, lines, net.inputSpec, null, net.stateScratch));
     if (v > best) best = v;
   }
   return best;
 }
 
-/** Reward for one move, the same formula training uses. */
-export const moveReward = (lines) => 1 + 10 * lines * lines;
-
 /**
- * The network's move for this piece, or null if no move fits (game over).
- *
- * Without `next` (or with lookahead off) it is 1-ply: score every placement of
- * the current piece with the network and take the best.
- *
- * With `next` and { lookahead: true } it is 2-ply: for every placement of the
- * current piece, also try every placement of the next piece, and score the
- * pair as
- *
- *     reward(move 1) + 0.99 x best over move 2 of [ reward(move 2) + 0.99 x V(board after both) ]
- *
- * which is the Bellman equation from training, unrolled one step with the
- * next piece known instead of guessed. Same network, no retraining - only the
- * way moves are chosen changes. About 30x slower, still fast enough to watch.
+ * Expected value of `board` when the next piece is unknown: the best each of
+ * the 7 pieces could do, averaged. A piece with nowhere to go counts as
+ * LOST_GAME_SCORE.
  */
-export function chooseDqnMove(board, pieceIdx, net, next = null, { lookahead = false, gamma = 0.99 } = {}) {
-  let best = null;
-  let bestScore = -Infinity;
-  const twoPly = lookahead && next != null;
-  for (const s of nextStates(board, pieceIdx, net.input)) {
-    let v;
-    if (!twoPly) {
-      v = net.predict(s.state);
-    } else {
-      const follow = bestFollow(s.board, next, net, gamma);
-      // no room for the next piece: this move loses the game
-      v = follow === -Infinity ? -1e9 : moveReward(s.lines) + gamma * follow;
-    }
-    if (v > bestScore) {
-      bestScore = v;
-      best = s.move;
-    }
+export function expectedFollow(board, net, gamma = GAMMA) {
+  let sum = 0;
+  for (let p = 0; p < PIECES.length; p++) {
+    const f = bestFollow(board, p, net, gamma);
+    sum += f === -Infinity ? LOST_GAME_SCORE : f;
   }
-  return best;
+  return sum / PIECES.length;
 }
+
+/** reward + gamma x follow, or LOST_GAME_SCORE when the follower had nowhere to go. */
+const withFollow = (lines, follow, gamma) => (follow === -Infinity ? LOST_GAME_SCORE : moveReward(lines) + gamma * follow);
 
 /**
  * The network's best placement for one piece, as a function the hold
  * decision can call: (piece, follower) -> { move, score } | null.
  *
- *   no lookahead:   score = V(board after the move)
- *   lookahead:      score = reward + 0.99 x (the best the follower can do), or
- *                   reward + 0.99 x V(board after) when the follower is unknown
+ *   1-ply:  score = V(board after the move)
+ *   2-ply:  score = reward + gamma x (the best the follower can do), or
+ *           reward + gamma x V(board after) when the follower is unknown
+ *   3-ply:  see bestPlacementDeep
  */
-export function dqnBest(net, board, { lookahead = false, deep = false, gamma = GAMMA_DEFAULT } = {}) {
-  if (deep) return dqnBestDeep(net, board, gamma);
+function bestPlacement(net, board, { lookahead = false, deep = false, gamma = GAMMA } = {}) {
+  if (deep) return bestPlacementDeep(net, board, gamma);
   return (piece, follower) => {
     let best = null;
-    for (const s of nextStates(board, piece, net.input)) {
+    for (const s of nextStates(board, piece, net.inputSpec)) {
       let v;
-      if (!lookahead) {
-        v = net.predict(s.state);
-      } else if (follower == null) {
-        v = moveReward(s.lines) + gamma * net.predict(s.state);
-      } else {
-        const follow = bestFollow(s.board, follower, net, gamma);
-        v = follow === -Infinity ? -1e9 : moveReward(s.lines) + gamma * follow;
-      }
+      if (!lookahead) v = net.predict(s.state);
+      else if (follower == null) v = moveReward(s.lines) + gamma * net.predict(s.state);
+      else v = withFollow(s.lines, bestFollow(s.board, follower, net, gamma), gamma);
       if (!best || v > best.score) best = { move: s.move, score: v };
     }
     return best;
   };
 }
 
-/* ------------------------------------------------- 3-ply: deeper lookahead */
-
-// How many candidates get the expensive deeper look at each level.
-export const DEEP_BEAM = { first: 6, second: 4 };
-
 /**
- * Expected value of the board after the next piece is placed, when the piece
- * after that is unknown: for each of the 7 pieces, the best it could do,
- * averaged. A piece with nowhere to go counts as a lost game.
- */
-function expectedFollow(board, net, gamma) {
-  let sum = 0;
-  for (let p = 0; p < PIECES.length; p++) {
-    const f = bestFollow(board, p, net, gamma);
-    sum += f === -Infinity ? -1e9 : f;
-  }
-  return sum / PIECES.length;
-}
-
-/**
- * The best the `piece` can do on `board` when we also look one piece further:
- *   max over its placements of  reward + 0.99 x (average over the 7 possible
- *   pieces after it of their best  reward + 0.99 x V(board) ).
- * Only the `beam` most promising placements (by reward + 0.99 x V) get that
+ * The best `piece` can do on `board` looking one more piece ahead:
+ *   max over its placements of  reward + gamma x expectedFollow(board after).
+ * Only the `beam` most promising placements (by reward + gamma x V) get that
  * deeper look; that is what keeps it fast enough to play.
  */
 function bestFollowDeep(board, piece, net, gamma, beam) {
-  const rotations = PIECES[piece].rotations;
   const cands = [];
   for (const m of placements(board, piece)) {
-    const after = board.slice();
-    placePiece(after, rotations[m.rotation], m.row, m.col);
-    const lines = clearLines(after);
-    const quick = moveReward(lines) + gamma * net.predict(boardState(after, lines, net.input, followState));
+    const after = copyBoard(board);
+    const lines = playMove(after, piece, m);
+    const quick = moveReward(lines) + gamma * net.predict(boardState(after, lines, net.inputSpec, null, net.stateScratch));
     cands.push({ after, lines, quick });
   }
   if (cands.length === 0) return -Infinity;
@@ -419,28 +417,28 @@ function bestFollowDeep(board, piece, net, gamma, beam) {
 }
 
 /**
- * 3-ply version of dqnBest: (piece, follower) -> { move, score }.
+ * 3-ply bestPlacement: (piece, follower) -> { move, score } | null.
  * For each placement of `piece`, the follower (the visible next piece) is
  * placed, and then the unknown piece after it is averaged over all 7:
- *   score = reward + 0.99 x max over follower placements of
- *             [ reward + 0.99 x average over 7 pieces of their best
- *                 ( reward + 0.99 x V(board) ) ]
+ *
+ *   score = reward + gamma x max over follower placements of
+ *             [ reward + gamma x average over 7 pieces of their best
+ *                 ( reward + gamma x V(board) ) ]
+ *
  * Beam search: every placement is first scored the 2-ply way, and only the
  * best DEEP_BEAM.first of them (and DEEP_BEAM.second follower placements
- * each) get the deeper look. Without a known follower it falls back to an
- * average over the 7 possible followers, 2-ply style.
+ * each) get the deeper look. Without a known follower it is 2-ply, with the
+ * follower averaged over all 7 pieces.
  */
-function dqnBestDeep(net, board, gamma) {
+function bestPlacementDeep(net, board, gamma) {
   return (piece, follower) => {
-    const states = nextStates(board, piece, net.input);
+    const states = nextStates(board, piece, net.inputSpec);
     if (states.length === 0) return null;
     for (const s of states) {
-      if (follower == null) {
-        s.shallow = moveReward(s.lines) + gamma * expectedFollow(s.board, net, gamma);
-      } else {
-        const f = bestFollow(s.board, follower, net, gamma);
-        s.shallow = f === -Infinity ? -1e9 : moveReward(s.lines) + gamma * f;
-      }
+      s.shallow =
+        follower == null
+          ? moveReward(s.lines) + gamma * expectedFollow(s.board, net, gamma)
+          : withFollow(s.lines, bestFollow(s.board, follower, net, gamma), gamma);
     }
     if (follower == null) {
       let best = states[0];
@@ -450,25 +448,45 @@ function dqnBestDeep(net, board, gamma) {
     states.sort((a, b) => b.shallow - a.shallow);
     let best = null;
     for (const s of states.slice(0, DEEP_BEAM.first)) {
-      const f = bestFollowDeep(s.board, follower, net, gamma, DEEP_BEAM.second);
-      const v = f === -Infinity ? -1e9 : moveReward(s.lines) + gamma * f;
+      const v = withFollow(s.lines, bestFollowDeep(s.board, follower, net, gamma, DEEP_BEAM.second), gamma);
       if (!best || v > best.score) best = { move: s.move, score: v };
     }
     return best;
   };
 }
 
+/* --------------------------------------------------------------- choosers */
+
 /**
- * Like chooseDqnMove, but understands hold: pass the 4th chooser argument
- * ({ held, canHold }) as `holdCtx`. Returns a placement or HOLD.
- * Without holdCtx it plays exactly like chooseDqnMove.
+ * The network's placement for this piece, or null if nothing fits.
+ *
+ * 1-ply by default. With { lookahead: true } and a known `next` piece it is
+ * 2-ply: every placement of the current piece is scored as
+ *
+ *     reward(move 1) + gamma x best over move 2 of [ reward(move 2) + gamma x V(board after both) ]
+ *
+ * which is the Bellman equation from training, unrolled one step with the
+ * next piece known instead of guessed. Same network, no retraining. Without
+ * a known next piece, lookahead has nothing to look at and it plays 1-ply.
  */
-export function chooseDqnAction(board, pieceIdx, net, next = null, holdCtx = null, { lookahead = false, deep = false } = {}) {
-  // a network trained with hold sees the hold box: decide with that knowledge
-  if (holdCtx && net.input.held.length > 0) return chooseWithHoldInputs(board, pieceIdx, net, next, holdCtx);
-  const best = dqnBest(net, board, { lookahead: lookahead || deep, deep });
+export function chooseDqnMove(board, pieceIdx, next, net, { lookahead = false, gamma = GAMMA } = {}) {
+  const best = bestPlacement(net, board, { lookahead: lookahead && next != null, gamma });
+  return best(pieceIdx, next)?.move ?? null;
+}
+
+/**
+ * The network's action: a placement, HOLD, or null (game over). Pass the
+ * chooser's 4th argument ({ held, canHold }) as `holdCtx`; without it this
+ * never holds. { lookahead: true } is 2-ply, { deep: true } is 3-ply.
+ *
+ * A network trained with hold inputs decides 1-ply only when it may hold
+ * (lookahead and deep are not used there).
+ */
+export function chooseDqnAction(board, pieceIdx, next, net, holdCtx = null, { lookahead = false, deep = false } = {}) {
+  if (holdCtx && net.inputSpec.held.length > 0) return chooseWithHoldInputs(board, pieceIdx, next, net, holdCtx);
+  const best = bestPlacement(net, board, { lookahead: lookahead || deep, deep });
   if (!holdCtx) return best(pieceIdx, next)?.move ?? null;
-  return decideWithHold(best, pieceIdx, next, holdCtx.held, holdCtx.canHold, lookahead || deep);
+  return decideWithHold(best, pieceIdx, next, holdCtx, lookahead || deep);
 }
 
 /**
@@ -477,26 +495,27 @@ export function chooseDqnAction(board, pieceIdx, net, next = null, holdCtx = nul
  * AND the piece it leaves in the box:
  *   place the current piece  -> the box keeps what it had
  *   hold, place the other    -> the box now holds the current piece
- * When the piece we'd get is unknown (empty box, no preview) we average over
- * all 7. Decides on the current position only (no 2-ply lookahead yet).
+ * When the piece we would get is unknown (empty box, no preview), the hold
+ * side is the average over all 7 pieces.
  */
-function chooseWithHoldInputs(board, cur, net, next, { held, canHold }) {
+function chooseWithHoldInputs(board, current, next, net, { held, canHold }) {
   const best = (piece, heldAfter) => {
     let b = null;
-    for (const s of nextStates(board, piece, net.input, heldAfter)) {
+    for (const s of nextStates(board, piece, net.inputSpec, heldAfter)) {
       const v = net.predict(s.state);
       if (!b || v > b.score) b = { move: s.move, score: v };
     }
     return b;
   };
-  const place = best(cur, held);
+  const place = best(current, held);
   if (!canHold) return place ? place.move : null;
   let holdScore;
-  if (held != null) holdScore = best(held, cur)?.score ?? -Infinity;
-  else if (next != null) holdScore = best(next, cur)?.score ?? -Infinity;
+  if (held != null) holdScore = best(held, current)?.score ?? -Infinity;
+  else if (next != null) holdScore = best(next, current)?.score ?? -Infinity;
   else {
     holdScore = 0;
-    for (let p = 0; p < PIECES.length; p++) holdScore += (best(p, cur)?.score ?? -Infinity) / PIECES.length;
+    // each term divided before adding (not the sum divided): keeps the trained results bit-identical
+    for (let p = 0; p < PIECES.length; p++) holdScore += (best(p, current)?.score ?? -Infinity) / PIECES.length;
   }
   if (!place) return holdScore > -Infinity ? HOLD : null;
   return holdScore > place.score ? HOLD : place.move;

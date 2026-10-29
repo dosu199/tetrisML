@@ -13,7 +13,7 @@
  * several and pick the best, the way you would pick a model on a validation
  * set.
  *
- * THREE SETS OF GAMES, NEVER MIXED
+ * THREE SETS OF GAMES, NEVER MIXED (scripts/lib/seeds.js)
  * --------------------------------
  *   500000+  the check inside training (picks each run's best checkpoint)
  *    70000+  this script's selection test (picks the best run)
@@ -22,11 +22,16 @@
  * If we picked the winner on the 90000+ games and then reported its score on
  * those same games, the score would be flattering: we would have chosen the
  * run that happened to suit them. A separate selection set avoids that. It is
- * the train / validation / test split from the course.
+ * the train / validation / test split of machine learning.
  *
  * Each run is saved as runs/seed-N.json. The current --out file (default
- * dqn-model.json) takes part in the selection test too, and it is replaced
- * only if a new run beats it. So running this can never make your model worse.
+ * models/dqn-model.json) takes part in the selection test too, and it is
+ * replaced only if a new run beats it. So running this can never make the
+ * model worse.
+ *
+ * --pieces and --hold are used here (for the selection test) and also passed
+ * on to train-dqn.js. --snapshots cannot be used: the parallel runs would all
+ * write the same snapshot files.
  */
 
 import { spawn } from 'node:child_process';
@@ -34,36 +39,43 @@ import { fileURLToPath } from 'node:url';
 import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { playEpisode } from '../src/tetris-core.js';
 import { loadDqn, chooseDqnMove, chooseDqnAction } from '../src/tetris-dqn.js';
+import { parseFlags, oneOf, numberList, fail } from './lib/cli.js';
+import { SEED_BASE } from './lib/seeds.js';
 
-const argv = process.argv.slice(2);
-const own = new Set(['seeds', 'parallel', 'out', 'select-games', 'select-cap']);
-const flag = (n, d) => {
-  const i = argv.indexOf(`--${n}`);
-  return i === -1 ? d : argv[i + 1];
-};
-// everything that is not ours is passed through to train-dqn.js
-const passThrough = [];
-for (let i = 0; i < argv.length; i++) {
-  const name = argv[i].replace(/^--/, '');
-  if (own.has(name)) i++;
-  else passThrough.push(argv[i]);
-}
-
-const SEEDS = flag('seeds', '1,2,3,4').split(',').map(Number);
-const PARALLEL = Number(flag('parallel', 2));
-const OUT = flag('out', 'models/dqn-model.json');
-const SELECT_GAMES = Number(flag('select-games', 50));
-const SELECT_CAP = Number(flag('select-cap', 2000));
-const PIECES = flag('pieces', 'random');
+const opts = parseFlags(
+  {
+    seeds: '1,2,3,4',
+    parallel: 2,
+    out: 'models/dqn-model.json',
+    'select-games': 50,
+    'select-cap': 2000,
+    pieces: 'random', // shared with train-dqn.js
+    hold: false, // shared with train-dqn.js
+  },
+  { passThrough: true }
+);
+const SEEDS = numberList(opts.seeds, 'seeds');
+const OUT = opts.out;
+const PIECES = oneOf(opts.pieces, 'pieces', ['bag', 'random', 'mix']);
 const RANDOMIZER = PIECES === 'bag' ? 'bag' : 'memoryless';
+// With --hold, ordinary games almost never end, so the selection test uses
+// hold on fast garbage (a row every 3 pieces): every game ends, and the
+// network that survives longest on average wins.
+const SELECT_HOLD = opts.hold;
+if (opts.rest.some((a) => a.startsWith('--snapshot'))) fail('--snapshots cannot be used with train-many.js (the runs would overwrite each other\'s snapshots)');
+if (opts.rest.some((a) => a === '--seed' || a === '--out')) fail('train-many.js sets --seed and --out of each run itself (use --seeds)');
+// what train-dqn.js gets: everything that is not ours, plus the shared flags
+const trainFlags = [...opts.rest, '--pieces', PIECES, ...(opts.hold ? ['--hold'] : [])];
 
-mkdirSync('runs', { recursive: true });
+const TRAIN_SCRIPT = fileURLToPath(new URL('./train-dqn.js', import.meta.url));
+const runFile = (seed) => `runs/seed-${seed}.json`;
+const running = new Set(); // child processes, stopped if any run fails
 
 function train(seed) {
   return new Promise((resolve, reject) => {
-    const file = `runs/seed-${seed}.json`;
-    const args = [fileURLToPath(new URL('./train-dqn.js', import.meta.url)), '--seed', String(seed), '--out', file, ...passThrough];
+    const args = [TRAIN_SCRIPT, '--seed', String(seed), '--out', runFile(seed), ...trainFlags];
     const child = spawn(process.execPath, args, { stdio: ['ignore', 'pipe', 'inherit'] });
+    running.add(child);
     let last = '';
     child.stdout.on('data', (d) => {
       for (const line of d.toString().split('\n')) {
@@ -71,65 +83,86 @@ function train(seed) {
         if (line.startsWith('best network')) console.log(`  seed ${seed}: ${line.trim()}`);
       }
     });
-    child.on('close', (code) => (code === 0 ? resolve(file) : reject(new Error(`seed ${seed} failed (${last})`))));
+    child.on('close', (code) => {
+      running.delete(child);
+      if (code === 0) resolve(runFile(seed));
+      else reject(new Error(`seed ${seed} failed (${last || `exit code ${code}`})`));
+    });
   });
 }
 
-// With --hold, ordinary games almost never end, so the selection test uses
-// hold on fast garbage (a row every 3 pieces): every game ends, and the
-// network that survives longest on average wins.
-const SELECT_HOLD = passThrough.includes('--hold');
+/** Trains every seed, `parallel` at a time. */
+async function trainAll() {
+  const queue = [...SEEDS];
+  try {
+    await Promise.all(
+      Array.from({ length: Math.min(opts.parallel, SEEDS.length) }, async () => {
+        while (queue.length) await train(queue.shift());
+      })
+    );
+  } catch (err) {
+    queue.length = 0;
+    for (const child of running) child.kill();
+    fail(err.message);
+  }
+}
 
+/** How a model does on the selection games: games lost and mean pieces survived. */
 function select(file) {
   const net = loadDqn(JSON.parse(readFileSync(file, 'utf8')));
   let lost = 0;
   let pieces = 0;
-  for (let g = 0; g < SELECT_GAMES; g++) {
+  for (let g = 0; g < opts.selectGames; g++) {
+    const seed = SEED_BASE.selection + g;
     const r = SELECT_HOLD
-      ? playEpisode((b, c, n, h) => chooseDqnAction(b, c, net, n, h), 70000 + g, {
-          cap: SELECT_CAP,
+      ? playEpisode((b, c, n, h) => chooseDqnAction(b, c, n, net, h), seed, {
+          cap: opts.selectCap,
           randomizer: RANDOMIZER,
           garbageEvery: 3,
           hold: true,
         })
-      : playEpisode((b, c) => chooseDqnMove(b, c, net), 70000 + g, {
-          cap: SELECT_CAP,
+      : playEpisode((b, c) => chooseDqnMove(b, c, null, net), seed, {
+          cap: opts.selectCap,
           randomizer: RANDOMIZER,
           preview: false,
         });
     if (r.died) lost++;
     pieces += r.pieces;
   }
-  return { file, lost, mean: pieces / SELECT_GAMES };
+  return { file, lost, mean: pieces / opts.selectGames };
 }
 
-const t0 = Date.now();
-console.log(`\ntraining ${SEEDS.length} networks (seeds ${SEEDS.join(', ')}), ${PARALLEL} at a time`);
-console.log(`train-dqn.js flags: ${passThrough.join(' ') || '(defaults)'}\n`);
+async function main() {
+  const t0 = Date.now();
+  mkdirSync('runs', { recursive: true });
+  console.log(`\ntraining ${SEEDS.length} networks (seeds ${SEEDS.join(', ')}), ${opts.parallel} at a time`);
+  console.log(`train-dqn.js flags: ${trainFlags.join(' ')}\n`);
+  await trainAll();
 
-// a tiny worker pool: PARALLEL trainings at once
-const queue = [...SEEDS];
-const files = [];
-await Promise.all(
-  Array.from({ length: Math.min(PARALLEL, SEEDS.length) }, async () => {
-    while (queue.length) files.push(await train(queue.shift()));
-  })
-);
+  console.log(
+    `\nselection test: ${opts.selectGames} games on seeds ${SEED_BASE.selection}+, ${RANDOMIZER} pieces, cap ${opts.selectCap}` +
+      `${SELECT_HOLD ? ', hold on, garbage every 3 pieces' : ''}\n`
+  );
+  // the current model competes too, so it is only replaced by something better
+  const files = SEEDS.map(runFile);
+  const contenders = existsSync(OUT) ? [OUT, ...files] : files;
+  const results = contenders.map(select);
+  results.sort((a, b) => a.lost - b.lost || b.mean - a.mean); // stable: on a tie the current model stays
+  for (const [i, r] of results.entries()) {
+    const label = r.file === OUT ? `${OUT} (current)` : r.file;
+    console.log(
+      `  ${label.padEnd(30)} lost ${String(r.lost).padStart(2)}/${opts.selectGames}   mean ${r.mean.toFixed(0).padStart(5)} pieces` +
+        (i === 0 ? '   <- best' : '')
+    );
+  }
+  const minutes = ((Date.now() - t0) / 60000).toFixed(1);
+  if (results[0].file === OUT) {
+    console.log(`\nno new run beat the current ${OUT}; it is unchanged   (${minutes} min)`);
+  } else {
+    copyFileSync(results[0].file, OUT);
+    console.log(`\n${results[0].file} -> ${OUT}   (${minutes} min)`);
+  }
+  console.log(`final check: node scripts/hardmode.js --model ${OUT} --games 50 --seed ${SEED_BASE.benchmark} --mode memoryless-no-preview\n`);
+}
 
-console.log(`\nselection test: ${SELECT_GAMES} games on seeds 70000+, ${RANDOMIZER} pieces, cap ${SELECT_CAP}${SELECT_HOLD ? ', hold on, garbage every 3 pieces' : ''}\n`);
-// the current model competes too, so it is only replaced by something better
-const contenders = existsSync(OUT) ? [OUT, ...files.sort()] : files.sort();
-const results = contenders.map(select);
-results.sort((a, b) => a.lost - b.lost || b.mean - a.mean);
-for (const [i, r] of results.entries()) {
-  const label = r.file === OUT ? `${OUT} (current)` : r.file;
-  console.log(`  ${label.padEnd(30)} lost ${String(r.lost).padStart(2)}/${SELECT_GAMES}   mean ${r.mean.toFixed(0).padStart(5)} pieces${i === 0 ? '   <- best' : ''}`);
-}
-const minutes = ((Date.now() - t0) / 60000).toFixed(1);
-if (results[0].file === OUT) {
-  console.log(`\nno new run beat the current ${OUT}; it is unchanged   (${minutes} min)`);
-} else {
-  copyFileSync(results[0].file, OUT);
-  console.log(`\n${results[0].file} -> ${OUT}   (${minutes} min)`);
-}
-console.log(`final check: node scripts/hardmode.js --model ${OUT} --games 50 --seed 90000 --mode memoryless-no-preview\n`);
+await main();

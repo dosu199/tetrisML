@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Tetris ML · Play vs Bot</title>
     <meta name="description" content="Play Tetris against a neural network: same pieces, side by side, with garbage battles or a race to 40 lines." />
-    <meta name="theme-color" content="#0d1120" />
+    <meta name="theme-color" content="#141218" />
     <link rel="icon" href="assets/meta/favicon.svg" type="image/svg+xml" />
     <link rel="icon" href="assets/meta/favicon-32.png" sizes="32x32" type="image/png" />
     <link rel="apple-touch-icon" href="assets/meta/apple-touch-icon.png" />
@@ -20,10 +20,11 @@
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="Tetris ML: a neural network that taught itself Tetris" />
     <meta name="twitter:card" content="summary_large_image" />
-    <link rel="stylesheet" href="assets/css/base.css?v=32" />
-    <link rel="stylesheet" href="assets/css/versus.css?v=32" />
-    <link rel="stylesheet" href="assets/css/theme.css?v=32" />
-    <link rel="stylesheet" href="assets/css/nav.css?v=32" />
+    <link rel="preload" href="assets/fonts/outfit-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="assets/css/base.css?v=34" />
+    <link rel="stylesheet" href="assets/css/versus.css?v=34" />
+    <link rel="stylesheet" href="assets/css/theme.css?v=34" />
+    <link rel="stylesheet" href="assets/css/nav.css?v=34" />
   </head>
   <body>
     <nav class="topnav" aria-label="Main">
@@ -34,6 +35,7 @@
         <li><a href="how-it-works.html">How it works</a></li>
         <li><a href="learning.html"><span class="nav-long">Watch it learn</span><span class="nav-short">Learn</span></a></li>
       </ul>
+      <a class="topnav-gh" href="https://github.com/dosu199/tetrisML" target="_blank" rel="noopener">GitHub</a>
     </nav>
 
     <main class="vs-main">
@@ -50,9 +52,9 @@
 
         <fieldset class="vs-choice" id="opponentChoice">
           <legend>Opponent</legend>
-          <label><input type="radio" name="opponent" value="dqn3" checked /><span><b>Network, 3 ahead</b><small>Strongest. Thinks 3 pieces ahead.</small></span></label>
-          <label><input type="radio" name="opponent" value="dqn2" /><span><b>Network, 2 ahead</b><small>Looks at this piece and the next.</small></span></label>
-          <label><input type="radio" name="opponent" value="dqn" /><span><b>Network, 1 piece</b><small>Current piece only. Misses more.</small></span></label>
+          <label><input type="radio" name="opponent" value="dqn3" checked /><span><b>Strongest</b><small>The network, thinking 3 pieces ahead.</small></span></label>
+          <label><input type="radio" name="opponent" value="dqn2" /><span><b>Strong</b><small>The network, this piece and the next.</small></span></label>
+          <label><input type="radio" name="opponent" value="dqn" /><span><b>Quick</b><small>The network, current piece only. Misses more.</small></span></label>
           <label><input type="radio" name="opponent" value="bot" /><span><b>Search bot</b><small>No network: hand-tuned search.</small></span></label>
         </fieldset>
 
@@ -90,18 +92,18 @@
       <!-- ============ the match: shown after Start ============ -->
       <div class="vs-match" id="matchView" hidden>
         <h1 class="sr-only">Play vs Bot match</h1>
-        <div class="vs-bar card">
-          <p class="vs-bar-mode" id="barMode">Battle</p>
-          <label class="vs-field">
+        <div class="vs-bar">
+          <p class="vs-mode-chip" id="barMode">Battle</p>
+          <label class="vs-field vs-field-opponent">
             <span>Opponent</span>
             <select id="opponent">
-              <option value="dqn3">Network, 3 ahead</option>
-              <option value="dqn2">Network, 2 ahead</option>
-              <option value="dqn">Network, 1 piece</option>
+              <option value="dqn3">Strongest · 3 ahead</option>
+              <option value="dqn2">Strong · 2 ahead</option>
+              <option value="dqn">Quick · 1 piece</option>
               <option value="bot">Search bot</option>
             </select>
           </label>
-          <label class="vs-field">
+          <label class="vs-field vs-field-speed">
             <span>Speed</span>
             <select id="speed">
               <option value="0.25" data-mistakes="0.3">Super easy</option>
@@ -112,97 +114,107 @@
               <option value="5">Machine</option>
             </select>
           </label>
+          <span class="vs-bar-sep" aria-hidden="true"></span>
           <div class="vs-bar-buttons">
-            <button id="pauseBtn" type="button">Pause</button>
-            <button id="restartBtn" type="button">Restart</button>
-            <button id="settingsBtn" type="button">Settings</button>
+            <button id="pauseBtn" type="button" class="btn-tonal">Pause</button>
+            <button id="restartBtn" type="button" class="btn-text">Restart</button>
+            <button id="settingsBtn" type="button" class="btn-text">Settings</button>
           </div>
         </div>
 
         <div class="vs-arena">
           <!-- you -->
-          <section class="vs-player" aria-label="Your board">
+          <section class="vs-player vs-you" aria-label="Your board">
             <header class="vs-head">
+              <span class="vs-avatar" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10" cy="7" r="3.5"></circle><path d="M3.5 17.5c1-3.3 3.5-5 6.5-5s5.5 1.7 6.5 5"></path></svg>
+              </span>
               <h2>You</h2>
+              <span class="vs-chip" id="youIncoming" hidden></span>
               <span class="vs-badge" id="youBadge"></span>
             </header>
-            <div class="vs-body">
+            <div class="vs-console">
               <div class="vs-side">
                 <div class="vs-mini"><span>Hold</span><canvas id="youHold"></canvas></div>
                 <div class="vs-mini"><span>Next</span><canvas id="youNext"></canvas></div>
-                <dl class="vs-stats">
-                  <div><dt>Lines</dt><dd id="youLines">0</dd></div>
-                  <div><dt>Score</dt><dd id="youScore">0</dd></div>
-                  <div><dt>Pieces/s</dt><dd id="youPps">0.0</dd></div>
-                </dl>
               </div>
-              <div class="vs-boardwrap">
-                <div class="vs-garbage" title="Garbage coming your way" aria-label="Garbage coming your way"><i id="youGarbage"></i></div>
-                <div class="vs-board">
-                  <canvas id="youBoard" aria-label="Your Tetris board"></canvas>
-                  <div class="vs-overlay" id="overlay" hidden>
-                    <div class="intro-box">
-                      <p class="vs-overlay-title" id="overlayTitle"></p>
-                      <div id="overlayText"></div>
-                    </div>
+              <div class="vs-garbage" title="Garbage coming your way" aria-label="Garbage coming your way"><i id="youGarbage"></i></div>
+              <div class="vs-board">
+                <canvas id="youBoard" aria-label="Your Tetris board"></canvas>
+                <div class="vs-overlay" id="overlay" hidden>
+                  <div class="intro-box" role="status" aria-live="polite">
+                    <p class="vs-overlay-title" id="overlayTitle"></p>
+                    <div id="overlayText"></div>
                   </div>
                 </div>
               </div>
             </div>
+            <dl class="stat-tiles compact">
+              <div class="t-cyan"><dt>Lines</dt><dd id="youLines">0</dd></div>
+              <div class="t-accent"><dt>Score</dt><dd id="youScore">0</dd></div>
+              <div><dt>Pieces/s</dt><dd id="youPps">0.0</dd></div>
+            </dl>
           </section>
 
           <!-- the middle -->
           <div class="vs-center">
             <div class="vs-timer" id="timer">0:00</div>
-            <div class="vs-goal" id="goal">Battle</div>
-            <div class="vs-vs">VS</div>
+            <div class="vs-vs shape-blob" aria-hidden="true">VS</div>
+            <dl class="vs-sent">
+              <div><dt>You sent</dt><dd id="youSent">0 rows</dd></div>
+              <div><dt>It sent</dt><dd id="aiSent">0 rows</dd></div>
+            </dl>
+            <p class="vs-goal" id="goal">Clear 2 or more lines at once to send garbage.</p>
           </div>
 
           <!-- the opponent -->
           <section class="vs-player vs-ai" aria-label="The opponent's board">
             <header class="vs-head">
+              <span class="vs-avatar" aria-hidden="true">
+                <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="5" cy="6" r="2.2"></circle><circle cx="5" cy="16" r="2.2"></circle><circle cx="17" cy="11" r="2.2"></circle><path d="M7 6.8l8 3.4M7 15.2l8-3.4"></path></svg>
+              </span>
               <h2 id="aiName"><span class="long">Network, 3 ahead</span><span class="short">Network 3</span></h2>
               <span class="vs-badge" id="aiBadge"></span>
             </header>
-            <div class="vs-body">
-              <div class="vs-boardwrap">
-                <div class="vs-garbage" title="Garbage coming its way" aria-label="Garbage coming its way"><i id="aiGarbage"></i></div>
-                <div class="vs-board">
-                  <canvas id="aiBoard" aria-label="The opponent's Tetris board"></canvas>
-                  <div class="vs-overlay" id="aiOverlay" hidden><div><p class="vs-overlay-title" id="aiOverlayTitle"></p></div></div>
-                </div>
+            <div class="vs-console">
+              <div class="vs-board">
+                <canvas id="aiBoard" aria-label="The opponent's Tetris board"></canvas>
+                <div class="vs-overlay" id="aiOverlay" hidden><div><p class="vs-overlay-title" id="aiOverlayTitle"></p></div></div>
               </div>
+              <div class="vs-garbage" title="Garbage coming its way" aria-label="Garbage coming its way"><i id="aiGarbage"></i></div>
               <div class="vs-side">
                 <div class="vs-mini"><span>Hold</span><canvas id="aiHold"></canvas></div>
                 <div class="vs-mini"><span>Next</span><canvas id="aiNext"></canvas></div>
-                <dl class="vs-stats">
-                  <div><dt>Lines</dt><dd id="aiLines">0</dd></div>
-                  <div><dt>Score</dt><dd id="aiScore">0</dd></div>
-                  <div><dt>Pieces/s</dt><dd id="aiPps">0.0</dd></div>
-                </dl>
               </div>
             </div>
+            <dl class="stat-tiles compact">
+              <div class="t-cyan"><dt>Lines</dt><dd id="aiLines">0</dd></div>
+              <div class="t-accent"><dt>Score</dt><dd id="aiScore">0</dd></div>
+              <div><dt>Pieces/s</dt><dd id="aiPps">0.0</dd></div>
+            </dl>
           </section>
         </div>
 
         <!-- touch controls (phones and tablets) -->
-        <div class="vs-touch" id="touch" aria-label="Touch controls">
-          <button type="button" data-key="hold">Hold</button>
-          <button type="button" data-key="ccw" aria-label="Rotate left">⟲</button>
-          <button type="button" data-key="cw" aria-label="Rotate right">⟳</button>
+        <div class="vs-touch" id="touch" role="group" aria-label="Touch controls">
+          <button type="button" class="tp-tonal" data-key="hold">Hold</button>
+          <button type="button" class="tp-tonal" data-key="ccw" aria-label="Rotate left">⟲</button>
+          <button type="button" class="tp-tonal" data-key="cw" aria-label="Rotate right">⟳</button>
           <button type="button" data-key="left" aria-label="Move left">◀</button>
           <button type="button" data-key="down" aria-label="Move down">▼</button>
           <button type="button" data-key="right" aria-label="Move right">▶</button>
-          <button type="button" data-key="drop" class="wide">Drop</button>
+          <button type="button" data-key="drop" class="wide tp-accent">Drop</button>
         </div>
       </div>
     </main>
+
+    <div class="snackbar is-hidden" id="snack" role="status" aria-live="polite"></div>
 
     <footer class="site-footer">
       Made by Suad · <a href="https://github.com/dosu199/tetrisML" target="_blank" rel="noopener">Source on GitHub</a> · Tetris ML
     </footer>
 
-    <script type="module" src="assets/js/versus.js?v=32"></script>
-      <script src="assets/js/tetro-bg.js?v=32" defer></script>
+    <script type="module" src="assets/js/versus.js?v=34"></script>
+    <script src="assets/js/tetro-bg.js?v=34" defer></script>
   </body>
 </html>

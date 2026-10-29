@@ -4,12 +4,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="assets/css/style.css?v=32">
-    <link rel="stylesheet" href="assets/css/theme.css?v=32">
-    <link rel="stylesheet" href="assets/css/nav.css?v=32">
+    <link rel="preload" href="assets/fonts/outfit-latin.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="assets/css/style.css?v=34">
+    <link rel="stylesheet" href="assets/css/theme.css?v=34">
+    <link rel="stylesheet" href="assets/css/nav.css?v=34">
     <title>Tetris ML · Play</title>
     <meta name="description" content="Play Tetris yourself, then flip one switch and let a neural network that taught itself Tetris take over your game." />
-    <meta name="theme-color" content="#0d1120" />
+    <meta name="theme-color" content="#141218" />
     <link rel="icon" href="assets/meta/favicon.svg" type="image/svg+xml" />
     <link rel="icon" href="assets/meta/favicon-32.png" sizes="32x32" type="image/png" />
     <link rel="apple-touch-icon" href="assets/meta/apple-touch-icon.png" />
@@ -26,7 +27,7 @@
     <meta name="twitter:card" content="summary_large_image" />
 </head>
 
-<body class="human"><!-- you play first; the ML switch changes this -->
+<body class="human"><!-- you play first; "Network plays" changes this -->
     <nav class="topnav" aria-label="Main">
       <a class="topnav-brand" href="index.html" aria-label="Tetris ML home"><span class="topnav-logo" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span>Tetris ML</span></a>
       <ul class="topnav-links">
@@ -35,266 +36,120 @@
         <li><a href="how-it-works.html">How it works</a></li>
         <li><a href="learning.html"><span class="nav-long">Watch it learn</span><span class="nav-short">Learn</span></a></li>
       </ul>
+      <a class="topnav-gh" href="https://github.com/dosu199/tetrisML" target="_blank" rel="noopener">GitHub</a>
     </nav>
 
     <h1 class="sr-only">Play Tetris, or let the neural network play</h1>
-    <div id="wrapper">
-        <div class="board-wrap">
+    <main class="play">
+
+      <aside class="play-side play-left">
+        <section class="hint-card" aria-labelledby="hintTitle">
+          <div class="hint-card-head">
+            <h2 id="hintTitle">Hint</h2>
+            <label class="switch">
+              <input type="checkbox" id="hintToggle" role="switch">
+              <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
+              <span class="sr-only">Show the hint</span>
+            </label>
+          </div>
+          <p class="hint-note" id="hintNote">Turn it on to see where the network would put your piece.<span class="keys-only"> Shortcut: <kbd>H</kbd></span></p>
+        </section>
+        <section class="ml-card" aria-live="polite">
+          <h2>The network is playing</h2>
+          <p>It continues your game from where you left it. Press <b>You play</b> to take over the same game.</p>
+        </section>
+
+        <fieldset class="players">
+          <legend>Who plays, and gives the hint</legend>
+          <label class="player"><input type="radio" name="player" value="dqn3"><span class="radio" aria-hidden="true"></span><span class="player-name">Strongest <span>· 3 ahead</span></span><span class="meter" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i></span></label>
+          <label class="player"><input type="radio" name="player" value="dqn2"><span class="radio" aria-hidden="true"></span><span class="player-name">Strong <span>· 2 ahead</span></span><span class="meter" aria-hidden="true"><i class="on"></i><i class="on"></i><i></i></span></label>
+          <label class="player"><input type="radio" name="player" value="dqn"><span class="radio" aria-hidden="true"></span><span class="player-name">Quick <span>· 1 piece</span></span><span class="meter" aria-hidden="true"><i class="on"></i><i></i><i></i></span></label>
+          <label class="player"><input type="radio" name="player" value="bot"><span class="radio" aria-hidden="true"></span><span class="player-name">Search bot <span>· no network</span></span></label>
+        </fieldset>
+      </aside>
+
+      <div class="play-center">
+        <div class="mode-group" role="group" aria-label="Who is playing">
+          <button type="button" id="youBtn" aria-pressed="true">
+            <svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5l4 4 8-9"></path></svg>
+            You play
+          </button>
+          <button type="button" id="netBtn" aria-pressed="false">
+            <svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5l4 4 8-9"></path></svg>
+            Network plays
+          </button>
+        </div>
+
+        <div class="console">
+          <div class="piece-tile" id="holdTetromino"><span class="tile-label">Hold<span class="keys-only"> · C</span></span><span class="mini"></span></div>
+          <div class="board-wrap">
             <div id="gameContainer"></div>
             <div class="play-overlay intro-screen" id="playOverlay">
-                <div class="intro-box">
-                    <p class="play-overlay-title intro-title" id="playTitle">Loading the network…</p>
-                    <div id="playText"><p class="intro-sub">One moment: downloading the trained model (92 KB).</p></div>
-                    <button type="button" class="btn-go" id="playGo" hidden>Start</button>
-                </div>
+              <div class="intro-box" role="status" aria-live="polite">
+                <p class="play-overlay-title intro-title" id="playTitle">Loading the network…</p>
+                <div id="playText"><p class="intro-sub">One moment: downloading the trained model (92 KB).</p></div>
+                <button type="button" class="btn-go" id="playGo" hidden>Start</button>
+              </div>
             </div>
+          </div>
+          <div class="piece-tile" id="nextTetromino"><span class="tile-label">Next</span><span class="mini"></span></div>
         </div>
-        <div id="gameStuff">
-            <div id="holdTetromino"></div>
-            <div id="nextTetromino">
-            </div>
-            <div id="score">
-                <div id="name">Score</div>
-                <div id="scoreBoard">0</div>
-            </div>
-            <div class="agent-panel">
-  <label class="ml-switch">
-    <input type="checkbox" id="mlToggle" role="switch">
-    <span class="ml-track" aria-hidden="true"><span class="ml-thumb"></span></span>
-    <span class="ml-text">Turn on ML</span>
-  </label>
-  <p class="ml-hint" id="mlHint">You're playing. Turn on to let the network continue your game.</p>
-  <div class="hint-row">
-    <label class="ml-switch small">
-      <input type="checkbox" id="hintToggle" role="switch">
-      <span class="ml-track" aria-hidden="true"><span class="ml-thumb"></span></span>
-      <span class="ml-text">Show hint</span>
-    </label>
-    <kbd class="keys-only" title="Keyboard shortcut">H</kbd>
-  </div>
-  <p class="hint-note" id="hintNote" hidden></p>
-  <label for="agent" title="Used when ML plays and for hints">Network level</label>
-  <select id="agent">
-    <option value="dqn3">Network, 3 ahead</option>
-    <option value="dqn2">Network, 2 ahead</option>
-    <option value="dqn">Network, 1 piece</option>
-    <option value="bot">Search bot</option>
-  </select>
-  <dl class="play-stats" aria-live="polite">
-    <div><dt>Lines</dt><dd id="stLines">0</dd></div>
-    <div><dt>Pieces</dt><dd id="stPieces">0</dd></div>
-    <div><dt>Game</dt><dd id="stGame">1</dd></div>
-    <div><dt>Best</dt><dd id="stBest">0</dd></div>
-  </dl>
-</div>
+
+        <div class="level">
+          <div class="level-text"><span id="levelName">Level 1</span><span id="levelLeft">10 lines to level 2</span></div>
+          <svg class="level-wave" id="levelWave" viewBox="0 0 300 14" preserveAspectRatio="none" aria-hidden="true">
+            <path class="wave-done" d=""></path>
+            <path class="wave-rest" d="M4 7 H296"></path>
+          </svg>
         </div>
+      </div>
+
+      <aside class="play-side play-right">
+        <div class="score-blob shape-blob">
+          <span class="tile-label">Score</span>
+          <span id="scoreBoard">0</span>
+          <span class="score-note" id="scoreNote"></span>
+        </div>
+        <dl class="stat-tiles">
+          <div class="t-cyan"><dt>Lines</dt><dd id="stLines">0</dd></div>
+          <div class="t-yellow"><dt>Pieces</dt><dd id="stPieces">0</dd></div>
+          <div class="t-rose"><dt>Best</dt><dd id="stBest">0</dd></div>
+        </dl>
+        <p class="game-line" id="stGame">Game 1</p>
+      </aside>
+    </main>
+
+    <!-- the floating toolbar (keyboard and mouse) -->
+    <div class="toolbar play-toolbar" role="toolbar" aria-label="Game">
+      <button type="button" class="icon-btn" id="pauseBtn" aria-label="Pause">
+        <svg class="i-pause" aria-hidden="true" width="18" height="18" viewBox="0 0 20 20" fill="currentColor"><rect x="4" y="3" width="4.5" height="14" rx="1.5"></rect><rect x="11.5" y="3" width="4.5" height="14" rx="1.5"></rect></svg>
+        <svg class="i-play" aria-hidden="true" width="18" height="18" viewBox="0 0 20 20" fill="currentColor"><path d="M6 3.5v13a1 1 0 0 0 1.5.86l11-6.5a1 1 0 0 0 0-1.72l-11-6.5A1 1 0 0 0 6 3.5z"></path></svg>
+      </button>
+      <button type="button" class="icon-btn" id="restartBtn" aria-label="New game">
+        <svg aria-hidden="true" width="20" height="20" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11a7 7 0 1 0 2.1-5"></path><path d="M4 3v4h4"></path></svg>
+      </button>
+      <span class="toolbar-sep keys-only" aria-hidden="true"></span>
+      <span class="toolbar-keys keys-only"><kbd>← →</kbd> move <kbd>↑</kbd> rotate <kbd>↓</kbd> faster <kbd>Space</kbd> drop <kbd>C</kbd> hold <kbd>P</kbd> pause</span>
     </div>
 
     <!-- touch controls (phones and tablets, only while you play) -->
-    <div class="touch-pad" id="touchPad" aria-label="Touch controls">
-        <button type="button" data-key="hold">Hold</button>
-        <button type="button" data-key="ccw" aria-label="Rotate left">⟲</button>
-        <button type="button" data-key="cw" aria-label="Rotate right">⟳</button>
+    <div class="touch-pad" id="touchPad" role="group" aria-label="Touch controls">
+        <button type="button" class="tp-tonal" data-key="hold">Hold</button>
+        <button type="button" class="tp-tonal" data-key="ccw" aria-label="Rotate left">⟲</button>
+        <button type="button" class="tp-tonal" data-key="cw" aria-label="Rotate right">⟳</button>
         <button type="button" data-key="pause" aria-label="Pause">❚❚</button>
         <button type="button" data-key="left" aria-label="Move left">◀</button>
         <button type="button" data-key="down" aria-label="Move down">▼</button>
         <button type="button" data-key="right" aria-label="Move right">▶</button>
-        <button type="button" data-key="drop" aria-label="Drop">Drop</button>
+        <button type="button" class="tp-accent" data-key="drop">Drop</button>
     </div>
 
     <footer class="site-footer">
       Made by Suad · <a href="https://github.com/dosu199/tetrisML" target="_blank" rel="noopener">Source on GitHub</a> · Tetris ML
     </footer>
 
-<script type="module">
-  import { startVisualGame } from './src/tetris-visual.js?v=32';
-  import { chooseMoveAction } from './src/tetris-ai.js';
-  import { loadDqn, chooseDqnAction } from './src/tetris-dqn.js';
-
-  const $ = (id) => document.getElementById(id);
-  const json = (f) =>
-    fetch(f).then((r) => {
-      if (!r.ok) throw new Error(`${f.replace('./', '')}: HTTP ${r.status}`);
-      return r.json();
-    });
-  let weights, net;
-  try {
-    [weights, net] = await Promise.all([
-      json('./models/weights.json').then((w) => w.weights),
-      json('./models/dqn-model.json').then(loadDqn),
-    ]);
-  } catch (e) {
-    // say so on the board instead of leaving a blank game that never starts
-    $('playTitle').textContent = "Couldn't load the network";
-    $('playText').innerHTML = '<p class="intro-sub">Check your connection, then reload the page.</p>';
-    throw e;
-  }
-
-  // every player may use the hold box: `hold` is { held, canHold }
-  const choosers = {
-    dqn3: (board, cur, next, hold) => chooseDqnAction(board, cur, net, next, hold, { deep: true }),
-    dqn2: (board, cur, next, hold) => chooseDqnAction(board, cur, net, next, hold, { lookahead: true }),
-    dqn: (board, cur, next, hold) => chooseDqnAction(board, cur, net, next, hold),
-    bot: (board, cur, next, hold) => chooseMoveAction(board, cur, next, weights, hold, { lookahead: true }),
-  };
-
-  // remember which agent you picked last time (optional nicety)
-  const saved = (() => {
-    try {
-      return JSON.parse(localStorage.getItem('tetris-play') || '{}');
-    } catch {
-      return {};
-    }
-  })();
-  const save = () => {
-    try {
-      localStorage.setItem('tetris-play', JSON.stringify({ agent: $('agent').value }));
-    } catch {}
-  };
-  if (saved.agent && choosers[saved.agent]) $('agent').value = saved.agent;
-  $('mlToggle').checked = false; // you always start playing yourself
-
-  const coarse = window.matchMedia('(pointer: coarse)').matches;
-  const READY_TEXT = coarse
-    ? '<p class="intro-sub">You play. Turn on ML below to let the network play instead.</p>'
-    : `<p class="intro-sub">You play. Turn on ML to let the network play instead.</p>
-       <ol class="intro-steps">
-         <li><span><kbd>←</kbd><kbd>→</kbd> move, <kbd>↑</kbd> rotate</span></li>
-         <li><span><kbd>↓</kbd> soft drop, <kbd>Space</kbd> drop</span></li>
-         <li><span><kbd>C</kbd> hold, <kbd>P</kbd> pause</span></li>
-       </ol>`;
-
-  function showOverlay(state, info) {
-    const o =
-      state === 'ready'
-        ? ['Ready to play?', READY_TEXT, 'Start']
-        : state === 'paused'
-          ? ['Paused', `<p class="intro-sub">${coarse ? 'Tap <b>Resume</b> to continue.' : 'Press <kbd>P</kbd> to continue.'}</p>`, 'Resume']
-          : state === 'over'
-            ? [
-                'Game over',
-                `<p class="intro-sub">${info.lines} lines · score ${info.score.toLocaleString('en-US')}</p>` +
-                  (coarse ? '' : '<p class="intro-sub">Press <kbd>Enter</kbd> or <kbd>Space</kbd> to play again.</p>'),
-                'Play again',
-              ]
-            : null;
-    $('playOverlay').hidden = !o;
-    if (!o) return;
-    $('playOverlay').classList.toggle('intro-screen', state === 'ready'); // falling blocks only on the start screen
-    $('playTitle').textContent = o[0];
-    $('playText').innerHTML = o[1];
-    $('playGo').textContent = o[2];
-    $('playGo').hidden = false;
-    $('playOverlay').dataset.state = state;
-  }
-
-  const game = startVisualGame({
-    chooser: choosers[$('agent').value],
-    hold: true,
-    human: !$('mlToggle').checked,
-    msPerRow: 45,
-    imagePath: 'assets/images/',
-    onState: showOverlay,
-    onHint: (h) => {
-      // the outline is drawn on the board; this line says what to do with hold
-      $('hintNote').hidden = !h;
-      $('holdTetromino').classList.toggle('hint-hold', !!h?.hold);
-      if (h) $('hintNote').textContent = h.hold
-        ? 'Hint: hold this piece (C). The network would rather keep it for later.'
-        : 'Hint: the outlined spot is where the network would put it.';
-    },
-    onStats: (s) => {
-      $('stLines').textContent = s.lines;
-      $('stPieces').textContent = s.pieces;
-      $('stGame').textContent = s.games;
-      $('stBest').textContent = Math.max(s.bestLines, s.lines);
-    },
-  });
-
-  function applyMode() {
-    const ml = $('mlToggle').checked;
-    document.body.classList.toggle('human', !ml);
-    setHint(ml);
-    if (game.isHuman() === ml) game.setHuman(!ml); // the same game carries on
-    save();
-  }
-  function setHint(ml) {
-    $('mlHint').textContent = ml
-      ? 'The network is playing. Turn off to take over the same game.'
-      : "You're playing. Turn on to let the network continue your game.";
-  }
-  document.body.classList.toggle('human', !$('mlToggle').checked);
-  setHint($('mlToggle').checked);
-
-  $('mlToggle').addEventListener('change', (e) => {
-    e.target.blur(); // so Space and the arrows go to the game, not the switch
-    applyMode();
-  });
-
-  // hint: where the selected player would put your piece (only while you play)
-  function setHintOn(on) {
-    $('hintToggle').checked = on;
-    game.setHint(on);
-  }
-  $('hintToggle').addEventListener('change', (e) => {
-    e.target.blur();
-    setHintOn(e.target.checked);
-  });
-  window.addEventListener('keydown', (e) => {
-    if (e.code !== 'KeyH' || e.repeat || $('mlToggle').checked) return;
-    if (e.target.closest?.('select, input, textarea')) return;
-    setHintOn(!$('hintToggle').checked);
-  });
-
-  $('agent').addEventListener('change', (e) => {
-    e.target.blur();
-    game.setChooser(choosers[e.target.value]);
-    if (!$('mlToggle').checked) {
-      // picking a player means you want to watch it: turn ML on
-      $('mlToggle').checked = true;
-      applyMode();
-    }
-    save();
-  });
-
-  $('playGo').addEventListener('click', (e) => {
-    e.currentTarget.blur();
-    const state = $('playOverlay').dataset.state;
-    game.press(state === 'paused' ? 'pause' : state === 'over' ? 'restart' : 'start');
-    if (coarse) $('gameContainer').scrollIntoView({ block: 'end', behavior: 'smooth' });
-  });
-
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) game.pause(true);
-  });
-
-  // touch buttons: tap to act; hold left/right to repeat, hold down to soft drop
-  for (const btn of document.querySelectorAll('#touchPad button')) {
-    const action = btn.dataset.key;
-    let timer = null;
-    const stop = () => {
-      clearInterval(timer);
-      timer = null;
-      if (action === 'down') game.softDrop(false);
-    };
-    btn.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      if (action === 'down') {
-        game.softDrop(true);
-        return;
-      }
-      game.press(action);
-      if (action === 'left' || action === 'right') {
-        const t0 = performance.now();
-        timer = setInterval(() => {
-          if (performance.now() - t0 >= 160) game.press(action);
-        }, 45);
-      }
-    });
-    for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) btn.addEventListener(ev, stop);
-  }
-</script>
-<script src="assets/js/tetro-bg.js?v=32" defer></script>
+    <script type="module" src="assets/js/play.js?v=34"></script>
+    <script src="assets/js/tetro-bg.js?v=34" defer></script>
 </body>
 
 </html>
